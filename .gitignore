@@ -1,9 +1,7 @@
-# PlatformIO
+# PlatformIO build artifacts
 .pio/
 .pioenvs/
 .piolibdeps/
-.clang_complete
-.gcc-flags.json
 
 # VSCode
 .vscode/.browse.c_cpp.db*
@@ -11,19 +9,31 @@
 .vscode/launch.json
 .vscode/ipch
 
-# Build artifacts
+# Build outputs
 *.o
 *.d
 *.elf
-*.bin
 *.map
 
-# Credentials / Secrets
+# Secrets / local config — never commit these
 secrets.h
-config.json
+include/secrets.h
+
+# Runtime config written by device — not part of source
+data/config.json
+
+# Build number — auto-incremented, not for version control
+include/buildnumber.txt
 
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
 
-# Node
+# Linux
+*~
+.nfs*
+
+# Node (if any tooling added)
 node_modules/
+package-lock.json

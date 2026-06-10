@@ -1,0 +1,72 @@
+// Hoymiles HMS DTU Protocol Buffers definition
+// Derived from ohAnd/dtuGateway (Apache 2.0)
+// Compatible with HMS-800W-2T with integrated Wi-Fi DTU
+//
+// Generate NanoPB C files with:
+//   python -m grpc_tools.protoc -I. --python_out=. hoymiles.proto
+//   nanopb_generator hoymiles.proto
+//
+// Or use the pre-generated .pb.h / .pb.c files included below.
+
+syntax = "proto3";
+
+package hoymiles;
+
+// ── Real-time data response ──────────────────────────────────────────────────
+// Returned by POST /api/realdata/new
+message RealDataNew {
+  // AC grid output (field 2)
+  repeated GridData  grid  = 2;
+  // DC PV string inputs (field 3) — one entry per panel
+  repeated PVData    pv    = 3;
+
+  float  temperature      = 7;   // inverter temperature °C
+  int32  power_limit_pct  = 8;   // current power limit 0–100
+  bool   inverter_active  = 6;   // true = producing
+  int32  wifi_rssi        = 10;  // DTU WiFi RSSI %
+  int32  warnings_active  = 11;  // number of active warnings
+}
+
+message GridData {
+  int32 voltage      = 1;   // V * 10
+  int32 current      = 2;   // A * 100
+  int32 power        = 3;   // W * 10
+  int32 energy_daily = 4;   // kWh * 1000
+  int32 energy_total = 5;   // kWh * 1000
+  int32 frequency    = 6;   // Hz * 100
+}
+
+message PVData {
+  int32 voltage      = 1;   // V * 10
+  int32 current      = 2;   // A * 100
+  int32 power        = 3;   // W * 10
+  int32 energy_daily = 4;   // kWh * 1000
+  int32 energy_total = 5;   // kWh * 1000
+}
+
+// ── Device information response ──────────────────────────────────────────────
+// Returned by POST /api/devinfo/get
+message DevInfoNew {
+  uint32 dtu_version      = 2;   // e.g. 4097 → "01.00.01"
+  uint32 inverter_version = 3;   // e.g. 10008 → "01.00.08"
+  string inverter_serial  = 4;   // e.g. "141241234567"
+  uint32 dtu_serial_high  = 5;
+  uint32 dtu_serial_low   = 6;
+}
+
+// ── Power limit command ──────────────────────────────────────────────────────
+// Sent via POST /api/inverter/limit
+message SetPowerLimit {
+  int32  power_limit_pct  = 1;   // 2–100
+}
+
+// ── Inverter on/off command ──────────────────────────────────────────────────
+// Sent via POST /api/inverter/power
+message SetInverterPower {
+  bool   on = 1;
+}
+
+// ── Generic request wrapper ──────────────────────────────────────────────────
+message AppGetHistPowerReqDto {
+  int32 offset = 1;
+}
