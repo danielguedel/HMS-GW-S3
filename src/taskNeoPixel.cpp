@@ -136,9 +136,11 @@ static bool sos(CRGB c) {
 // ─── Task ─────────────────────────────────────────────────────────────────────
 void taskNeoPixel(void* pvParameters) {
     FastLED.addLeds<WS2812B, NEOPIXEL_PIN, GRB>(leds, NEOPIXEL_COUNT);
-    FastLED.setBrightness(appConfig.ledBrightness);
+    // Use safe default brightness — appConfig may not be loaded yet at this point
+    uint8_t initBright = NEOPIXEL_BRIGHTNESS_DEF > 0 ? NEOPIXEL_BRIGHTNESS_DEF : 80;
+    FastLED.setBrightness(initBright);
     off();
-    LOG_I(MOD_LED, "NeoPixel ready on GPIO%d", NEOPIXEL_PIN);
+    LOG_I(MOD_LED, "NeoPixel ready on GPIO%d  brightness=%d", NEOPIXEL_PIN, initBright);
 
     for (;;) {
         // Pick up state changes
@@ -218,8 +220,9 @@ void taskNeoPixel(void* pvParameters) {
                 break;
         }
 
-        // Update FastLED brightness if config changed
-        FastLED.setBrightness(appConfig.ledBrightness);
+        // Update FastLED brightness if config changed (guard against 0)
+        uint8_t b = appConfig.ledBrightness > 0 ? appConfig.ledBrightness : 80;
+        FastLED.setBrightness(b);
 
         if (!abort) {
             vTaskDelay(pdMS_TO_TICKS(10));

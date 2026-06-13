@@ -8,6 +8,7 @@
 #include "taskGPIO.h"
 #include <Arduino.h>
 #include <WiFi.h>
+
 #include <LittleFS.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -102,11 +103,8 @@ static void printSysInfo() {
     Serial.printf("  Flash Size:   %lu B\n",  (unsigned long)ESP.getFlashChipSize());
     Serial.printf("  Uptime:       %lu s\n",  (unsigned long)(millis() / 1000));
 
-    // FreeRTOS task list
-    char taskBuf[800];
-    vTaskList(taskBuf);
-    Serial.println("  Tasks (Name / State / Prio / Stack / Core):");
-    Serial.println(taskBuf);
+    // FreeRTOS task count (vTaskList requires configUSE_STATS_FORMATTING_FUNCTIONS=1)
+    Serial.printf("  Tasks running:  %lu\n", (unsigned long)uxTaskGetNumberOfTasks());
     Serial.println("─────────────────────────────────────────────────────\n");
 }
 

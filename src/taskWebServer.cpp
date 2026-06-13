@@ -11,6 +11,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
+
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Update.h>
@@ -23,17 +24,16 @@ static AsyncWebServer server(80);
 static DNSServer      dnsServer;
 static bool           _apMode = false;
 
-// ─── Auth helper ──────────────────────────────────────────────────────────────
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 static bool checkAuth(AsyncWebServerRequest* req) {
     if (!appConfig.protectSettings) return true;
     if (!req->authenticate("admin", appConfig.wifiPassword)) {
-        req->requestAuthentication();
-        return false;
+        req->requestAuthentication(); return false;
     }
     return true;
 }
 
-// ─── JSON: /api/data.json ─────────────────────────────────────────────────────
+// ─── GET /api/data.json ───────────────────────────────────────────────────────
 static void handleApiData(AsyncWebServerRequest* req) {
     DtuData_t d = {};
     bool valid = false;
@@ -42,213 +42,155 @@ static void handleApiData(AsyncWebServerRequest* req) {
         valid = dtuDataValid;
         xSemaphoreGive(configMutex);
     }
+    JsonDocument doc;
+    doc["localtime"]     = (unsigned long)(millis() / 1000);
+    doc["lastResponse"]  = d.lastResponse;
+    doc["dtuConnState"]  = d.dtuConnState;
+    doc["dtuErrorState"] = 0;
 
-    DynamicJsonDocument doc(1024);
-    doc["localtime"]    = (unsigned long)(millis() / 1000);
-    doc["lastResponse"] = d.lastResponse;
-    doc["dtuConnState"] = d.dtuConnState;
-    doc["dtuErrorState"]= 0;
+    doc["inverter"]["pLim"]    = d.powerLimit;
+    doc["inverter"]["pLimSet"] = d.powerLimitSet;
+    doc["inverter"]["temp"]    = serialized(String(d.temp, 1));
+    doc["inverter"]["active"]  = d.inverterActive ? 1 : 0;
+    doc["inverter"]["uptodate"]= valid ? 1 : 0;
 
-    JsonObject inv = doc.createNestedObject("inverter");
-    inv["pLim"]    = d.powerLimit;
-    inv["pLimSet"] = d.powerLimitSet;
-    inv["temp"]    = serialized(String(d.temp, 1));
-    inv["active"]  = d.inverterActive ? 1 : 0;
-    inv["uptodate"]= valid ? 1 : 0;
+    doc["grid"]["v"]  = serialized(String(d.grid_v,  1));
+    doc["grid"]["i"]  = serialized(String(d.grid_i,  2));
+    doc["grid"]["p"]  = serialized(String(d.grid_p,  1));
+    doc["grid"]["dE"] = serialized(String(d.grid_dE, 3));
+    doc["grid"]["tE"] = serialized(String(d.grid_tE, 3));
+    doc["pv0"]["v"]   = serialized(String(d.pv0_v,  1));
+    doc["pv0"]["i"]   = serialized(String(d.pv0_i,  2));
+    doc["pv0"]["p"]   = serialized(String(d.pv0_p,  1));
+    doc["pv0"]["dE"]  = serialized(String(d.pv0_dE, 3));
+    doc["pv0"]["tE"]  = serialized(String(d.pv0_tE, 3));
+    doc["pv1"]["v"]   = serialized(String(d.pv1_v,  1));
+    doc["pv1"]["i"]   = serialized(String(d.pv1_i,  2));
+    doc["pv1"]["p"]   = serialized(String(d.pv1_p,  1));
+    doc["pv1"]["dE"]  = serialized(String(d.pv1_dE, 3));
+    doc["pv1"]["tE"]  = serialized(String(d.pv1_tE, 3));
 
-    JsonObject grid = doc.createNestedObject("grid");
-    grid["v"]  = serialized(String(d.grid_v,  1));
-    grid["i"]  = serialized(String(d.grid_i,  2));
-    grid["p"]  = serialized(String(d.grid_p,  1));
-    grid["dE"] = serialized(String(d.grid_dE, 3));
-    grid["tE"] = serialized(String(d.grid_tE, 3));
-
-    JsonObject pv0 = doc.createNestedObject("pv0");
-    pv0["v"]  = serialized(String(d.pv0_v,  1));
-    pv0["i"]  = serialized(String(d.pv0_i,  2));
-    pv0["p"]  = serialized(String(d.pv0_p,  1));
-    pv0["dE"] = serialized(String(d.pv0_dE, 3));
-    pv0["tE"] = serialized(String(d.pv0_tE, 3));
-
-    JsonObject pv1 = doc.createNestedObject("pv1");
-    pv1["v"]  = serialized(String(d.pv1_v,  1));
-    pv1["i"]  = serialized(String(d.pv1_i,  2));
-    pv1["p"]  = serialized(String(d.pv1_p,  1));
-    pv1["dE"] = serialized(String(d.pv1_dE, 3));
-    pv1["tE"] = serialized(String(d.pv1_tE, 3));
-
-    String out;
-    serializeJson(doc, out);
+    String out; serializeJson(doc, out);
     req->send(200, "application/json", out);
 }
 
-// ─── JSON: /api/info.json ─────────────────────────────────────────────────────
+// ─── GET /api/info.json ───────────────────────────────────────────────────────
 static void handleApiInfo(AsyncWebServerRequest* req) {
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
     doc["chipid"]   = (unsigned long)(ESP.getEfuseMac() & 0xFFFFFF);
     doc["chipType"] = "ESP32-S3";
     doc["host"]     = appConfig.hostname;
     doc["initMode"] = _apMode ? 1 : 0;
-
-    JsonObject fw = doc.createNestedObject("firmware");
-    fw["version"]    = FW_VERSION;
-    fw["build"]      = BUILD_NUMBER;
-    fw["versiondate"]= FW_DATE;
-
-    JsonObject dtu = doc.createNestedObject("dtuConnection");
-    dtu["dtuHostIpDomain"] = appConfig.dtuHost;
-    dtu["dtuPort"]         = appConfig.dtuPort;
-    dtu["dtuDataCycle"]    = appConfig.dtuInterval;
-    dtu["dtuCloudPause"]   = appConfig.dtuCloudPause;
-
-    JsonObject dev = dtu.createNestedObject("deviceData");
+    doc["firmware"]["version"]     = FW_VERSION;
+    doc["firmware"]["build"]       = BUILD_NUMBER;
+    doc["firmware"]["versiondate"] = FW_DATE;
+    doc["dtuConnection"]["dtuHostIpDomain"] = appConfig.dtuHost;
+    doc["dtuConnection"]["dtuPort"]         = appConfig.dtuPort;
+    doc["dtuConnection"]["dtuDataCycle"]    = appConfig.dtuInterval;
+    doc["dtuConnection"]["dtuCloudPause"]   = appConfig.dtuCloudPause;
     if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        dev["inverter_model"]          = latestDtuData.inverterModel;
-        dev["inverter_serial"]         = latestDtuData.inverterSerial;
-        dev["dtu_version_string"]      = latestDtuData.dtuVersionStr;
-        dev["inverter_version_string"] = latestDtuData.inverterVersionStr;
+        doc["dtuConnection"]["deviceData"]["inverter_model"]          = latestDtuData.inverterModel;
+        doc["dtuConnection"]["deviceData"]["inverter_serial"]         = latestDtuData.inverterSerial;
+        doc["dtuConnection"]["deviceData"]["dtu_version_string"]      = latestDtuData.dtuVersionStr;
+        doc["dtuConnection"]["deviceData"]["inverter_version_string"] = latestDtuData.inverterVersionStr;
         xSemaphoreGive(configMutex);
     }
-
-    JsonObject wifi = doc.createNestedObject("wifiConnection");
-    wifi["wifiSsid"] = WiFi.SSID();
-    wifi["rssiGW"]   = WiFi.RSSI();
-    wifi["ip"]       = WiFi.localIP().toString();
-
-    JsonObject sys = doc.createNestedObject("system");
-    sys["uptime"]   = (unsigned long)(millis() / 1000);
-    sys["freeHeap"] = (unsigned long)ESP.getFreeHeap();
-
-    String out;
-    serializeJson(doc, out);
+    doc["wifiConnection"]["wifiSsid"] = WiFi.SSID();
+    doc["wifiConnection"]["rssiGW"]   = (int)WiFi.RSSI();
+    doc["wifiConnection"]["ip"]       = WiFi.localIP().toString();
+    doc["system"]["uptime"]   = (unsigned long)(millis() / 1000);
+    doc["system"]["freeHeap"] = (unsigned long)ESP.getFreeHeap();
+    String out; serializeJson(doc, out);
     req->send(200, "application/json", out);
 }
 
-// ─── JSON: GET /api/gpio ──────────────────────────────────────────────────────
+// ─── GET /api/gpio ────────────────────────────────────────────────────────────
 static void handleApiGpioGet(AsyncWebServerRequest* req) {
-    DynamicJsonDocument doc(512);
-    JsonObject relay = doc.createNestedObject("relay");
-    relay["state"] = gpioState.relay ? 1 : 0;
-    relay["mode"]  = "output";
-
+    JsonDocument doc;
+    doc["relay"]["state"] = gpioState.relay ? 1 : 0;
+    doc["relay"]["mode"]  = "output";
     for (int i = 0; i < 4; i++) {
-        char key[8];
-        snprintf(key, sizeof(key), "gpio%d", i+1);
-        JsonObject gp = doc.createNestedObject(key);
-        gp["state"]  = gpioState.gpio[i] ? 1 : 0;
-        gp["mode"]   = appConfig.gp[i].isOutput ? "output" : "input";
-        gp["pullup"] = appConfig.gp[i].pullup;
+        char key[8]; snprintf(key, sizeof(key), "gpio%d", i+1);
+        doc[key]["state"]  = gpioState.gpio[i] ? 1 : 0;
+        doc[key]["mode"]   = appConfig.gp[i].isOutput ? "output" : "input";
+        doc[key]["pullup"] = appConfig.gp[i].pullup;
     }
-
-    String out;
-    serializeJson(doc, out);
+    String out; serializeJson(doc, out);
     req->send(200, "application/json", out);
 }
 
-// ─── JSON: POST /api/gpio ─────────────────────────────────────────────────────
+// ─── POST /api/gpio ───────────────────────────────────────────────────────────
 static void handleApiGpioPost(AsyncWebServerRequest* req, uint8_t* data,
                                size_t len, size_t index, size_t total) {
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     if (deserializeJson(doc, (char*)data) != DeserializationError::Ok) {
-        req->send(400, "application/json", "{\"error\":\"invalid json\"}");
-        return;
+        req->send(400, "application/json", "{\"error\":\"invalid json\"}"); return;
     }
-    if (doc.containsKey("relay")) {
-        gpioSetRelay(doc["relay"].as<int>() == 1);
-    }
+    if (!doc["relay"].isNull()) gpioSetRelay(doc["relay"].as<int>() == 1);
     for (int i = 1; i <= 4; i++) {
-        char key[8];
-        snprintf(key, sizeof(key), "gpio%d", i);
-        if (doc.containsKey(key)) {
-            gpioSetPin(i-1, doc[key].as<int>() == 1);
-        }
+        char key[8]; snprintf(key, sizeof(key), "gpio%d", i);
+        if (!doc[key].isNull()) gpioSetPin(i-1, doc[key].as<int>() == 1);
     }
     req->send(200, "application/json", "{\"ok\":true}");
 }
 
-// ─── JSON: POST /api/control ─────────────────────────────────────────────────
+// ─── POST /api/control ────────────────────────────────────────────────────────
 static void handleApiControl(AsyncWebServerRequest* req, uint8_t* data,
                               size_t len, size_t index, size_t total) {
     if (!checkAuth(req)) return;
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     if (deserializeJson(doc, (char*)data) != DeserializationError::Ok) {
-        req->send(400, "application/json", "{\"error\":\"invalid json\"}");
-        return;
+        req->send(400, "application/json", "{\"error\":\"invalid json\"}"); return;
     }
-    if (doc.containsKey("powerLimit"))   dtuSetPowerLimit(doc["powerLimit"]);
-    if (doc.containsKey("inverterOn"))   dtuSetInverterOn(doc["inverterOn"].as<bool>());
-    if (doc.containsKey("rebootDTU"))    dtuRequestReboot();
-    if (doc.containsKey("rebootGateway")) {
+    if (!doc["powerLimit"].isNull())   dtuSetPowerLimit(doc["powerLimit"].as<int>());
+    if (!doc["inverterOn"].isNull())   dtuSetInverterOn(doc["inverterOn"].as<bool>());
+    if (!doc["rebootDTU"].isNull())    dtuRequestReboot();
+    if (!doc["rebootGateway"].isNull()) {
         req->send(200, "application/json", "{\"ok\":true}");
-        vTaskDelay(pdMS_TO_TICKS(500));
-        ESP.restart();
-        return;
+        vTaskDelay(pdMS_TO_TICKS(500)); ESP.restart(); return;
     }
     req->send(200, "application/json", "{\"ok\":true}");
 }
 
-// ─── POST /api/config — save config ──────────────────────────────────────────
+// ─── POST /api/config ─────────────────────────────────────────────────────────
 static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
                                  size_t len, size_t index, size_t total) {
     if (!checkAuth(req)) return;
-    DynamicJsonDocument doc(2048);
+    JsonDocument doc;
     if (deserializeJson(doc, (char*)data) != DeserializationError::Ok) {
-        req->send(400, "application/json", "{\"error\":\"invalid json\"}");
-        return;
+        req->send(400, "application/json", "{\"error\":\"invalid json\"}"); return;
     }
     if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(500)) == pdTRUE) {
-        // WiFi
-        if (doc["wifi"]["ssid"].is<const char*>())
-            strlcpy(appConfig.wifiSsid, doc["wifi"]["ssid"], sizeof(appConfig.wifiSsid));
-        if (doc["wifi"]["password"].is<const char*>())
-            strlcpy(appConfig.wifiPassword, doc["wifi"]["password"], sizeof(appConfig.wifiPassword));
-
-        // DTU
-        if (doc["dtu"]["host"].is<const char*>())
-            strlcpy(appConfig.dtuHost, doc["dtu"]["host"], sizeof(appConfig.dtuHost));
-        if (doc["dtu"]["port"].is<int>())
-            appConfig.dtuPort = doc["dtu"]["port"];
-        if (doc["dtu"]["interval"].is<int>()) {
-            int iv = doc["dtu"]["interval"];
+        if (!doc["wifi"]["ssid"].isNull())
+            strlcpy(appConfig.wifiSsid, doc["wifi"]["ssid"].as<const char*>(), sizeof(appConfig.wifiSsid));
+        if (!doc["wifi"]["password"].isNull())
+            strlcpy(appConfig.wifiPassword, doc["wifi"]["password"].as<const char*>(), sizeof(appConfig.wifiPassword));
+        if (!doc["wifi"]["hostname"].isNull())
+            strlcpy(appConfig.hostname, doc["wifi"]["hostname"].as<const char*>(), sizeof(appConfig.hostname));
+        if (!doc["dtu"]["host"].isNull())
+            strlcpy(appConfig.dtuHost, doc["dtu"]["host"].as<const char*>(), sizeof(appConfig.dtuHost));
+        if (!doc["dtu"]["port"].isNull())     appConfig.dtuPort       = doc["dtu"]["port"].as<int>();
+        if (!doc["dtu"]["interval"].isNull()) {
+            int iv = doc["dtu"]["interval"].as<int>();
             appConfig.dtuInterval = (iv < DTU_MIN_INTERVAL) ? DTU_MIN_INTERVAL : iv;
         }
-        if (doc["dtu"]["cloudPause"].is<int>())
-            appConfig.dtuCloudPause = doc["dtu"]["cloudPause"];
-
-        // MQTT
-        if (doc["mqtt"]["host"].is<const char*>())
-            strlcpy(appConfig.mqttHost, doc["mqtt"]["host"], sizeof(appConfig.mqttHost));
-        if (doc["mqtt"]["port"].is<int>())
-            appConfig.mqttPort = doc["mqtt"]["port"];
-        if (doc["mqtt"]["user"].is<const char*>())
-            strlcpy(appConfig.mqttUser, doc["mqtt"]["user"], sizeof(appConfig.mqttUser));
-        if (doc["mqtt"]["pass"].is<const char*>())
-            strlcpy(appConfig.mqttPass, doc["mqtt"]["pass"], sizeof(appConfig.mqttPass));
-        if (doc["mqtt"]["topic"].is<const char*>())
-            strlcpy(appConfig.mqttTopic, doc["mqtt"]["topic"], sizeof(appConfig.mqttTopic));
-        if (doc["mqtt"]["tls"].is<bool>())      appConfig.mqttTls         = doc["mqtt"]["tls"];
-        if (doc["mqtt"]["ha"].is<bool>())       appConfig.mqttHaDiscovery = doc["mqtt"]["ha"];
-        if (doc["mqtt"]["openDTU"].is<bool>())  appConfig.mqttOpenDtu     = doc["mqtt"]["openDTU"];
-
-        // GPIO
-        if (doc["gpio"]["relay"]["output"].is<bool>())
-            appConfig.relay.isOutput = doc["gpio"]["relay"]["output"];
-        if (doc["gpio"]["relay"]["inverted"].is<bool>())
-            appConfig.relay.inverted = doc["gpio"]["relay"]["inverted"];
-        for (int i = 0; i < 4; i++) {
-            char key[8]; snprintf(key, sizeof(key), "gp%d", i+1);
-            if (doc["gpio"][key]["output"].is<bool>())
-                appConfig.gp[i].isOutput = doc["gpio"][key]["output"];
-            if (doc["gpio"][key]["pullup"].is<bool>())
-                appConfig.gp[i].pullup   = doc["gpio"][key]["pullup"];
-        }
-
-        // System
-        if (doc["system"]["tz"].is<int>())            appConfig.tzOffset      = doc["system"]["tz"];
-        if (doc["system"]["ledBrightness"].is<int>()) appConfig.ledBrightness = doc["system"]["ledBrightness"];
-        if (doc["system"]["logLevel"].is<int>())      appConfig.logLevel      = doc["system"]["logLevel"];
-        if (doc["system"]["protect"].is<bool>())      appConfig.protectSettings = doc["system"]["protect"];
-
+        if (!doc["dtu"]["cloudPause"].isNull()) appConfig.dtuCloudPause = doc["dtu"]["cloudPause"].as<int>();
+        if (!doc["mqtt"]["host"].isNull())
+            strlcpy(appConfig.mqttHost, doc["mqtt"]["host"].as<const char*>(), sizeof(appConfig.mqttHost));
+        if (!doc["mqtt"]["port"].isNull())    appConfig.mqttPort        = doc["mqtt"]["port"].as<int>();
+        if (!doc["mqtt"]["user"].isNull())
+            strlcpy(appConfig.mqttUser, doc["mqtt"]["user"].as<const char*>(), sizeof(appConfig.mqttUser));
+        if (!doc["mqtt"]["pass"].isNull())
+            strlcpy(appConfig.mqttPass, doc["mqtt"]["pass"].as<const char*>(), sizeof(appConfig.mqttPass));
+        if (!doc["mqtt"]["topic"].isNull())
+            strlcpy(appConfig.mqttTopic, doc["mqtt"]["topic"].as<const char*>(), sizeof(appConfig.mqttTopic));
+        if (!doc["mqtt"]["tls"].isNull())     appConfig.mqttTls         = doc["mqtt"]["tls"].as<bool>();
+        if (!doc["mqtt"]["ha"].isNull())      appConfig.mqttHaDiscovery = doc["mqtt"]["ha"].as<bool>();
+        if (!doc["mqtt"]["openDTU"].isNull()) appConfig.mqttOpenDtu     = doc["mqtt"]["openDTU"].as<bool>();
+        if (!doc["system"]["tz"].isNull())            appConfig.tzOffset      = doc["system"]["tz"].as<int>();
+        if (!doc["system"]["ledBrightness"].isNull()) appConfig.ledBrightness = doc["system"]["ledBrightness"].as<int>();
+        if (!doc["system"]["logLevel"].isNull())      appConfig.logLevel      = doc["system"]["logLevel"].as<int>();
+        if (!doc["system"]["protect"].isNull())       appConfig.protectSettings = doc["system"]["protect"].as<bool>();
         xSemaphoreGive(configMutex);
     }
     configSave();
@@ -256,21 +198,18 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     req->send(200, "application/json", "{\"ok\":true,\"reboot\":true}");
 }
 
-// ─── GET /api/config — read config (passwords masked) ─────────────────────────
+// ─── GET /api/config ──────────────────────────────────────────────────────────
 static void handleApiConfigGet(AsyncWebServerRequest* req) {
     if (!checkAuth(req)) return;
-    DynamicJsonDocument doc(2048);
-
+    JsonDocument doc;
     doc["wifi"]["ssid"]     = appConfig.wifiSsid;
     doc["wifi"]["password"] = "***";
     doc["wifi"]["hostname"] = appConfig.hostname;
-
     doc["dtu"]["host"]             = appConfig.dtuHost;
     doc["dtu"]["port"]             = appConfig.dtuPort;
     doc["dtu"]["interval"]         = appConfig.dtuInterval;
     doc["dtu"]["cloudPause"]       = appConfig.dtuCloudPause;
     doc["dtu"]["rebootAfterFails"] = appConfig.dtuRebootAfterFails;
-
     doc["mqtt"]["host"]    = appConfig.mqttHost;
     doc["mqtt"]["port"]    = appConfig.mqttPort;
     doc["mqtt"]["user"]    = appConfig.mqttUser;
@@ -281,29 +220,25 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
     doc["mqtt"]["openDTU"] = appConfig.mqttOpenDtu;
     doc["mqtt"]["qos"]     = appConfig.mqttQos;
     doc["mqtt"]["retain"]  = appConfig.mqttRetain;
-
     doc["gpio"]["relay"]["output"]   = appConfig.relay.isOutput;
     doc["gpio"]["relay"]["inverted"] = appConfig.relay.inverted;
+    const char* gpKeys[] = {"gp1","gp2","gp3","gp4"};
     for (int i = 0; i < 4; i++) {
-        char key[8]; snprintf(key, sizeof(key), "gp%d", i+1);
-        doc["gpio"][key]["output"]   = appConfig.gp[i].isOutput;
-        doc["gpio"][key]["pullup"]   = appConfig.gp[i].pullup;
-        doc["gpio"][key]["inverted"] = appConfig.gp[i].inverted;
+        doc["gpio"][gpKeys[i]]["output"]   = appConfig.gp[i].isOutput;
+        doc["gpio"][gpKeys[i]]["pullup"]   = appConfig.gp[i].pullup;
+        doc["gpio"][gpKeys[i]]["inverted"] = appConfig.gp[i].inverted;
     }
-
     doc["system"]["tz"]            = appConfig.tzOffset;
     doc["system"]["ledBrightness"] = appConfig.ledBrightness;
     doc["system"]["logLevel"]      = appConfig.logLevel;
     doc["system"]["protect"]       = appConfig.protectSettings;
     doc["system"]["webPort"]       = appConfig.webPort;
     doc["system"]["apSsid"]        = appConfig.apSsid;
-
-    String out;
-    serializeJson(doc, out);
+    String out; serializeJson(doc, out);
     req->send(200, "application/json", out);
 }
 
-// ─── OTA firmware upload ──────────────────────────────────────────────────────
+// ─── OTA upload ───────────────────────────────────────────────────────────────
 static void handleOtaUpload(AsyncWebServerRequest* req, String filename,
                              size_t index, uint8_t* data, size_t len, bool final) {
     if (!checkAuth(req)) return;
@@ -312,98 +247,70 @@ static void handleOtaUpload(AsyncWebServerRequest* req, String filename,
         xEventGroupSetBits(systemStateEvents, EVT_OTA_RUNNING);
         setLedState(LED_OTA);
         xSemaphoreTake(otaSemaphore, portMAX_DELAY);
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
-            LOG_E(MOD_OTA, "Update.begin failed");
-        }
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) LOG_E(MOD_OTA, "Update.begin failed");
     }
-    if (Update.write(data, len) != len) {
-        LOG_E(MOD_OTA, "Write error at %zu", index);
-    }
+    if (Update.write(data, len) != len) LOG_E(MOD_OTA, "Write error at %zu", index);
     if (final) {
-        if (Update.end(true)) {
-            LOG_I(MOD_OTA, "OTA success: %zu B", index + len);
-        } else {
-            LOG_E(MOD_OTA, "OTA end error: %s", Update.errorString());
-        }
+        if (Update.end(true)) LOG_I(MOD_OTA, "OTA OK: %zu B", index + len);
+        else                  LOG_E(MOD_OTA, "OTA error: %s", Update.errorString());
         xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
         xSemaphoreGive(otaSemaphore);
     }
 }
 
-static void handleOtaUploadDone(AsyncWebServerRequest* req) {
-    if (Update.hasError()) {
-        req->send(500, "text/plain", String("OTA Error: ") + Update.errorString());
-    } else {
-        req->send(200, "text/plain", "OTA OK. Rebooting...");
-        vTaskDelay(pdMS_TO_TICKS(500));
-        ESP.restart();
-    }
+static void handleOtaDone(AsyncWebServerRequest* req) {
+    if (Update.hasError()) req->send(500, "text/plain", String("OTA Error: ") + Update.errorString());
+    else { req->send(200, "text/plain", "OTA OK. Rebooting..."); vTaskDelay(pdMS_TO_TICKS(500)); ESP.restart(); }
 }
 
-// ─── Captive portal support ───────────────────────────────────────────────────
-static void handleCaptivePortal(AsyncWebServerRequest* req) {
-    req->redirect("http://" AP_IP "/");
-}
+// ─── Captive portal ───────────────────────────────────────────────────────────
+static void handleCaptive(AsyncWebServerRequest* req) { req->redirect("http://" AP_IP "/"); }
 
-// ─── WiFi setup and mode ─────────────────────────────────────────────────────
+// ─── WiFi ─────────────────────────────────────────────────────────────────────
 static void startWifi() {
     WiFi.setHostname(appConfig.hostname);
-
     if (strlen(appConfig.wifiSsid) == 0) {
-        // Start AP mode
         _apMode = true;
         char apSsid[40];
-        snprintf(apSsid, sizeof(apSsid), "%s_%06llX",
-                 appConfig.apSsid,
+        snprintf(apSsid, sizeof(apSsid), "%s_%06llX", appConfig.apSsid,
                  (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFF));
         WiFi.mode(WIFI_AP);
         WiFi.softAP(apSsid);
-        WiFi.softAPConfig(
-            IPAddress(192,168,4,1),
-            IPAddress(192,168,4,1),
-            IPAddress(255,255,255,0)
-        );
+        WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
         xEventGroupSetBits(systemStateEvents, EVT_WIFI_AP_MODE);
         setLedState(LED_AP_MODE);
-        LOG_I(MOD_WIFI, "AP mode: SSID=%s  IP=192.168.4.1", apSsid);
-
-        // Start DNS for captive portal
         dnsServer.start(53, "*", IPAddress(192,168,4,1));
+        LOG_I(MOD_WIFI, "AP mode: %s  IP=192.168.4.1", apSsid);
         return;
     }
-
     WiFi.mode(WIFI_STA);
     WiFi.begin(appConfig.wifiSsid, appConfig.wifiPassword);
     setLedState(LED_WIFI_CONNECTING);
     LOG_I(MOD_WIFI, "Connecting to %s...", appConfig.wifiSsid);
-
     uint32_t t0 = millis();
-    while (WiFi.status() != WL_CONNECTED && (millis() - t0) < 20000) {
+    while (WiFi.status() != WL_CONNECTED && (millis() - t0) < 20000)
         vTaskDelay(pdMS_TO_TICKS(500));
-    }
 
     if (WiFi.status() == WL_CONNECTED) {
+        WiFi.setSleep(false);  // disable power saving — prevents watchdog starvation
         xEventGroupSetBits(systemStateEvents, EVT_WIFI_CONNECTED);
-        LOG_I(MOD_WIFI, "Connected! IP: %s  RSSI: %d dBm",
-              WiFi.localIP().toString().c_str(), WiFi.RSSI());
-
-        // Auto-reconnect
-        WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
-            if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+        LOG_I(MOD_WIFI, "Connected! IP=%s  RSSI=%d dBm",
+              WiFi.localIP().toString().c_str(), (int)WiFi.RSSI());
+        WiFi.onEvent([](WiFiEvent_t ev, WiFiEventInfo_t info) {
+            if (ev == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
                 xEventGroupClearBits(systemStateEvents, EVT_WIFI_CONNECTED | EVT_DTU_ONLINE);
                 LOG_W(MOD_WIFI, "Disconnected. Reconnecting...");
                 WiFi.reconnect();
-            } else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
+            } else if (ev == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
                 xEventGroupSetBits(systemStateEvents, EVT_WIFI_CONNECTED);
-                LOG_I(MOD_WIFI, "Reconnected. IP: %s", WiFi.localIP().toString().c_str());
+                LOG_I(MOD_WIFI, "Reconnected. IP=%s", WiFi.localIP().toString().c_str());
             }
         });
     } else {
-        LOG_W(MOD_WIFI, "Failed to connect. Starting AP fallback.");
+        LOG_W(MOD_WIFI, "Connection failed — starting AP fallback");
         _apMode = true;
         char apSsid[40];
-        snprintf(apSsid, sizeof(apSsid), "%s_%06llX",
-                 appConfig.apSsid,
+        snprintf(apSsid, sizeof(apSsid), "%s_%06llX", appConfig.apSsid,
                  (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFF));
         WiFi.mode(WIFI_AP);
         WiFi.softAP(apSsid);
@@ -413,100 +320,69 @@ static void startWifi() {
     }
 }
 
-// ─── Route setup ─────────────────────────────────────────────────────────────
+// ─── Routes ───────────────────────────────────────────────────────────────────
 static void setupRoutes() {
-    // Serve static files from LittleFS
+    // API routes MUST be registered before serveStatic —
+    // ESPAsyncWebServer matches in registration order and serveStatic
+    // would otherwise intercept /api/* requests first.
+    server.on("/api/data.json", HTTP_GET,  handleApiData);
+    server.on("/api/info.json", HTTP_GET,  handleApiInfo);
+    server.on("/api/gpio",      HTTP_GET,  handleApiGpioGet);
+    server.on("/api/config",    HTTP_GET,  handleApiConfigGet);
+
+    server.on("/api/gpio", HTTP_POST,
+        [](AsyncWebServerRequest* r){},
+        nullptr,
+        [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiGpioPost(r,d,l,i,t); });
+
+    server.on("/api/control", HTTP_POST,
+        [](AsyncWebServerRequest* r){},
+        nullptr,
+        [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiControl(r,d,l,i,t); });
+
+    server.on("/api/config", HTTP_POST,
+        [](AsyncWebServerRequest* r){},
+        nullptr,
+        [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiConfigPost(r,d,l,i,t); });
+
+    server.on("/update", HTTP_POST, handleOtaDone, handleOtaUpload);
+
+    // Static files — registered LAST so API routes take priority
     server.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
 
-    // REST API
-    server.on("/api/data.json",    HTTP_GET,  handleApiData);
-    server.on("/api/info.json",    HTTP_GET,  handleApiInfo);
-    server.on("/api/gpio",         HTTP_GET,  handleApiGpioGet);
-    server.on("/api/config",       HTTP_GET,  handleApiConfigGet);
+    // Captive portal
+    const char* captive[] = {"/generate_204","/hotspot-detect.html",
+                              "/connecttest.txt","/ncsi.txt","/wpad.dat"};
+    for (auto u : captive) server.on(u, HTTP_GET, handleCaptive);
 
-    server.on("/api/gpio",    HTTP_POST, [](AsyncWebServerRequest* r){},
-              nullptr,
-              [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t) {
-                  handleApiGpioPost(r, d, l, i, t);
-              });
-
-    server.on("/api/control", HTTP_POST, [](AsyncWebServerRequest* r){},
-              nullptr,
-              [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t) {
-                  handleApiControl(r, d, l, i, t);
-              });
-
-    server.on("/api/config",  HTTP_POST, [](AsyncWebServerRequest* r){},
-              nullptr,
-              [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t) {
-                  handleApiConfigPost(r, d, l, i, t);
-              });
-
-    // OTA upload
-    server.on("/update", HTTP_POST,
-              handleOtaUploadDone,
-              handleOtaUpload);
-
-    // Captive portal endpoints (Android, iOS, Windows, macOS)
-    const char* captiveUrls[] = {
-        "/generate_204", "/hotspot-detect.html", "/connecttest.txt",
-        "/wpad.dat", "/autodiscover/autodiscover.xml", "/ncsi.txt"
-    };
-    for (auto u : captiveUrls) {
-        server.on(u, HTTP_GET, handleCaptivePortal);
-    }
-
-    // Redirect anything not found to index (SPA support)
-    server.onNotFound([](AsyncWebServerRequest* req) {
-        if (_apMode) {
-            handleCaptivePortal(req);
-        } else {
-            req->redirect("/");
-        }
+    server.onNotFound([](AsyncWebServerRequest* req){
+        if (_apMode) handleCaptive(req); else req->redirect("/");
     });
 
-    // CORS for API development
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
-
     server.begin();
     LOG_I(MOD_WEB, "Web server started on port %d", appConfig.webPort);
 }
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
 void taskWebServer(void* pvParameters) {
-    // Mount LittleFS
     if (!LittleFS.begin(true)) {
         LOG_E(MOD_WEB, "LittleFS mount failed!");
         xEventGroupSetBits(systemStateEvents, EVT_ERROR);
-        vTaskDelete(nullptr);
-        return;
+        vTaskDelete(nullptr); return;
     }
-    LOG_I(MOD_WEB, "LittleFS mounted. Free: %lu B",
-          (unsigned long)LittleFS.totalBytes() - LittleFS.usedBytes());
-
-    // Init config
+    LOG_I(MOD_WEB, "LittleFS mounted. Used: %lu / %lu B",
+          (unsigned long)LittleFS.usedBytes(), (unsigned long)LittleFS.totalBytes());
     configSetDefaults();
     configLoad();
-
-    // Init logger (after config so log level is set)
     logInit();
-
     LOG_I(MOD_SYS, "HMS-GW-S3 v%s (Build %d, %s)", FW_VERSION, BUILD_NUMBER, FW_DATE);
-    LOG_I(MOD_SYS, "Chip: ESP32-S3  MAC: %llX  Heap: %lu B",
-          (unsigned long long)ESP.getEfuseMac(),
-          (unsigned long)ESP.getFreeHeap());
-
-    // Start WiFi
+    LOG_I(MOD_SYS, "Heap: %lu B  MAC: %llX",
+          (unsigned long)ESP.getFreeHeap(), (unsigned long long)ESP.getEfuseMac());
     startWifi();
-
-    // Start web server
     setupRoutes();
-
-    // In AP mode: keep DNS server running
     for (;;) {
-        if (_apMode) {
-            dnsServer.processNextRequest();
-        }
+        if (_apMode) dnsServer.processNextRequest();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

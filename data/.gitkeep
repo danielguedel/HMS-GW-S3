@@ -1,2 +1,0 @@
-# This directory contains LittleFS filesystem data (web assets, config).
-# Files placed here are flashed with: pio run -t uploadfs

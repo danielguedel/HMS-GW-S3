@@ -13,7 +13,7 @@
 
 // ─── GPIO Pin Definitions ─────────────────────────────────────────────────────
 #ifndef NEOPIXEL_PIN
-  #define NEOPIXEL_PIN    48
+  #define NEOPIXEL_PIN    38
 #endif
 #ifndef RELAY_PIN
   #define RELAY_PIN        1
@@ -72,17 +72,17 @@
 #define TASK_PRIO_SYSMONITOR   1
 
 // ─── FreeRTOS Stack Sizes (words) ─────────────────────────────────────────────
-#define STACK_DTU          6144
-#define STACK_MQTT         4096
-#define STACK_WEBSERVER    6144
-#define STACK_NEOPIXEL     2048
-#define STACK_GPIO         2048
-#define STACK_SERIAL       3072
-#define STACK_SYSMONITOR   2048
+#define STACK_DTU          10240
+#define STACK_MQTT          6144
+#define STACK_WEBSERVER     10240
+#define STACK_NEOPIXEL      3072
+#define STACK_GPIO           4096
+#define STACK_SERIAL         5120
+#define STACK_SYSMONITOR     3072
 
 // ─── FreeRTOS Core Assignment ─────────────────────────────────────────────────
-#define CORE_DTU           0
-#define CORE_MQTT          0
+#define CORE_DTU           1  // blocking HTTPClient — keep off Core 0
+#define CORE_MQTT          1  // blocking PubSubClient — keep off Core 0
 #define CORE_WEBSERVER     1
 #define CORE_NEOPIXEL      1
 #define CORE_GPIO          1
