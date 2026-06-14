@@ -1,22 +1,23 @@
+// taskMQTT.cpp — v2 (esp-mqtt non-blocking, DataStore pattern)
+// Uses ESP-IDF native esp_mqtt_client — no blocking connect(), no watchdog issues.
+// Event handler runs in esp-mqtt's own thread; DataStore API is mutex-safe.
+
 #include "taskMQTT.h"
-#include "config.h"
+#include "dataStore.h"
 #include "appConfig.h"
 #include "systemState.h"
+#include "config.h"
 #include "logger.h"
-#include "taskNeoPixel.h"
-#include "taskDTU.h"
-#include "taskGPIO.h"
 #include <Arduino.h>
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <PubSubClient.h>
+#include "mqtt_client.h"
 #include <ArduinoJson.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/event_groups.h>
 
-static WiFiClient   wifiClient;
-static PubSubClient mqttClient(wifiClient);
+static esp_mqtt_client_handle_t _client = nullptr;
+
+// Persistent config strings — must outlive the client handle
+static char _uri[80];
+static char _clientId[32];
+static char _lwtTopic[80];
 
 // ─── Topic helpers ────────────────────────────────────────────────────────────
 static String T(const char* suffix) {
@@ -24,92 +25,103 @@ static String T(const char* suffix) {
 }
 
 static void pub(const char* suffix, const char* payload, bool retain = false) {
-    if (!mqttClient.connected()) return;
-    String topic = T(suffix);
-    mqttClient.publish(topic.c_str(), payload, retain);
+    if (!_client) return;
+    esp_mqtt_client_publish(_client, T(suffix).c_str(), payload, 0, 0, retain ? 1 : 0);
 }
 
-static void pubFloat(const char* suffix, float val, int dec = 2) {
+static void pubFloat(const char* suffix, float val, int dec, bool retain) {
     char buf[24]; dtostrf(val, 1, dec, buf);
-    pub(suffix, buf, appConfig.mqttRetain);
+    pub(suffix, buf, retain);
 }
 
-static void pubInt(const char* suffix, int val) {
+static void pubInt(const char* suffix, int val, bool retain = false) {
     char buf[16]; snprintf(buf, sizeof(buf), "%d", val);
-    pub(suffix, buf, appConfig.mqttRetain);
+    pub(suffix, buf, retain);
 }
 
-// ─── Publish DTU data ─────────────────────────────────────────────────────────
-static void publishDtuData(const DtuData_t& d) {
-    if (!mqttClient.connected()) return;
+// ─── Publish PV data (Spec §5.3) ─────────────────────────────────────────────
+static void publishPvData(const DataStore::PvData& pv) {
+    bool r = appConfig.mqttRetain;
 
     if (appConfig.mqttOpenDtu) {
         String base = String(appConfig.mqttTopic) + "/";
-        auto opub = [&](const char* path, float val, int dec=2) {
+        auto opub = [&](const char* path, float val, int dec) {
             char buf[24]; dtostrf(val, 1, dec, buf);
-            mqttClient.publish((base + path).c_str(), buf, appConfig.mqttRetain);
+            esp_mqtt_client_publish(_client, (base + path).c_str(), buf, 0, 0, r ? 1 : 0);
         };
-        opub("0/power",      d.grid_p, 1); opub("0/voltage",    d.grid_v, 1);
-        opub("0/current",    d.grid_i, 2); opub("0/yieldday",   d.grid_dE, 3);
-        opub("0/yieldtotal", d.grid_tE,3); opub("0/temperatur", d.temp, 1);
-        opub("1/power",      d.pv0_p, 1);  opub("1/voltage",    d.pv0_v, 1);
-        opub("1/current",    d.pv0_i, 2);  opub("1/yieldday",   d.pv0_dE,3);
-        opub("1/yieldtotal", d.pv0_tE,3);
-        opub("2/power",      d.pv1_p, 1);  opub("2/voltage",    d.pv1_v, 1);
-        opub("2/current",    d.pv1_i, 2);  opub("2/yieldday",   d.pv1_dE,3);
-        opub("2/yieldtotal", d.pv1_tE,3);
+        opub("0/power",      pv.grid_p, 1); opub("0/voltage",    pv.grid_v, 1);
+        opub("0/current",    pv.grid_i, 2); opub("0/yieldday",   pv.grid_dE,3);
+        opub("0/yieldtotal", pv.grid_tE,3); opub("0/temperatur", pv.temp,   1);
+        opub("1/power",      pv.pv0_p,  1); opub("1/voltage",    pv.pv0_v,  1);
+        opub("1/current",    pv.pv0_i,  2); opub("1/yieldday",   pv.pv0_dE, 3);
+        opub("1/yieldtotal", pv.pv0_tE, 3);
+        opub("2/power",      pv.pv1_p,  1); opub("2/voltage",    pv.pv1_v,  1);
+        opub("2/current",    pv.pv1_i,  2); opub("2/yieldday",   pv.pv1_dE, 3);
+        opub("2/yieldtotal", pv.pv1_tE, 3);
         char buf[16];
-        snprintf(buf,sizeof(buf),"%d",d.powerLimit);
-        mqttClient.publish((base+"status/limit_relative").c_str(),buf,appConfig.mqttRetain);
-        snprintf(buf,sizeof(buf),"%d",d.wifiRssi);
-        mqttClient.publish((base+"dtu/rssi").c_str(),buf,appConfig.mqttRetain);
+        snprintf(buf, sizeof(buf), "%d", pv.powerLimit);
+        esp_mqtt_client_publish(_client, (base+"status/limit_relative").c_str(), buf, 0, 0, r?1:0);
+        snprintf(buf, sizeof(buf), "%d", pv.wifiRssi);
+        esp_mqtt_client_publish(_client, (base+"dtu/rssi").c_str(), buf, 0, 0, 0);
     } else {
         char buf[16];
-        snprintf(buf,sizeof(buf),"%lu",(unsigned long)d.timestamp);
+        snprintf(buf, sizeof(buf), "%lu", (unsigned long)pv.timestamp);
         pub("timestamp", buf, false);
-        pubFloat("grid/U",            d.grid_v, 1);
-        pubFloat("grid/I",            d.grid_i, 2);
-        pubFloat("grid/P",            d.grid_p, 1);
-        pubFloat("grid/dailyEnergy",  d.grid_dE,3);
-        pubFloat("grid/totalEnergy",  d.grid_tE,3);
-        pubFloat("pv0/U",             d.pv0_v, 1);
-        pubFloat("pv0/I",             d.pv0_i, 2);
-        pubFloat("pv0/P",             d.pv0_p, 1);
-        pubFloat("pv0/dailyEnergy",   d.pv0_dE,3);
-        pubFloat("pv1/U",             d.pv1_v, 1);
-        pubFloat("pv1/I",             d.pv1_i, 2);
-        pubFloat("pv1/P",             d.pv1_p, 1);
-        pubFloat("pv1/dailyEnergy",   d.pv1_dE,3);
-        pubFloat("inverter/Temp",          d.temp,   1);
-        pubInt  ("inverter/PowerLimit",    d.powerLimit);
-        pubInt  ("inverter/dtuConnState",  d.dtuConnState);
-        pubInt  ("inverter/warningsActive",d.warningsActive);
-        pubInt  ("inverter/WifiRSSI",      d.wifiRssi);
+        pubFloat("grid/U",           pv.grid_v,  1, r);
+        pubFloat("grid/I",           pv.grid_i,  2, r);
+        pubFloat("grid/P",           pv.grid_p,  1, r);
+        pubFloat("grid/dailyEnergy", pv.grid_dE, 3, r);
+        pubFloat("grid/totalEnergy", pv.grid_tE, 3, r);
+        pubFloat("pv0/U",            pv.pv0_v,   1, r);
+        pubFloat("pv0/I",            pv.pv0_i,   2, r);
+        pubFloat("pv0/P",            pv.pv0_p,   1, r);
+        pubFloat("pv0/dailyEnergy",  pv.pv0_dE,  3, r);
+        pubFloat("pv0/totalEnergy",  pv.pv0_tE,  3, r);
+        pubFloat("pv1/U",            pv.pv1_v,   1, r);
+        pubFloat("pv1/I",            pv.pv1_i,   2, r);
+        pubFloat("pv1/P",            pv.pv1_p,   1, r);
+        pubFloat("pv1/dailyEnergy",  pv.pv1_dE,  3, r);
+        pubFloat("pv1/totalEnergy",  pv.pv1_tE,  3, r);
+        pubFloat("inverter/Temp",    pv.temp,     1, r);
+        pubInt  ("inverter/PowerLimit",    pv.powerLimit,     r);
+        pubInt  ("inverter/warningsActive",pv.warningsActive, false);
     }
-    LOG_D(MOD_MQTT, "Published DTU data");
+    LOG_D(MOD_MQTT, "Published PV data (ts=%lu)", (unsigned long)pv.timestamp);
 }
 
-// ─── GPIO state ───────────────────────────────────────────────────────────────
-void mqttPublishGpioState() {
-    if (!mqttClient.connected()) return;
-    pub("relay/state", gpioState.relay ? "1" : "0", appConfig.mqttRetain);
+// ─── Publish GPIO state ───────────────────────────────────────────────────────
+static void publishGpioState(const DataStore::GpioState& gpio) {
+    bool r = appConfig.mqttRetain;
+    pub("relay/state", gpio.relay ? "1" : "0", r);
     for (int i = 0; i < 4; i++) {
-        char topic[24]; snprintf(topic,sizeof(topic),"gpio%d/state",i+1);
-        pub(topic, gpioState.gpio[i] ? "1" : "0", appConfig.mqttRetain);
+        char topic[24]; snprintf(topic, sizeof(topic), "gpio%d/state", i + 1);
+        pub(topic, gpio.gpio[i] ? "1" : "0", r);
     }
 }
 
-// ─── HA Auto-Discovery ────────────────────────────────────────────────────────
+// ─── Publish system stats ─────────────────────────────────────────────────────
+static void publishSystemStats() {
+    DataStore::SystemStatus sys = dsGetSystem();
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)sys.uptimeS);
+    pub("system/uptime", buf, false);
+    snprintf(buf, sizeof(buf), "%d",  (int)sys.wifiRssi);
+    pub("system/rssi",   buf, false);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)sys.freeHeap);
+    pub("system/heap",   buf, false);
+}
+
+// ─── HA Auto-Discovery (Spec §5.4) ───────────────────────────────────────────
 static void publishHaSensor(const char* uid, const char* name,
-                             const char* topic, const char* unit,
+                             const char* stateSuffix, const char* unit,
                              const char* devClass) {
     char discTopic[128];
-    snprintf(discTopic,sizeof(discTopic),
+    snprintf(discTopic, sizeof(discTopic),
              "homeassistant/sensor/%s_%s/config", appConfig.mqttTopic, uid);
     JsonDocument doc;
-    doc["name"]       = name;
-    doc["unique_id"]  = String(appConfig.mqttTopic) + "_" + uid;
-    doc["state_topic"]= T(topic);
+    doc["name"]        = name;
+    doc["unique_id"]   = String(appConfig.mqttTopic) + "_" + uid;
+    doc["state_topic"] = T(stateSuffix);
     if (unit)     doc["unit_of_measurement"] = unit;
     if (devClass) doc["device_class"]        = devClass;
     doc["device"]["identifiers"][0] = appConfig.mqttTopic;
@@ -117,217 +129,252 @@ static void publishHaSensor(const char* uid, const char* name,
     doc["device"]["manufacturer"]   = "Hoymiles";
     doc["device"]["sw_version"]     = FW_VERSION;
     String payload; serializeJson(doc, payload);
-    mqttClient.publish(discTopic, payload.c_str(), true);
+    esp_mqtt_client_publish(_client, discTopic, payload.c_str(), 0, 0, 1);
 }
 
 static void publishHaSwitch(const char* uid, const char* name,
-                             const char* stateTopic, const char* cmdTopic) {
+                             const char* stateSuffix, const char* cmdSuffix) {
     char discTopic[128];
-    snprintf(discTopic,sizeof(discTopic),
+    snprintf(discTopic, sizeof(discTopic),
              "homeassistant/switch/%s_%s/config", appConfig.mqttTopic, uid);
     JsonDocument doc;
     doc["name"]          = name;
     doc["unique_id"]     = String(appConfig.mqttTopic) + "_" + uid;
-    doc["state_topic"]   = T(stateTopic);
-    doc["command_topic"] = T(cmdTopic);
+    doc["state_topic"]   = T(stateSuffix);
+    doc["command_topic"] = T(cmdSuffix);
     doc["payload_on"]    = "1";
     doc["payload_off"]   = "0";
     doc["device"]["identifiers"][0] = appConfig.mqttTopic;
     doc["device"]["name"]           = "HMS-800W-2T";
     doc["device"]["manufacturer"]   = "Hoymiles";
     String payload; serializeJson(doc, payload);
-    mqttClient.publish(discTopic, payload.c_str(), true);
+    esp_mqtt_client_publish(_client, discTopic, payload.c_str(), 0, 0, 1);
 }
 
-// HA discovery sent one item per loop iteration via index counter
-static int _haDiscoveryIdx = -1;  // -1 = idle, 0..N = sending
+// Discovery sends one entity per 500ms, starting 5s after connect (Spec §5.4)
+static int      _haIdx    = -1;
+static uint32_t _haNextMs = 0;
 
-void mqttSendHaDiscovery() {
-    // HA discovery disabled — PubSubClient.connect() already blocks 1s+
-    // which starves the WiFi watchdog on Core 0.
-    // Will be re-enabled as separate task on Core 1 in future release.
-    return;
-}
-
-// Called once per loop iteration — sends one item and returns
 static void haDiscoveryStep() {
-    // HA discovery disabled: PubSubClient publish() on Core 0 starves WiFi watchdog
-    // Home Assistant will auto-discover via MQTT topics without explicit discovery
-    _haDiscoveryIdx = -1;
-    return;
-    if (_haDiscoveryIdx < 0 || !mqttClient.connected()) return;
-    switch (_haDiscoveryIdx) {
-        case  0: publishHaSensor("grid_p",      "Grid Power",        "grid/P",            "W",   "power");       break;
-        case  1: publishHaSensor("grid_u",      "Grid Voltage",      "grid/U",            "V",   "voltage");     break;
-        case  2: publishHaSensor("grid_i",      "Grid Current",      "grid/I",            "A",   "current");     break;
-        case  3: publishHaSensor("grid_dE",     "Grid Energy Today", "grid/dailyEnergy",  "kWh", "energy");      break;
-        case  4: publishHaSensor("grid_tE",     "Grid Energy Total", "grid/totalEnergy",  "kWh", "energy");      break;
-        case  5: publishHaSensor("pv0_p",       "PV1 Power",         "pv0/P",             "W",   "power");       break;
-        case  6: publishHaSensor("pv0_u",       "PV1 Voltage",       "pv0/U",             "V",   "voltage");     break;
-        case  7: publishHaSensor("pv1_p",       "PV2 Power",         "pv1/P",             "W",   "power");       break;
-        case  8: publishHaSensor("pv1_u",       "PV2 Voltage",       "pv1/U",             "V",   "voltage");     break;
-        case  9: publishHaSensor("temp",        "Inverter Temp",     "inverter/Temp",     "°C",  "temperature"); break;
-        case 10: publishHaSensor("power_limit", "Power Limit",       "inverter/PowerLimit","%",  nullptr);       break;
-        case 11: publishHaSwitch("relay",  "Relay",  "relay/state",  "relay/set");  break;
-        case 12: publishHaSwitch("gpio1",  "GPIO 1", "gpio1/state",  "gpio1/set");  break;
-        case 13: publishHaSwitch("gpio2",  "GPIO 2", "gpio2/state",  "gpio2/set");  break;
-        case 14: publishHaSwitch("gpio3",  "GPIO 3", "gpio3/state",  "gpio3/set");  break;
-        case 15: publishHaSwitch("gpio4",  "GPIO 4", "gpio4/state",  "gpio4/set");  break;
-        case 16:
-            LOG_I(MOD_MQTT, "HA discovery sent");
-            _haDiscoveryIdx = -1;  // done
+    if (_haIdx < 0 || !_client)    return;
+    if (millis() < _haNextMs)      return;
+
+    switch (_haIdx) {
+        case  0: publishHaSensor("grid_p",  "Grid Power",        "grid/P",            "W",   "power");       break;
+        case  1: publishHaSensor("grid_u",  "Grid Voltage",      "grid/U",            "V",   "voltage");     break;
+        case  2: publishHaSensor("grid_i",  "Grid Current",      "grid/I",            "A",   "current");     break;
+        case  3: publishHaSensor("grid_dE", "Grid Energy Today", "grid/dailyEnergy",  "kWh", "energy");      break;
+        case  4: publishHaSensor("grid_tE", "Grid Energy Total", "grid/totalEnergy",  "kWh", "energy");      break;
+        case  5: publishHaSensor("pv0_p",   "PV1 Power",         "pv0/P",             "W",   "power");       break;
+        case  6: publishHaSensor("pv0_u",   "PV1 Voltage",       "pv0/U",             "V",   "voltage");     break;
+        case  7: publishHaSensor("pv1_p",   "PV2 Power",         "pv1/P",             "W",   "power");       break;
+        case  8: publishHaSensor("pv1_u",   "PV2 Voltage",       "pv1/U",             "V",   "voltage");     break;
+        case  9: publishHaSensor("temp",    "Inverter Temp",     "inverter/Temp",     "°C",  "temperature"); break;
+        case 10: publishHaSensor("pwr_lim", "Power Limit",       "inverter/PowerLimit","%",  nullptr);       break;
+        case 11: publishHaSwitch("relay",   "Relay",  "relay/state",  "relay/set");  break;
+        case 12: publishHaSwitch("gpio1",   "GPIO 1", "gpio1/state",  "gpio1/set");  break;
+        case 13: publishHaSwitch("gpio2",   "GPIO 2", "gpio2/state",  "gpio2/set");  break;
+        case 14: publishHaSwitch("gpio3",   "GPIO 3", "gpio3/state",  "gpio3/set");  break;
+        case 15: publishHaSwitch("gpio4",   "GPIO 4", "gpio4/state",  "gpio4/set");  break;
+        default:
+            LOG_I(MOD_MQTT, "HA discovery complete (%d entities)", _haIdx);
+            _haIdx = -1;
             return;
     }
-    _haDiscoveryIdx++;
+    _haIdx++;
+    _haNextMs = millis() + 500;
 }
 
-// ─── Inbound message callback ─────────────────────────────────────────────────
-static void onMessage(char* topic, byte* payload, unsigned int len) {
-    char val[64] = {};
-    strlcpy(val, (char*)payload, min((unsigned int)sizeof(val)-1, len)+1);
-
+// ─── Inbound message handler ──────────────────────────────────────────────────
+static void onMessage(const char* topic, const char* data) {
     String t    = String(topic);
     String base = String(appConfig.mqttTopic) + "/";
 
-    if      (t == base+"inverter/PowerLimitSet/set") { dtuSetPowerLimit(atoi(val)); }
-    else if (t == base+"inverter/RebootDtu/set")     { dtuRequestReboot(); }
-    else if (t == base+"inverter/RebootGw/set")      { vTaskDelay(pdMS_TO_TICKS(200)); ESP.restart(); }
-    else if (t == base+"inverter/On/set")            { dtuSetInverterOn(atoi(val)==1); }
-    else if (t == base+"relay/set") {
-        GpioCommand_t cmd = {0, atoi(val)==1};
-        xQueueSend(gpioCommandQueue, &cmd, 0);
+    if (t == base + "inverter/PowerLimitSet/set") {
+        DataStore::DtuCommand cmd = {};
+        cmd.setPowerLimit   = true;
+        cmd.powerLimitValue = atoi(data);
+        dsSetDtuCommand(cmd);
+    } else if (t == base + "inverter/On/set") {
+        DataStore::DtuCommand cmd = {};
+        cmd.setInverterOn   = true;
+        cmd.inverterOnValue = (atoi(data) == 1);
+        dsSetDtuCommand(cmd);
+    } else if (t == base + "inverter/RebootDtu/set" && atoi(data) == 1) {
+        DataStore::DtuCommand cmd = {};
+        cmd.rebootDtu = true;
+        dsSetDtuCommand(cmd);
+    } else if (t == base + "inverter/RebootGw/set" && atoi(data) == 1) {
+        LOG_W(MOD_MQTT, "Gateway reboot via MQTT");
+        vTaskDelay(pdMS_TO_TICKS(200)); ESP.restart();
+    } else if (t == base + "relay/set") {
+        dsSetGpioCommand(0, atoi(data) == 1);
     } else {
         for (int i = 1; i <= 4; i++) {
-            char gTopic[32]; snprintf(gTopic,sizeof(gTopic),"gpio%d/set",i);
-            if (t == base+gTopic) {
-                GpioCommand_t cmd = {i, atoi(val)==1};
-                xQueueSend(gpioCommandQueue, &cmd, 0);
+            char sub[32]; snprintf(sub, sizeof(sub), "gpio%d/set", i);
+            if (t == base + sub) {
+                dsSetGpioCommand(i, atoi(data) == 1);
+                break;
             }
         }
     }
 }
 
-// ─── Connect helper ───────────────────────────────────────────────────────────
-static bool mqttConnect() {
-    char clientId[32];
-    snprintf(clientId,sizeof(clientId),"hmsgws3_%06llX",
-             (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFF));
-    WiFi.setSleep(false);
+// ─── esp-mqtt event handler (runs in esp-mqtt internal thread) ────────────────
+static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
+                              int32_t eventId, void* eventData) {
+    auto ev = (esp_mqtt_event_handle_t)eventData;
 
-    // Pre-connect TCP with explicit 2s timeout to avoid watchdog starvation
-    // PubSubClient.connect() calls WiFiClient.connect() without timeout (blocks forever)
-    // By pre-connecting we skip that blocking call
-    if (!wifiClient.connected()) {
-        if (!wifiClient.connect(appConfig.mqttHost, appConfig.mqttPort, 2000)) {
-            LOG_W(MOD_MQTT, "TCP connect failed");
-            return false;
+    switch (eventId) {
+
+        case MQTT_EVENT_CONNECTED: {
+            LOG_I(MOD_MQTT, "Connected to %s:%d", appConfig.mqttHost, appConfig.mqttPort);
+
+            DataStore::SystemStatus sys = dsGetSystem();
+            sys.mqttConnected     = true;
+            sys.mqttLastConnectMs = millis();
+            dsSetSystem(sys);
+            xEventGroupSetBits(systemStateEvents, EVT_MQTT_CONNECTED);
+
+            // Subscribe to all control topics
+            String base = String(appConfig.mqttTopic) + "/";
+            const char* subs[] = {
+                "relay/set",
+                "inverter/PowerLimitSet/set",
+                "inverter/On/set",
+                "inverter/RebootDtu/set",
+                "inverter/RebootGw/set"
+            };
+            for (auto s : subs)
+                esp_mqtt_client_subscribe(_client, (base + s).c_str(), 0);
+            for (int i = 1; i <= 4; i++) {
+                char sub[48]; snprintf(sub, sizeof(sub), "%sgpio%d/set", base.c_str(), i);
+                esp_mqtt_client_subscribe(_client, sub, 0);
+            }
+
+            pub("system/status", "online", true);
+            publishGpioState(dsGetGpio());
+
+            // Schedule HA discovery: 5s delay, 500ms between entities (Spec §5.4)
+            if (appConfig.mqttHaDiscovery) {
+                _haIdx    = 0;
+                _haNextMs = millis() + 5000;
+                LOG_I(MOD_MQTT, "HA discovery scheduled in 5s (%d entities)", 16);
+            }
+            break;
         }
+
+        case MQTT_EVENT_DISCONNECTED: {
+            LOG_W(MOD_MQTT, "Disconnected — will reconnect automatically");
+            DataStore::SystemStatus sys = dsGetSystem();
+            sys.mqttConnected = false;
+            dsSetSystem(sys);
+            xEventGroupClearBits(systemStateEvents, EVT_MQTT_CONNECTED);
+            _haIdx = -1;
+            break;
+        }
+
+        case MQTT_EVENT_DATA: {
+            if (!ev->topic || ev->topic_len == 0) break;
+            // topic and data are NOT null-terminated — copy to stack buffers
+            char topic[128] = {};
+            char data[128]  = {};
+            memcpy(topic, ev->topic, min(ev->topic_len, (int)sizeof(topic) - 1));
+            memcpy(data,  ev->data,  min(ev->data_len,  (int)sizeof(data)  - 1));
+            onMessage(topic, data);
+            break;
+        }
+
+        case MQTT_EVENT_ERROR:
+            if (ev->error_handle)
+                LOG_E(MOD_MQTT, "Error type=%d", ev->error_handle->error_type);
+            break;
+
+        default:
+            break;
     }
-
-    bool ok;
-    if (strlen(appConfig.mqttUser) > 0)
-        ok = mqttClient.connect(clientId, appConfig.mqttUser, appConfig.mqttPass);
-    else
-        ok = mqttClient.connect(clientId);
-
-    if (ok) {
-        LOG_I(MOD_MQTT, "Connected to %s:%d", appConfig.mqttHost, appConfig.mqttPort);
-        xEventGroupSetBits(systemStateEvents, EVT_MQTT_CONNECTED);
-        setLedState(LED_OPERATIONAL);
-
-        // Subscribe to control topics
-        String base = String(appConfig.mqttTopic) + "/";
-        mqttClient.subscribe((base+"inverter/PowerLimitSet/set").c_str());
-        mqttClient.subscribe((base+"inverter/RebootDtu/set").c_str());
-        mqttClient.subscribe((base+"inverter/RebootGw/set").c_str());
-        mqttClient.subscribe((base+"inverter/On/set").c_str());
-        mqttClient.subscribe((base+"relay/set").c_str());
-        for (int i = 1; i <= 4; i++)
-            mqttClient.subscribe((base+"gpio"+i+"/set").c_str());
-
-        mqttSendHaDiscovery();
-        mqttPublishGpioState();
-    } else {
-        LOG_W(MOD_MQTT, "Connect failed (rc=%d). Retry in %ds",
-              mqttClient.state(), MQTT_RECONNECT_MS/1000);
-        xEventGroupClearBits(systemStateEvents, EVT_MQTT_CONNECTED);
-    }
-    return ok;
 }
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
 void taskMQTT(void* pvParameters) {
-    // MQTT temporarily disabled — PubSubClient.connect() triggers interrupt
-    // watchdog on ESP32-S3. Will be re-implemented with non-blocking approach.
-    LOG_W(MOD_MQTT, "MQTT disabled pending non-blocking implementation");
-    vTaskDelete(nullptr);
-    return;
-
     if (strlen(appConfig.mqttHost) == 0) {
-        LOG_W(MOD_MQTT, "No MQTT broker configured, task idle");
+        LOG_W(MOD_MQTT, "No broker configured — task idle");
         vTaskDelete(nullptr); return;
     }
 
-    mqttClient.setServer(appConfig.mqttHost, appConfig.mqttPort);
-    mqttClient.setCallback(onMessage);
-    mqttClient.setKeepAlive(MQTT_KEEPALIVE_S);
-    mqttClient.setBufferSize(2048);
+    // Wait for STA WiFi only (not AP mode)
+    xEventGroupWaitBits(systemStateEvents, EVT_WIFI_CONNECTED | EVT_WIFI_AP_MODE,
+                        pdFALSE, pdFALSE, portMAX_DELAY);
+    if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE) {
+        LOG_W(MOD_MQTT, "AP mode — task idle");
+        vTaskDelete(nullptr); return;
+    }
 
-    LOG_I(MOD_MQTT, "Connecting to %s:%d", appConfig.mqttHost, appConfig.mqttPort);
+    // Build persistent config strings
+    snprintf(_uri,      sizeof(_uri),
+             "mqtt://%s:%d", appConfig.mqttHost, appConfig.mqttPort);
+    snprintf(_clientId, sizeof(_clientId),
+             "hmsgws3_%06llX", (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFF));
+    snprintf(_lwtTopic, sizeof(_lwtTopic),
+             "%s/system/status", appConfig.mqttTopic);
 
-    // Wait for WiFi
-    xEventGroupWaitBits(systemStateEvents, EVT_WIFI_CONNECTED,
-                        pdFALSE, pdTRUE, portMAX_DELAY);
+    LOG_I(MOD_MQTT, "Starting — broker: %s  client: %s", _uri, _clientId);
 
-    uint32_t lastReconnect = 0;
-    uint32_t lastSysMs     = 0;
-    uint32_t lastGpioCheck = 0;
-    GpioState_t lastGpio   = {};
-    DtuData_t   data       = {};
+    // Flat struct API (ESP-IDF 4.x / Arduino-ESP32 2.x bundled SDK)
+    esp_mqtt_client_config_t cfg = {};
+    cfg.uri         = _uri;
+    cfg.client_id   = _clientId;
+    cfg.keepalive   = MQTT_KEEPALIVE_S;
+    cfg.lwt_topic   = _lwtTopic;
+    cfg.lwt_msg     = "offline";
+    cfg.lwt_msg_len = 7;
+    cfg.lwt_retain  = 1;
+    if (strlen(appConfig.mqttUser) > 0) {
+        cfg.username = appConfig.mqttUser;
+        cfg.password = appConfig.mqttPass;
+    }
+
+    _client = esp_mqtt_client_init(&cfg);
+    esp_mqtt_client_register_event(_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID,
+                                   mqttEventHandler, nullptr);
+    esp_mqtt_client_start(_client);
+
+    uint32_t lastPvTs     = 0;
+    uint32_t lastSysMs    = 0;
+    uint32_t lastGpioCkMs = 0;
+    DataStore::GpioState lastGpio = {};
 
     for (;;) {
-        // ── Maintain connection ────────────────────────────────────────────
-        if (!mqttClient.connected()) {
-            xEventGroupClearBits(systemStateEvents, EVT_MQTT_CONNECTED);
-            uint32_t now = millis();
-            if (now - lastReconnect >= 10000UL) {  // 10s between retries
-                lastReconnect = now;
-                LOG_I(MOD_MQTT, "Reconnecting...");
-                mqttConnect();
-            }
-        } // reconnect
+        EventBits_t bits = xEventGroupGetBits(systemStateEvents);
+        bool connected   = (bits & EVT_MQTT_CONNECTED) != 0;
 
-        // ── Publish DTU data ───────────────────────────────────────────────
-        if (xQueueReceive(dtuDataQueue, &data, 0) == pdTRUE) {
-            if (mqttClient.connected()) publishDtuData(data);
+        // ── Publish PV data when new measurement arrives ───────────────────────
+        DataStore::PvData pv = dsGetPv();
+        if (connected && pv.valid && pv.timestamp != lastPvTs) {
+            publishPvData(pv);
+            lastPvTs = pv.timestamp;
         }
 
-        // ── GPIO state on change ───────────────────────────────────────────
+        // ── Publish GPIO state on change ───────────────────────────────────────
         uint32_t now = millis();
-        if (now - lastGpioCheck > 250) {
-            lastGpioCheck = now;
-            if (memcmp(&gpioState, &lastGpio, sizeof(GpioState_t)) != 0) {
-                mqttPublishGpioState();
-                memcpy(&lastGpio, &gpioState, sizeof(GpioState_t));
+        if (connected && now - lastGpioCkMs >= 250) {
+            lastGpioCkMs = now;
+            DataStore::GpioState gpio = dsGetGpio();
+            if (memcmp(&gpio, &lastGpio, sizeof(gpio)) != 0) {
+                publishGpioState(gpio);
+                lastGpio = gpio;
             }
         }
 
-        // ── System stats every 60 s ────────────────────────────────────────
-        if (now - lastSysMs > 60000 && mqttClient.connected()) {
+        // ── System stats every 60s ─────────────────────────────────────────────
+        if (connected && now - lastSysMs >= 60000) {
             lastSysMs = now;
-            char buf[16];
-            snprintf(buf,sizeof(buf),"%lu",(unsigned long)(now/1000));
-            pub("system/uptime", buf, false);
-            snprintf(buf,sizeof(buf),"%d",(int)WiFi.RSSI());
-            pub("system/rssi",   buf, false);
-            snprintf(buf,sizeof(buf),"%lu",(unsigned long)ESP.getFreeHeap());
-            pub("system/heap",   buf, false);
+            publishSystemStats();
         }
 
-        // Send one HA discovery item per iteration (non-blocking spread)
+        // ── HA discovery — one entity per 500ms, starting 5s after connect ─────
         haDiscoveryStep();
 
-        mqttClient.loop();
-        vTaskDelay(pdMS_TO_TICKS(100));  // 100ms — plenty of time for WiFi keepalive
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

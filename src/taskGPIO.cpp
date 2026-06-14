@@ -1,28 +1,29 @@
+// taskGPIO.cpp — v2 (DataStore pattern)
+
 #include "taskGPIO.h"
-#include "config.h"
+#include "dataStore.h"
 #include "appConfig.h"
 #include "systemState.h"
+#include "taskLED.h"
+#include "config.h"
 #include "logger.h"
 #include <Arduino.h>
 #include <LittleFS.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
-#include <freertos/event_groups.h>
 
-GpioState_t gpioState = {};
+static const uint32_t DEBOUNCE_MS = 50;
 
-static void applyRelay(bool state) {
+// ─── Apply relay ──────────────────────────────────────────────────────────────
+static void applyRelay(bool state, DataStore::GpioState& gpio) {
     bool out = appConfig.relay.inverted ? !state : state;
     digitalWrite(appConfig.relay.pin, out ? HIGH : LOW);
-    gpioState.relay = state;
+    gpio.relay = state;
 }
 
-static void applyGpio(int idx, bool state) {
-    if (!appConfig.gp[idx].isOutput) return;
+// ─── Apply GP output ──────────────────────────────────────────────────────────
+static void applyGp(int idx, bool state, DataStore::GpioState& gpio) {
     bool out = appConfig.gp[idx].inverted ? !state : state;
     digitalWrite(appConfig.gp[idx].pin, out ? HIGH : LOW);
-    gpioState.gpio[idx] = state;
+    gpio.gpio[idx] = state;
 }
 
 // ─── Factory reset via long BOOT press ───────────────────────────────────────
@@ -42,89 +43,95 @@ static void checkFactoryReset() {
     }
 }
 
+// ─── Task ─────────────────────────────────────────────────────────────────────
 void taskGPIO(void* pvParameters) {
-    // ── Wait for config to be loaded by taskWebServer ─────────────────────
-    // taskWebServer sets EVT_WIFI_CONNECTED or EVT_WIFI_AP_MODE after config load
-    LOG_I(MOD_GPIO, "GPIO task waiting for config...");
-    xEventGroupWaitBits(systemStateEvents,
-                        EVT_WIFI_CONNECTED | EVT_WIFI_AP_MODE,
-                        pdFALSE, pdFALSE,          // wait for ANY bit
-                        pdMS_TO_TICKS(15000));      // max 15 s
+    // Config is loaded in main.cpp before tasks start — no wait needed here
 
-    // ── Pin setup ─────────────────────────────────────────────────────────
+    // ── Pin setup ─────────────────────────────────────────────────────────────
+    DataStore::GpioState gpio = {};
+
     pinMode(appConfig.relay.pin, OUTPUT);
-    applyRelay(false);
+    applyRelay(false, gpio);
 
     for (int i = 0; i < 4; i++) {
-        if (appConfig.gp[i].isOutput) {
-            pinMode(appConfig.gp[i].pin, OUTPUT);
-            applyGpio(i, false);
-        } else {
-            pinMode(appConfig.gp[i].pin,
-                    appConfig.gp[i].pullup ? INPUT_PULLUP : INPUT);
-            gpioState.gpio[i] = (digitalRead(appConfig.gp[i].pin) == HIGH);
+        switch (appConfig.gp[i].mode) {
+            case GP_OUTPUT:
+                pinMode(appConfig.gp[i].pin, OUTPUT);
+                applyGp(i, false, gpio);
+                break;
+            case GP_INPUT:
+                pinMode(appConfig.gp[i].pin, appConfig.gp[i].pullup ? INPUT_PULLUP : INPUT);
+                gpio.gpio[i] = (digitalRead(appConfig.gp[i].pin) == HIGH);
+                if (appConfig.gp[i].inverted) gpio.gpio[i] = !gpio.gpio[i];
+                break;
+            case GP_I2C_RESERVED:
+                // Initialize as high-impedance input — I2C init in future version
+                pinMode(appConfig.gp[i].pin, INPUT);
+                break;
         }
     }
     pinMode(BOOT_PIN, INPUT_PULLUP);
 
-    LOG_I(MOD_GPIO, "GPIO ready. Relay=GPIO%d  GP1-4=GPIO%d,%d,%d,%d",
+    dsSetGpio(gpio);
+
+    LOG_I(MOD_GPIO, "GPIO ready — Relay=GPIO%d  GP1-4=GPIO%d,%d,%d,%d",
           appConfig.relay.pin,
           appConfig.gp[0].pin, appConfig.gp[1].pin,
           appConfig.gp[2].pin, appConfig.gp[3].pin);
 
-    // Debounce state
-    bool     lastGpioState[4];
-    uint32_t lastChangeTime[4] = {0,0,0,0};
-    const uint32_t DEBOUNCE_MS = 50;
-    for (int i = 0; i < 4; i++) lastGpioState[i] = gpioState.gpio[i];
+    // Debounce state for INPUT pins
+    bool     lastRaw[4]      = {};
+    uint32_t lastChangeMs[4] = {};
+    for (int i = 0; i < 4; i++) lastRaw[i] = gpio.gpio[i];
 
     for (;;) {
-        // ── Process commands ──────────────────────────────────────────────
-        GpioCommand_t cmd;
-        while (xQueueReceive(gpioCommandQueue, &cmd, 0) == pdTRUE) {
-            if (cmd.target == 0) {
-                applyRelay(cmd.state);
-                LOG_I(MOD_GPIO, "Relay -> %s", cmd.state ? "ON" : "OFF");
-            } else if (cmd.target >= 1 && cmd.target <= 4) {
-                int idx = cmd.target - 1;
-                if (appConfig.gp[idx].isOutput) {
-                    applyGpio(idx, cmd.state);
-                    LOG_I(MOD_GPIO, "GP%d -> %s", cmd.target, cmd.state ? "HIGH" : "LOW");
+        // ── Process pending GPIO command from DataStore ────────────────────────
+        {
+            xSemaphoreTake(ds.mutex, portMAX_DELAY);
+            bool pending = ds.gpioCmd.pending;
+            int  target  = ds.gpioCmd.target;
+            bool state   = ds.gpioCmd.state;
+            if (pending) ds.gpioCmd.pending = false;
+            xSemaphoreGive(ds.mutex);
+
+            if (pending) {
+                if (target == 0) {
+                    applyRelay(state, gpio);
+                    LOG_I(MOD_GPIO, "Relay -> %s", state ? "ON" : "OFF");
+                } else if (target >= 1 && target <= 4) {
+                    int idx = target - 1;
+                    if (appConfig.gp[idx].mode == GP_OUTPUT) {
+                        applyGp(idx, state, gpio);
+                        LOG_I(MOD_GPIO, "GP%d -> %s", target, state ? "HIGH" : "LOW");
+                    } else {
+                        LOG_W(MOD_GPIO, "GP%d command ignored (not OUTPUT)", target);
+                    }
                 }
+                dsSetGpio(gpio);
             }
         }
 
-        // ── Debounce inputs ───────────────────────────────────────────────
+        // ── Debounce INPUT pins → update DataStore on change ─────────────────
+        bool inputChanged = false;
         for (int i = 0; i < 4; i++) {
-            if (appConfig.gp[i].isOutput) continue;
+            if (appConfig.gp[i].mode != GP_INPUT) continue;
             bool raw = (digitalRead(appConfig.gp[i].pin) == HIGH);
             if (appConfig.gp[i].inverted) raw = !raw;
-            if (raw != lastGpioState[i]) {
-                lastGpioState[i] = raw;
-                lastChangeTime[i] = millis();
+            if (raw != lastRaw[i]) {
+                lastRaw[i]      = raw;
+                lastChangeMs[i] = millis();
             }
-            if ((millis() - lastChangeTime[i]) >= DEBOUNCE_MS && raw != gpioState.gpio[i]) {
-                gpioState.gpio[i] = raw;
-                LOG_D(MOD_GPIO, "GP%d input -> %s", i+1, raw ? "HIGH" : "LOW");
+            if ((millis() - lastChangeMs[i]) >= DEBOUNCE_MS && raw != gpio.gpio[i]) {
+                gpio.gpio[i] = raw;
+                inputChanged  = true;
+                LOG_D(MOD_GPIO, "GP%d input -> %s", i + 1, raw ? "HIGH" : "LOW");
             }
         }
+        if (inputChanged) dsSetGpio(gpio);
 
-        // ── Factory reset check ───────────────────────────────────────────
+        // ── Factory reset check ───────────────────────────────────────────────
         checkFactoryReset();
 
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
-
-void gpioSetRelay(bool state) {
-    GpioCommand_t cmd = {0, state};
-    xQueueSend(gpioCommandQueue, &cmd, pdMS_TO_TICKS(100));
-}
-
-void gpioSetPin(int index, bool state) {
-    GpioCommand_t cmd = {index + 1, state};
-    xQueueSend(gpioCommandQueue, &cmd, pdMS_TO_TICKS(100));
-}
-
-bool gpioGetPin(int index)  { return gpioState.gpio[index]; }
-bool gpioGetRelay()         { return gpioState.relay; }

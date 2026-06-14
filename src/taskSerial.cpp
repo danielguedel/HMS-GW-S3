@@ -1,233 +1,294 @@
+// taskSerial.cpp — v2 (Konsolen-Kommandos, DataStore pattern)
+// Reads commands from Serial line by line, dispatches via DataStore API.
+// All command output goes to Serial directly (not routed through the logger).
+
 #include "taskSerial.h"
-#include "config.h"
+#include "dataStore.h"
 #include "appConfig.h"
 #include "systemState.h"
+#include "config.h"
 #include "logger.h"
-#include "taskNeoPixel.h"
-#include "taskDTU.h"
-#include "taskGPIO.h"
+#include "taskLED.h"
 #include <Arduino.h>
-#include <WiFi.h>
 
-#include <LittleFS.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
+// ─── Output helpers ───────────────────────────────────────────────────────────
 
-static char   _lineBuf[128];
-static int    _linePos = 0;
-
-static void printHelp() {
-    Serial.println("\n── HMS-GW-S3 Serial Console ─────────────────────────");
-    Serial.println("  help                    This help");
-    Serial.println("  status                  System status overview");
-    Serial.println("  data                    Latest inverter data");
-    Serial.println("  sysinfo                 Heap, tasks, uptime");
-    Serial.println("  setPower <W>            Set power limit (W)");
-    Serial.println("  setRelay <0|1>          Switch relay");
-    Serial.println("  setGPIO <1-4> <0|1>     Set GPIO output");
-    Serial.println("  getGPIO <1-4>           Read GPIO state");
-    Serial.println("  setWifi <0|1>           Enable/disable WiFi");
-    Serial.println("  rebootDTU 1             Request DTU reboot");
-    Serial.println("  rebootInverter 1        Request inverter reboot");
-    Serial.println("  reboot                  Restart gateway");
-    Serial.println("  resetToFactory 1        Factory reset (deletes config)");
-    Serial.println("  setInterval <s>         Set DTU poll interval (min 31)");
-    Serial.println("  setLogLevel <0-3>       Set log level (0=ERR..3=DBG)");
-    Serial.println("  ledTest                 Cycle through all LED states");
-    Serial.println("  protectSettings <0|1>   Lock/unlock web config");
-    Serial.println("─────────────────────────────────────────────────────\n");
+static void printf_(const char* fmt, ...) {
+    char buf[256]; va_list ap; va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap); va_end(ap);
+    Serial.print(buf);
 }
 
-static void printStatus() {
-    EventBits_t bits = xEventGroupGetBits(systemStateEvents);
-    Serial.println("\n── System Status ────────────────────────────────────");
-    Serial.printf("  Firmware:     %s (Build %d, %s)\n", FW_VERSION, BUILD_NUMBER, FW_DATE);
-    Serial.printf("  Uptime:       %lu s\n",   (unsigned long)(millis() / 1000));
-    Serial.printf("  Free Heap:    %lu B\n",   (unsigned long)ESP.getFreeHeap());
-    Serial.printf("  WiFi:         %s  SSID: %s  RSSI: %d dBm\n",
-                  (bits & EVT_WIFI_CONNECTED) ? "CONNECTED" : "DISCONNECTED",
-                  WiFi.SSID().c_str(), WiFi.RSSI());
-    Serial.printf("  IP:           %s\n",      WiFi.localIP().toString().c_str());
-    Serial.printf("  DTU:          %s (%s:%d)\n",
-                  (bits & EVT_DTU_ONLINE) ? "ONLINE" : "OFFLINE",
-                  appConfig.dtuHost, appConfig.dtuPort);
-    Serial.printf("  MQTT:         %s (%s:%d)\n",
-                  (bits & EVT_MQTT_CONNECTED) ? "CONNECTED" : "DISCONNECTED",
-                  appConfig.mqttHost, appConfig.mqttPort);
-    Serial.printf("  Relay:        %s\n",      gpioState.relay ? "ON" : "OFF");
-    Serial.printf("  GPIO 1-4:     %d %d %d %d  (mode: %s %s %s %s)\n",
-                  gpioState.gpio[0], gpioState.gpio[1],
-                  gpioState.gpio[2], gpioState.gpio[3],
-                  appConfig.gp[0].isOutput ? "OUT" : "IN",
-                  appConfig.gp[1].isOutput ? "OUT" : "IN",
-                  appConfig.gp[2].isOutput ? "OUT" : "IN",
-                  appConfig.gp[3].isOutput ? "OUT" : "IN");
-    Serial.println("─────────────────────────────────────────────────────\n");
+static void prompt() { Serial.print("\r\n> "); }
+
+// ─── Command handlers ─────────────────────────────────────────────────────────
+
+static void cmdHelp() {
+    Serial.println("Available commands:");
+    Serial.println("  help              This list");
+    Serial.println("  version           Firmware version");
+    Serial.println("  status            System status (WiFi, DTU, MQTT, heap)");
+    Serial.println("  wifi              WiFi detail");
+    Serial.println("  dtu               DTU status + last PV data");
+    Serial.println("  mqtt              MQTT status");
+    Serial.println("  gpio              GPIO states");
+    Serial.println("  config            Current configuration");
+    Serial.println("  relay on|off      Set relay");
+    Serial.println("  gpio1 on|off      Set GP1");
+    Serial.println("  gpio2 on|off      Set GP2");
+    Serial.println("  gpio3 on|off      Set GP3");
+    Serial.println("  gpio4 on|off      Set GP4");
+    Serial.println("  loglevel error|warn|info|debug");
+    Serial.println("  restart           Reboot gateway");
+    Serial.println("  reset             Factory reset (clears config.json)");
+    Serial.println("  ledtest           Cycle through all LED states");
 }
 
-static void printData() {
-    if (!dtuDataValid) {
-        Serial.println("[DATA] No valid data yet");
+static void cmdVersion() {
+    printf_("HMS-GW-S3  fw=%s  build=%d  date=%s\n",
+            FW_VERSION, BUILD_NUMBER, FW_DATE);
+}
+
+static void cmdStatus() {
+    DataStore::SystemStatus sys  = dsGetSystem();
+    EventBits_t             bits = xEventGroupGetBits(systemStateEvents);
+
+    printf_("Uptime   : %lu s\n",     (unsigned long)sys.uptimeS);
+    printf_("Heap     : %lu bytes\n", (unsigned long)sys.freeHeap);
+    printf_("WiFi     : %s  IP=%s  RSSI=%d dBm\n",
+            sys.wifiConnected ? "connected" : (sys.wifiApMode ? "AP mode" : "offline"),
+            sys.wifiIp, (int)sys.wifiRssi);
+    printf_("NTP      : %s  time=%lu\n",
+            sys.ntpTime > 0 ? "synced" : "not synced",
+            (unsigned long)sys.ntpTime);
+    printf_("DTU      : %s\n",        sys.dtuOnline      ? "online"    : "offline");
+    printf_("MQTT     : %s\n",        sys.mqttConnected  ? "connected" : "disconnected");
+    printf_("EventBits: 0x%02X\n",   (unsigned)bits);
+}
+
+static void cmdWifi() {
+    DataStore::SystemStatus sys = dsGetSystem();
+    printf_("Mode     : %s\n",       sys.wifiApMode    ? "AP"  : "STA");
+    printf_("Connected: %s\n",       sys.wifiConnected ? "yes" : "no");
+    printf_("IP       : %s\n",       sys.wifiIp);
+    printf_("RSSI     : %d dBm\n",   (int)sys.wifiRssi);
+    printf_("MAC      : %s\n",       sys.macAddress.c_str());
+    printf_("SSID     : %s\n",       appConfig.wifiSsid);
+}
+
+static void cmdDtu() {
+    DataStore::SystemStatus sys = dsGetSystem();
+    DataStore::PvData       pv  = dsGetPv();
+
+    printf_("Host     : %s:%d\n",  appConfig.dtuHost, appConfig.dtuPort);
+    printf_("Online   : %s\n",     sys.dtuOnline     ? "yes" : "no");
+    printf_("Cloud    : %s\n",     sys.dtuCloudBusy  ? "busy (paused)" : "free");
+    if (!pv.valid) { Serial.println("PV data  : not yet received"); return; }
+    printf_("PV data  : ts=%lu\n", (unsigned long)pv.timestamp);
+    printf_("  Grid   : %.1f V  %.2f A  %.1f W  today=%.3f kWh  total=%.3f kWh\n",
+            pv.grid_v, pv.grid_i, pv.grid_p, pv.grid_dE, pv.grid_tE);
+    printf_("  PV1    : %.1f V  %.2f A  %.1f W  today=%.3f kWh  total=%.3f kWh\n",
+            pv.pv0_v,  pv.pv0_i,  pv.pv0_p,  pv.pv0_dE,  pv.pv0_tE);
+    printf_("  PV2    : %.1f V  %.2f A  %.1f W  today=%.3f kWh  total=%.3f kWh\n",
+            pv.pv1_v,  pv.pv1_i,  pv.pv1_p,  pv.pv1_dE,  pv.pv1_tE);
+    printf_("  Temp   : %.1f C   Limit: %d%%   Active: %s\n",
+            pv.temp, pv.powerLimit, pv.inverterActive ? "yes" : "no");
+    printf_("  DTU RSSI: %d dBm\n", pv.wifiRssi);
+}
+
+static void cmdMqtt() {
+    DataStore::SystemStatus sys = dsGetSystem();
+    printf_("Broker   : %s:%d\n", appConfig.mqttHost, appConfig.mqttPort);
+    printf_("Topic    : %s\n",    appConfig.mqttTopic);
+    printf_("User     : %s\n",    strlen(appConfig.mqttUser) ? appConfig.mqttUser : "(none)");
+    printf_("Connected: %s\n",    sys.mqttConnected     ? "yes" : "no");
+    printf_("HA disco : %s\n",    appConfig.mqttHaDiscovery ? "on" : "off");
+    printf_("OpenDTU  : %s\n",    appConfig.mqttOpenDtu     ? "on" : "off");
+    printf_("Retain   : %s\n",    appConfig.mqttRetain      ? "on" : "off");
+}
+
+static void cmdGpio() {
+    DataStore::GpioState gpio = dsGetGpio();
+    const char* modes[]       = {"OUTPUT", "INPUT", "I2C_RESERVED"};
+    printf_("Relay  (GPIO%d, inv=%d): %s\n",
+            appConfig.relay.pin, appConfig.relay.inverted,
+            gpio.relay ? "ON" : "OFF");
+    for (int i = 0; i < 4; i++) {
+        uint8_t m = (uint8_t)appConfig.gp[i].mode;
+        if (m > 2) m = 2;
+        printf_("GP%d    (GPIO%d, mode=%s, inv=%d): %s\n",
+                i + 1, appConfig.gp[i].pin, modes[m],
+                appConfig.gp[i].inverted, gpio.gpio[i] ? "ON" : "OFF");
+    }
+}
+
+static void cmdConfig() {
+    Serial.println("─── WiFi ───────────────────────────────");
+    printf_("  ssid        : %s\n",   appConfig.wifiSsid);
+    printf_("  apFallback  : %s\n",   appConfig.wifiApFallback ? "yes" : "no");
+    Serial.println("─── DTU ────────────────────────────────");
+    printf_("  host        : %s\n",   appConfig.dtuHost);
+    printf_("  port        : %d\n",   appConfig.dtuPort);
+    printf_("  interval    : %d s\n", appConfig.dtuInterval);
+    printf_("  cloudPause  : %d s\n", appConfig.dtuCloudPause);
+    printf_("  rebootFails : %d\n",   appConfig.dtuRebootAfterFails);
+    Serial.println("─── Power ──────────────────────────────");
+    printf_("  limitDefault: %d%%\n", appConfig.powerLimitDefault);
+    printf_("  limitTimeout: %d s\n", appConfig.powerLimitTimeout);
+    Serial.println("─── MQTT ───────────────────────────────");
+    printf_("  host        : %s\n",   appConfig.mqttHost);
+    printf_("  port        : %d\n",   appConfig.mqttPort);
+    printf_("  topic       : %s\n",   appConfig.mqttTopic);
+    printf_("  haDiscovery : %s\n",   appConfig.mqttHaDiscovery ? "on" : "off");
+    printf_("  openDtu     : %s\n",   appConfig.mqttOpenDtu     ? "on" : "off");
+    printf_("  retain      : %s\n",   appConfig.mqttRetain      ? "on" : "off");
+    Serial.println("─── LED ────────────────────────────────");
+    printf_("  pin         : GPIO%d\n", appConfig.ledPin);
+    printf_("  brightness  : %d\n",     appConfig.ledBrightness);
+    Serial.println("─── NTP ────────────────────────────────");
+    printf_("  server      : %s\n",   appConfig.ntpServer);
+    printf_("  tzOffset    : %d s\n", appConfig.tzOffset);
+    Serial.println("─── Misc ───────────────────────────────");
+    printf_("  logLevel    : %d\n",   appConfig.logLevel);
+}
+
+static void cmdRelaySet(const char* arg) {
+    if (!arg || (strcmp(arg, "on") != 0 && strcmp(arg, "off") != 0)) {
+        Serial.println("Usage: relay on|off"); return;
+    }
+    dsSetGpioCommand(0, strcmp(arg, "on") == 0);
+    printf_("Relay -> %s\n", arg);
+}
+
+static void cmdGpioSet(int gpIdx, const char* arg) {
+    if (!arg || (strcmp(arg, "on") != 0 && strcmp(arg, "off") != 0)) {
+        printf_("Usage: gpio%d on|off\n", gpIdx); return;
+    }
+    dsSetGpioCommand(gpIdx, strcmp(arg, "on") == 0);
+    printf_("GPIO%d -> %s\n", gpIdx, arg);
+}
+
+static void cmdLoglevel(const char* arg) {
+    if (!arg) {
+        printf_("Log level: %d  (0=error 1=warn 2=info 3=debug)\n", appConfig.logLevel);
         return;
     }
-    DtuData_t d;
-    if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-        memcpy(&d, &latestDtuData, sizeof(DtuData_t));
-        xSemaphoreGive(configMutex);
-    } else return;
-
-    Serial.println("\n── Inverter Data ────────────────────────────────────");
-    Serial.printf("  Model:        %s  Serial: %s\n", d.inverterModel, d.inverterSerial);
-    Serial.printf("  PV1:          %.1fV / %.2fA / %.0fW  Today: %.3f kWh\n",
-                  d.pv0_v, d.pv0_i, d.pv0_p, d.pv0_dE);
-    Serial.printf("  PV2:          %.1fV / %.2fA / %.0fW  Today: %.3f kWh\n",
-                  d.pv1_v, d.pv1_i, d.pv1_p, d.pv1_dE);
-    Serial.printf("  Grid:         %.1fV / %.2fA / %.0fW\n",
-                  d.grid_v, d.grid_i, d.grid_p);
-    Serial.printf("  Energy:       Today: %.3f kWh  Total: %.3f kWh\n",
-                  d.grid_dE, d.grid_tE);
-    Serial.printf("  Temperature:  %.1f°C\n", d.temp);
-    Serial.printf("  Power Limit:  %d%%\n",   d.powerLimit);
-    Serial.printf("  DTU RSSI:     %d%%\n",   d.wifiRssi);
-    Serial.printf("  Warnings:     %d\n",     d.warningsActive);
-    Serial.printf("  Last Update:  %lu\n",    (unsigned long)d.lastResponse);
-    Serial.println("─────────────────────────────────────────────────────\n");
+    int lvl = -1;
+    if      (strcmp(arg, "error") == 0) lvl = LOG_LEVEL_ERROR;
+    else if (strcmp(arg, "warn")  == 0) lvl = LOG_LEVEL_WARN;
+    else if (strcmp(arg, "info")  == 0) lvl = LOG_LEVEL_INFO;
+    else if (strcmp(arg, "debug") == 0) lvl = LOG_LEVEL_DEBUG;
+    else { Serial.println("Usage: loglevel error|warn|info|debug"); return; }
+    appConfig.logLevel = lvl;
+    configSave();
+    printf_("Log level -> %d (%s)\n", lvl, arg);
 }
 
-static void printSysInfo() {
-    Serial.println("\n── System Info ──────────────────────────────────────");
-    Serial.printf("  Free Heap:    %lu B\n",  (unsigned long)ESP.getFreeHeap());
-    Serial.printf("  Min Heap:     %lu B\n",  (unsigned long)ESP.getMinFreeHeap());
-    Serial.printf("  Chip Rev:     %d\n",     ESP.getChipRevision());
-    Serial.printf("  CPU Freq:     %d MHz\n", ESP.getCpuFreqMHz());
-    Serial.printf("  Flash Size:   %lu B\n",  (unsigned long)ESP.getFlashChipSize());
-    Serial.printf("  Uptime:       %lu s\n",  (unsigned long)(millis() / 1000));
-
-    // FreeRTOS task count (vTaskList requires configUSE_STATS_FORMATTING_FUNCTIONS=1)
-    Serial.printf("  Tasks running:  %lu\n", (unsigned long)uxTaskGetNumberOfTasks());
-    Serial.println("─────────────────────────────────────────────────────\n");
-}
-
-static void ledTestSequence() {
-    const LedState_t states[] = {
-        LED_BOOT, LED_WIFI_CONNECTING, LED_AP_MODE, LED_DTU_OFFLINE,
-        LED_NO_MQTT, LED_OPERATIONAL, LED_DATA_FLASH, LED_OTA,
-        LED_ERROR, LED_STANDBY
+static void cmdLedTest() {
+    const struct { LedState_t state; const char* name; } seq[] = {
+        { LED_BOOT,            "BOOT"            },
+        { LED_WIFI_CONNECTING, "WIFI_CONNECTING" },
+        { LED_AP_MODE,         "AP_MODE"         },
+        { LED_DTU_OFFLINE,     "DTU_OFFLINE"     },
+        { LED_NO_MQTT,         "NO_MQTT"         },
+        { LED_OPERATIONAL,     "OPERATIONAL"     },
+        { LED_DATA_FLASH,      "DATA_FLASH"      },
+        { LED_OTA,             "OTA"             },
+        { LED_ERROR,           "ERROR"           },
+        { LED_STANDBY,         "STANDBY"         },
     };
-    const char* names[] = {
-        "BOOT","WIFI_CONNECTING","AP_MODE","DTU_OFFLINE",
-        "NO_MQTT","OPERATIONAL","DATA_FLASH","OTA",
-        "ERROR","STANDBY"
-    };
-    Serial.println("[LED] Starting LED test sequence...");
-    for (int i = 0; i < 10; i++) {
-        Serial.printf("[LED] State: %s\n", names[i]);
-        setLedState(states[i]);
+    Serial.println("LED test — 2.5s per state...");
+    for (auto& s : seq) {
+        printf_("  -> %s\n", s.name);
+        setLedState(s.state);
         vTaskDelay(pdMS_TO_TICKS(2500));
     }
-    setLedState(LED_OPERATIONAL);
-    Serial.println("[LED] Test done.");
+    Serial.println("LED test done.");
 }
 
-// ─── Command parser ───────────────────────────────────────────────────────────
-static void processCommand(const char* line) {
-    char cmd[32] = {};
-    char arg1[32] = {};
-    char arg2[32] = {};
-    sscanf(line, "%31s %31s %31s", cmd, arg1, arg2);
+static void cmdReset() {
+    Serial.println("Factory reset — setting EVT_FACTORY_RESET and rebooting...");
+    vTaskDelay(pdMS_TO_TICKS(100));
+    xEventGroupSetBits(systemStateEvents, EVT_FACTORY_RESET);
+    vTaskDelay(pdMS_TO_TICKS(3000));    // allow LED to show red; main handles erase
+    ESP.restart();
+}
 
-    if (strcmp(cmd, "help") == 0) {
-        printHelp();
-    } else if (strcmp(cmd, "status") == 0) {
-        printStatus();
-    } else if (strcmp(cmd, "data") == 0) {
-        printData();
-    } else if (strcmp(cmd, "sysinfo") == 0) {
-        printSysInfo();
-    } else if (strcmp(cmd, "reboot") == 0) {
-        Serial.println("[SYS] Rebooting...");
-        vTaskDelay(pdMS_TO_TICKS(300));
-        ESP.restart();
-    } else if (strcmp(cmd, "resetToFactory") == 0 && strcmp(arg1,"1")==0) {
-        Serial.println("[SYS] Factory reset! Deleting config and rebooting...");
-        LittleFS.remove(CONFIG_FILE);
-        vTaskDelay(pdMS_TO_TICKS(300));
-        ESP.restart();
-    } else if (strcmp(cmd, "setPower") == 0) {
-        int w = atoi(arg1);
-        dtuSetPowerLimit(w);
-        Serial.printf("[DTU] Power limit set to %d\n", w);
-    } else if (strcmp(cmd, "setRelay") == 0) {
-        bool s = (atoi(arg1) == 1);
-        gpioSetRelay(s);
-        Serial.printf("[GPIO] Relay -> %s\n", s ? "ON" : "OFF");
-    } else if (strcmp(cmd, "setGPIO") == 0) {
-        int idx = atoi(arg1) - 1;
-        bool s  = (atoi(arg2) == 1);
-        if (idx >= 0 && idx < 4) {
-            gpioSetPin(idx, s);
-            Serial.printf("[GPIO] GP%d -> %s\n", idx+1, s ? "HIGH" : "LOW");
-        } else {
-            Serial.println("[GPIO] Invalid GPIO number (1-4)");
+static void cmdRestart() {
+    Serial.println("Rebooting...");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    ESP.restart();
+}
+
+// ─── Command dispatcher ───────────────────────────────────────────────────────
+static void dispatch(char* line) {
+    while (*line == ' ') line++;
+    if (*line == '\0') return;
+
+    char* verb = line;
+    char* arg  = nullptr;
+    for (char* p = line; *p; p++) {
+        if (*p == ' ') {
+            *p = '\0';
+            arg = p + 1;
+            while (*arg == ' ') arg++;
+            break;
         }
-    } else if (strcmp(cmd, "getGPIO") == 0) {
-        int idx = atoi(arg1) - 1;
-        if (idx >= 0 && idx < 4) {
-            Serial.printf("[GPIO] GP%d = %s\n", idx+1,
-                          gpioGetPin(idx) ? "HIGH" : "LOW");
-        }
-    } else if (strcmp(cmd, "rebootDTU") == 0 && strcmp(arg1,"1")==0) {
-        dtuRequestReboot();
-        Serial.println("[DTU] Reboot requested");
-    } else if (strcmp(cmd, "rebootInverter") == 0 && strcmp(arg1,"1")==0) {
-        dtuRequestInverterReboot();
-        Serial.println("[DTU] Inverter reboot requested");
-    } else if (strcmp(cmd, "setInterval") == 0) {
-        int s = atoi(arg1);
-        if (s < DTU_MIN_INTERVAL) s = DTU_MIN_INTERVAL;
-        if (xSemaphoreTake(configMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-            appConfig.dtuInterval = s;
-            xSemaphoreGive(configMutex);
-        }
-        configSave();
-        Serial.printf("[DTU] Interval set to %d s\n", s);
-    } else if (strcmp(cmd, "setLogLevel") == 0) {
-        int l = atoi(arg1);
-        if (l >= 0 && l <= 3) {
-            appConfig.logLevel = l;
-            Serial.printf("[SYS] Log level -> %d\n", l);
-        }
-    } else if (strcmp(cmd, "setWifi") == 0) {
-        if (atoi(arg1) == 0) { WiFi.disconnect(); Serial.println("[WIFI] Disabled"); }
-        else                 { WiFi.reconnect();   Serial.println("[WIFI] Reconnecting"); }
-    } else if (strcmp(cmd, "protectSettings") == 0) {
-        bool p = (atoi(arg1) == 1);
-        appConfig.protectSettings = p;
-        configSave();
-        Serial.printf("[SYS] protectSettings -> %s\n", p ? "ON" : "OFF");
-    } else if (strcmp(cmd, "ledTest") == 0) {
-        ledTestSequence();
-    } else if (strlen(cmd) > 0) {
-        Serial.printf("[SYS] Unknown command: '%s'  (type 'help')\n", cmd);
     }
+    if (arg && *arg == '\0') arg = nullptr;
+
+    if      (strcmp(verb, "help")     == 0) cmdHelp();
+    else if (strcmp(verb, "version")  == 0) cmdVersion();
+    else if (strcmp(verb, "status")   == 0) cmdStatus();
+    else if (strcmp(verb, "wifi")     == 0) cmdWifi();
+    else if (strcmp(verb, "dtu")      == 0) cmdDtu();
+    else if (strcmp(verb, "mqtt")     == 0) cmdMqtt();
+    else if (strcmp(verb, "gpio")     == 0 && !arg) cmdGpio();
+    else if (strcmp(verb, "config")   == 0) cmdConfig();
+    else if (strcmp(verb, "relay")    == 0) cmdRelaySet(arg);
+    else if (strcmp(verb, "gpio1")    == 0) cmdGpioSet(1, arg);
+    else if (strcmp(verb, "gpio2")    == 0) cmdGpioSet(2, arg);
+    else if (strcmp(verb, "gpio3")    == 0) cmdGpioSet(3, arg);
+    else if (strcmp(verb, "gpio4")    == 0) cmdGpioSet(4, arg);
+    else if (strcmp(verb, "loglevel") == 0) cmdLoglevel(arg);
+    else if (strcmp(verb, "ledtest")  == 0) cmdLedTest();
+    else if (strcmp(verb, "restart")  == 0) cmdRestart();
+    else if (strcmp(verb, "reset")    == 0) cmdReset();
+    else printf_("Unknown command: '%s'  (type 'help')\n", verb);
 }
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
 void taskSerial(void* pvParameters) {
-    Serial.println("\n[SYS] Serial console ready. Type 'help' for commands.");
+    static char    buf[128];
+    static uint8_t pos = 0;
+
+    LOG_I(MOD_SYS, "Serial console ready at %d baud", SERIAL_BAUD);
+    Serial.print("\r\nHMS-GW-S3 serial console — type 'help'\r\n> ");
 
     for (;;) {
         while (Serial.available()) {
-            char c = Serial.read();
+            char c = (char)Serial.read();
+
             if (c == '\r') continue;
+
             if (c == '\n') {
-                _lineBuf[_linePos] = '\0';
-                if (_linePos > 0) {
-                    processCommand(_lineBuf);
-                }
-                _linePos = 0;
-            } else if (_linePos < (int)sizeof(_lineBuf) - 1) {
-                _lineBuf[_linePos++] = c;
+                buf[pos] = '\0';
+                Serial.println();
+                if (pos > 0) dispatch(buf);
+                pos = 0;
+                prompt();
+                continue;
+            }
+
+            // Backspace / DEL
+            if (c == 0x7F || c == '\b') {
+                if (pos > 0) { pos--; Serial.print("\b \b"); }
+                continue;
+            }
+
+            if (pos < sizeof(buf) - 1) {
+                buf[pos++] = c;
+                Serial.print(c);    // local echo
             }
         }
         vTaskDelay(pdMS_TO_TICKS(20));

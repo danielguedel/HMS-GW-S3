@@ -4,8 +4,8 @@
 **Hardware:** ESP32-S3-DevKitC-1-N8R8 (8MB Flash, 8MB PSRAM)  
 **Framework:** Arduino / FreeRTOS (PlatformIO)  
 **Repository:** https://github.com/danielguedel/HMS-GW-S3  
-**Datum:** 2026-06-11  
-**Status:** Spezifikation für Neuimplementierung
+**Datum:** 2026-06-14  
+**Status:** Implementiert und produktiv (v0.2.0, Build 150)
 
 ---
 
@@ -201,7 +201,7 @@ Tasks setzen und lesen diese Bits. Der DataStore enthält die detaillierten Zust
 - **Adresse:** `appConfig.dtuHost:appConfig.dtuPort` (default: Port 10081)
 - **Protokoll:** Rohes TCP (kein HTTP)
 - **Library:** AsyncTCP
-- **Keepalive:** DTU trennt nach ~10s Inaktivität
+- **RX-Timeout:** 60s (`setRxTimeout(60)`) — länger als Poll-Interval, damit die Verbindung zwischen Zyklen offen bleibt
 
 ### 4.2 Paket-Format
 
@@ -228,17 +228,30 @@ Byte 10+:   [Protobuf-Payload]
 ### 4.4 Ablauf pro Zyklus
 
 ```
-1. TCP Connect zu DTU
-2. Sofort: AppInformation senden (0xa3 0x01)
-3. Warten auf Response (max. 5s)
-4. RealDataNew senden (0xa3 0x11)
-5. Warten auf Response (max. 5s)
-6. Daten parsen → dsSetPv()
-7. GetConfig senden (0xa3 0x09)
-8. Warten auf Response (max. 3s)
-9. Power Limit → dsSetPv(powerLimit)
-10. TCP Verbindung offen halten bis nächster Zyklus
-    oder DTU trennt (ERR_RST bei Cloud-Sync)
+Beim Connect (einmalig):
+  1. TCP Connect zu DTU
+  2. Sofort in onConnect-Callback: AppInformation senden (0xa3 0x01)
+  3. Warten auf AppInfo-Response (max. 8s) — DIREKT nach Connect,
+     VOR dem Poll-Interval, damit die Response nicht durch den
+     RX-Timeout verloren geht
+  4. TCP-Verbindung bleibt offen (RxTimeout=60s > Poll-Interval)
+
+Pro Poll-Interval (dtuInterval Sekunden):
+  5. RealDataNew senden (0xa3 0x11)
+  6. Warten auf Response (max. 5s)
+  7. Daten parsen → dsSetPv()  →  setLedState(LED_DATA_FLASH)
+  8. GetConfig senden (0xa3 0x09)
+  9. Warten auf Response (max. 3s, non-fatal bei Timeout)
+  10. Power Limit + DTU RSSI → dsSetPv()
+  11. dsSetPv() + setDtuOnline(true) → MQTT publiziert automatisch
+  12. Weiter bei Schritt 5
+
+Wichtig — onData Flag-Reihenfolge:
+  _appReady / _dataReady / _cfgReady akkumulieren sich (true bleibt true).
+  Nur sendRealDataNew() setzt _dataReady=false, sendGetConfig() setzt _cfgReady=false.
+  waitFor() darf Flags NICHT zurücksetzen, sonst bricht die Detektionskette.
+
+Bei ERR_RST (-14): Cloud-Sync-Pause, dann neu verbinden (ab Schritt 1)
 ```
 
 ### 4.5 Cloud-Sync-Pause
@@ -310,14 +323,21 @@ PubSubClient ist synchron-blockierend. `connect()` blockiert den Thread für >1 
 ### 5.2 Vorgeschlagene Lösung: esp_mqtt
 
 ```cpp
-// Nicht-blockierender MQTT-Client (ESP-IDF native)
+// Nicht-blockierender MQTT-Client (ESP-IDF native, flat 4.x API)
+// Hinweis: framework-arduinoespressif32 @ 3.x bundelt ESP-IDF 4.x →
+//          flat struct fields, NICHT die nested 5.x API (broker.address.uri)
 #include "mqtt_client.h"
 
-esp_mqtt_client_config_t mqtt_cfg = {
-    .broker.address.uri = "mqtt://10.1.1.41:1883",
-};
-esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+esp_mqtt_client_config_t cfg = {};
+cfg.uri         = "mqtt://10.1.1.41:1883";
+cfg.client_id   = "hmsgws3";
+cfg.keepalive   = 60;
+cfg.lwt_topic   = "hmsgws3/LWT";
+cfg.lwt_msg     = "offline";
+cfg.lwt_msg_len = 7;
+cfg.lwt_retain  = 1;
+esp_mqtt_client_handle_t client = esp_mqtt_client_init(&cfg);
+esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqttEventHandler, NULL);
 esp_mqtt_client_start(client);
 ```
 
@@ -408,17 +428,19 @@ Discovery-Nachrichten werden 5 Sekunden nach MQTT-Connect gesendet, eine pro 500
 
 | Zustand | Farbe | Muster | Bedeutung |
 |---|---|---|---|
-| LED_BOOT | Weiss | Blinken 500ms | Bootvorgang |
-| LED_WIFI_CONNECTING | Gelb | Blinken 500ms | WiFi-Verbindungsaufbau |
-| LED_AP_MODE | Gelb | Blinken 1000ms | AP-Modus aktiv |
-| LED_DTU_OFFLINE | Orange | Blinken 2x kurz | WiFi OK, DTU offline |
-| LED_NO_MQTT | Blau | Blinken 500ms | WiFi+DTU OK, MQTT offline |
-| LED_OPERATIONAL | Grün | Herzschlag (kurz) | Vollbetrieb |
-| LED_STANDBY | Grün | Sehr langsam | Kein PV-Ertrag (Nacht) |
-| LED_DATA_FLASH | Weiss | 1x kurz | Daten empfangen |
-| LED_OTA | Blau | Schnell blinken | OTA-Update läuft |
-| LED_ERROR | Rot | Blinken 250ms | Fehler |
-| LED_FACTORY_RESET | Rot | Dauerhaft | Factory Reset |
+| LED_BOOT | Weiss | 3× Blinken (120ms) | Bootvorgang |
+| LED_WIFI_CONNECTING | Blau | Blinken 1 Hz | WiFi-Verbindungsaufbau |
+| LED_AP_MODE | Blau | 3× kurz + Pause | AP-Modus aktiv (braucht Nutzeraktion) |
+| LED_DTU_OFFLINE | Orange | Doppelblink + Pause | WiFi OK, DTU offline |
+| LED_NO_MQTT | Cyan | Langsamer Puls 4s | WiFi+DTU OK, MQTT offline |
+| LED_OPERATIONAL | Grün | Herzschlag 5s | Vollbetrieb, PV aktiv (≥ 1W) |
+| LED_STANDBY | Grün (10%) | Sehr langer Puls 10s | Kein PV-Ertrag (Nacht/bewölkt) |
+| LED_DATA_FLASH | Weiss | 1× 80ms | Neue DTU-Daten empfangen (transient) |
+| LED_OTA | Magenta | Schnell 5 Hz | OTA-Update läuft |
+| LED_ERROR | Rot | 4 Hz | Kritischer Fehler |
+| LED_FACTORY_RESET | Rot | Dauerhaft | Factory Reset läuft |
+
+Der Zustand wird **auto-deriviert** (`deriveState()`) — kein manuelles `setLedState()` nötig ausser für Transienten (`LED_DATA_FLASH`) und OTA.
 
 ---
 
@@ -652,18 +674,18 @@ HMS-GW-S3/
 │   ├── dataStore.h             (DataStore struct + API)
 │   ├── systemState.h           (EventGroup Bits)
 │   ├── logger.h                (LOG_I/W/E/D Makros)
-│   └── proto/                  (Protobuf .proto Dateien)
+│   └── taskLED.h               (setLedState() Deklaration)
 └── src/
     ├── main.cpp                (Setup, Task-Start)
     ├── appConfig.cpp           (Config laden/speichern)
     ├── dataStore.cpp           (DataStore Implementation)
     ├── logger.cpp
-    ├── taskWiFi.cpp            (NEU: WiFi + NTP als eigener Task)
-    ├── taskDTU.cpp             (TCP + Protobuf, refactored)
-    ├── taskMQTT.cpp            (esp-mqtt, non-blocking)
+    ├── taskWiFi.cpp            (WiFi + NTP als eigener Task)
+    ├── taskDTU.cpp             (TCP + manuelles Protobuf, kein Nanopb)
+    ├── taskMQTT.cpp            (esp-mqtt, non-blocking, ESP-IDF 4.x flat API)
     ├── taskWebServer.cpp       (ESPAsyncWebServer)
     ├── taskGPIO.cpp            (Relay + GP1-4)
-    ├── taskLED.cpp             (NeoPixel, war taskNeoPixel)
+    ├── taskNeoPixel.cpp        (WS2812B GPIO38, Zustands-Auto-Derivierung)
     ├── taskSerial.cpp          (Konsole)
     └── taskSysMonitor.cpp      (Heap, Uptime)
 ```
@@ -686,18 +708,18 @@ HMS-GW-S3/
 │   ├── dataStore.h             (DataStore struct + API)
 │   ├── systemState.h           (EventGroup Bits)
 │   ├── logger.h                (LOG_I/W/E/D Makros mit ANSI-Farben)
-│   └── proto/                  (Protobuf .proto Dateien)
+│   └── taskLED.h               (setLedState() Deklaration)
 └── src/
     ├── main.cpp                (Setup, Task-Start, dsInit)
     ├── appConfig.cpp           (Config laden/speichern)
     ├── dataStore.cpp           (DataStore Implementation)
     ├── logger.cpp              (Formatierte Ausgabe HH:MM:SS.mmm)
     ├── taskWiFi.cpp            (WiFi + NTP als eigener Task)
-    ├── taskDTU.cpp             (TCP + Protobuf, schreibt in DataStore)
-    ├── taskMQTT.cpp            (esp-mqtt non-blocking)
+    ├── taskDTU.cpp             (TCP + manuelles Protobuf, kein Nanopb)
+    ├── taskMQTT.cpp            (esp-mqtt non-blocking, ESP-IDF 4.x flat API)
     ├── taskWebServer.cpp       (HTTP-API, OTA File+URL, Static Files)
     ├── taskGPIO.cpp            (Relay GPIO1, GP1-4)
-    ├── taskLED.cpp             (NeoPixel GPIO38)
+    ├── taskNeoPixel.cpp        (WS2812B GPIO38, Zustands-Auto-Derivierung)
     ├── taskSerial.cpp          (Konsole mit Kommandos)
     └── taskSysMonitor.cpp      (Heap, Uptime)
 ```

@@ -1,169 +1,217 @@
+// appConfig.cpp — v2 (flat JSON format, v2 AppConfig fields)
+// config.json uses the same flat keys as the web API for consistency.
+
 #include "appConfig.h"
 #include "config.h"
 #include "logger.h"
-#include "systemState.h"
-
 #include <LittleFS.h>
 #include <ArduinoJson.h>
-#include <freertos/semphr.h>
-#include <string.h>
+#include <Arduino.h>
 
 AppConfig appConfig;
 
 void configSetDefaults() {
     memset(&appConfig, 0, sizeof(AppConfig));
-    strlcpy(appConfig.wifiSsid,     "",              sizeof(appConfig.wifiSsid));
-    strlcpy(appConfig.wifiPassword, "",              sizeof(appConfig.wifiPassword));
-    snprintf(appConfig.hostname, sizeof(appConfig.hostname),
-             "hmsgws3-%06llX", (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFF));
-    strlcpy(appConfig.dtuHost,   "192.168.1.100",   sizeof(appConfig.dtuHost));
+
+    // WiFi
+    strlcpy(appConfig.wifiSsid,  "", sizeof(appConfig.wifiSsid));
+    strlcpy(appConfig.wifiPass,  "", sizeof(appConfig.wifiPass));
+    appConfig.wifiApFallback = true;
+
+    // DTU
+    strlcpy(appConfig.dtuHost, "192.168.1.100", sizeof(appConfig.dtuHost));
     appConfig.dtuPort             = DTU_DEFAULT_PORT;
     appConfig.dtuInterval         = DTU_DEFAULT_INTERVAL;
     appConfig.dtuCloudPause       = DTU_DEFAULT_CLOUD_PAUSE;
     appConfig.dtuRebootAfterFails = DTU_REBOOT_AFTER_FAILS;
-    strlcpy(appConfig.mqttHost,  "",                sizeof(appConfig.mqttHost));
-    appConfig.mqttPort            = MQTT_DEFAULT_PORT;
-    strlcpy(appConfig.mqttUser,  "",                sizeof(appConfig.mqttUser));
-    strlcpy(appConfig.mqttPass,  "",                sizeof(appConfig.mqttPass));
+
+    // Power Limit
+    appConfig.powerLimitDefault = POWER_LIMIT_DEFAULT;
+    appConfig.powerLimitTimeout = POWER_LIMIT_TIMEOUT;
+
+    // MQTT
+    strlcpy(appConfig.mqttHost,  "",                 sizeof(appConfig.mqttHost));
+    appConfig.mqttPort = MQTT_DEFAULT_PORT;
+    strlcpy(appConfig.mqttUser,  "",                 sizeof(appConfig.mqttUser));
+    strlcpy(appConfig.mqttPass,  "",                 sizeof(appConfig.mqttPass));
     snprintf(appConfig.mqttTopic, sizeof(appConfig.mqttTopic),
              "hmsgws3_%06llX", (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFF));
-    appConfig.mqttTls          = false;
-    appConfig.mqttHaDiscovery  = true;
-    appConfig.mqttOpenDtu      = false;
-    appConfig.mqttQos          = 0;
-    appConfig.mqttRetain       = false;
-    appConfig.relay = { RELAY_PIN, true,  false, false };
-    appConfig.gp[0] = { GPIO1_PIN, false, true,  false };
-    appConfig.gp[1] = { GPIO2_PIN, false, true,  false };
-    appConfig.gp[2] = { GPIO3_PIN, false, true,  false };
-    appConfig.gp[3] = { GPIO4_PIN, false, true,  false };
-    appConfig.tzOffset        = 3600;
-    appConfig.ledBrightness   = NEOPIXEL_BRIGHTNESS_DEF;
-    appConfig.logLevel        = LOG_LEVEL_DEBUG;   // debug for DTU troubleshooting
-    appConfig.protectSettings = false;
-    appConfig.webPort         = WEB_DEFAULT_PORT;
-    strlcpy(appConfig.apSsid, AP_DEFAULT_SSID, sizeof(appConfig.apSsid));
+    appConfig.mqttRetain      = false;
+    appConfig.mqttHaDiscovery = true;
+    appConfig.mqttOpenDtu     = false;
+
+    // GPIO — Relay
+    appConfig.relay.pin      = RELAY_PIN;
+    appConfig.relay.inverted = false;
+
+    // GPIO — GP1–GP4 (GP2/GP3 = I2C_RESERVED)
+    appConfig.gp[0].pin      = GP1_PIN;
+    appConfig.gp[0].mode     = GP_INPUT;
+    appConfig.gp[0].inverted = false;
+    appConfig.gp[0].pullup   = true;
+
+    appConfig.gp[1].pin      = GP2_PIN;
+    appConfig.gp[1].mode     = GP_I2C_RESERVED;
+    appConfig.gp[1].inverted = false;
+    appConfig.gp[1].pullup   = false;
+
+    appConfig.gp[2].pin      = GP3_PIN;
+    appConfig.gp[2].mode     = GP_I2C_RESERVED;
+    appConfig.gp[2].inverted = false;
+    appConfig.gp[2].pullup   = false;
+
+    appConfig.gp[3].pin      = 255;              // GP4: no default pin
+    appConfig.gp[3].mode     = GP_OUTPUT;
+    appConfig.gp[3].inverted = false;
+    appConfig.gp[3].pullup   = false;
+
+    // LED
+    appConfig.ledPin        = LED_PIN;
+    appConfig.ledBrightness = LED_BRIGHTNESS_DEFAULT;
+
+    // System
+    appConfig.tzOffset  = 3600;                 // UTC+1
+    strlcpy(appConfig.ntpServer, "pool.ntp.org", sizeof(appConfig.ntpServer));
+    appConfig.logLevel  = LOG_LEVEL_INFO;
 }
 
-bool configLoad() {
-    // LittleFS must be mounted before calling configLoad()
+void configLoad() {
     if (!LittleFS.exists(CONFIG_FILE)) {
-        LOG_W(MOD_CFG, "No config.json found (first boot or empty FS) — using defaults");
+        LOG_W(MOD_CFG, "No %s — using defaults", CONFIG_FILE);
         configSetDefaults();
-        return false;
+        return;
     }
     File f = LittleFS.open(CONFIG_FILE, "r");
     if (!f) {
-        LOG_W(MOD_CFG, "Cannot open config.json — using defaults");
+        LOG_W(MOD_CFG, "Cannot open %s — using defaults", CONFIG_FILE);
         configSetDefaults();
-        return false;
+        return;
     }
-
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, f);
     f.close();
-    if (err) { LOG_E(MOD_CFG, "JSON parse: %s", err.c_str()); configSetDefaults(); return false; }
-
-    strlcpy(appConfig.wifiSsid,     doc["wifi"]["ssid"]     | "", sizeof(appConfig.wifiSsid));
-    strlcpy(appConfig.wifiPassword, doc["wifi"]["password"] | "", sizeof(appConfig.wifiPassword));
-    strlcpy(appConfig.hostname,     doc["wifi"]["hostname"] | appConfig.hostname, sizeof(appConfig.hostname));
-
-    strlcpy(appConfig.dtuHost, doc["dtu"]["host"] | "192.168.1.100", sizeof(appConfig.dtuHost));
-    appConfig.dtuPort             = doc["dtu"]["port"]             | (int)DTU_DEFAULT_PORT;
-    appConfig.dtuInterval         = doc["dtu"]["interval"]         | (int)DTU_DEFAULT_INTERVAL;
-    appConfig.dtuCloudPause       = doc["dtu"]["cloudPause"]       | (int)DTU_DEFAULT_CLOUD_PAUSE;
-    appConfig.dtuRebootAfterFails = doc["dtu"]["rebootAfterFails"] | (int)DTU_REBOOT_AFTER_FAILS;
-
-    strlcpy(appConfig.mqttHost,  doc["mqtt"]["host"]  | "", sizeof(appConfig.mqttHost));
-    appConfig.mqttPort            = doc["mqtt"]["port"]  | (int)MQTT_DEFAULT_PORT;
-    strlcpy(appConfig.mqttUser,  doc["mqtt"]["user"]  | "", sizeof(appConfig.mqttUser));
-    strlcpy(appConfig.mqttPass,  doc["mqtt"]["pass"]  | "", sizeof(appConfig.mqttPass));
-    strlcpy(appConfig.mqttTopic, doc["mqtt"]["topic"] | appConfig.mqttTopic, sizeof(appConfig.mqttTopic));
-    appConfig.mqttTls         = doc["mqtt"]["tls"]    | false;
-    appConfig.mqttHaDiscovery = doc["mqtt"]["ha"]     | true;
-    appConfig.mqttOpenDtu     = doc["mqtt"]["openDTU"]| false;
-    appConfig.mqttQos         = doc["mqtt"]["qos"]    | 0;
-    appConfig.mqttRetain      = doc["mqtt"]["retain"] | false;
-
-    // GPIO — use JsonObjectConst to avoid copy-constructor issue
-    JsonObjectConst relay = doc["gpio"]["relay"];
-    if (!relay.isNull()) {
-        appConfig.relay.pin      = relay["pin"]      | (int)RELAY_PIN;
-        appConfig.relay.isOutput = relay["output"]   | true;
-        appConfig.relay.inverted = relay["inverted"] | false;
+    if (err) {
+        LOG_E(MOD_CFG, "JSON parse error: %s — using defaults", err.c_str());
+        configSetDefaults();
+        return;
     }
-    const char* gpKeys[] = {"gp1","gp2","gp3","gp4"};
-    const uint8_t gpPins[] = {GPIO1_PIN, GPIO2_PIN, GPIO3_PIN, GPIO4_PIN};
+
+    // Start from defaults so missing keys fall back gracefully
+    configSetDefaults();
+
+    // WiFi
+    if (doc["wifiSsid"].is<const char*>())
+        strlcpy(appConfig.wifiSsid, doc["wifiSsid"].as<const char*>(), sizeof(appConfig.wifiSsid));
+    if (doc["wifiPass"].is<const char*>())
+        strlcpy(appConfig.wifiPass, doc["wifiPass"].as<const char*>(), sizeof(appConfig.wifiPass));
+    if (!doc["wifiApFallback"].isNull())
+        appConfig.wifiApFallback = doc["wifiApFallback"].as<bool>();
+
+    // DTU
+    if (doc["dtuHost"].is<const char*>())
+        strlcpy(appConfig.dtuHost, doc["dtuHost"].as<const char*>(), sizeof(appConfig.dtuHost));
+    if (!doc["dtuPort"].isNull())             appConfig.dtuPort             = doc["dtuPort"].as<int>();
+    if (!doc["dtuInterval"].isNull()) {
+        int iv = doc["dtuInterval"].as<int>();
+        appConfig.dtuInterval = (iv < DTU_MIN_INTERVAL) ? DTU_MIN_INTERVAL : iv;
+    }
+    if (!doc["dtuCloudPause"].isNull())       appConfig.dtuCloudPause       = doc["dtuCloudPause"].as<int>();
+    if (!doc["dtuRebootAfterFails"].isNull()) appConfig.dtuRebootAfterFails = doc["dtuRebootAfterFails"].as<int>();
+
+    // Power Limit
+    if (!doc["powerLimitDefault"].isNull()) appConfig.powerLimitDefault = doc["powerLimitDefault"].as<int>();
+    if (!doc["powerLimitTimeout"].isNull()) appConfig.powerLimitTimeout = doc["powerLimitTimeout"].as<int>();
+
+    // MQTT
+    if (doc["mqttHost"].is<const char*>())
+        strlcpy(appConfig.mqttHost,  doc["mqttHost"].as<const char*>(),  sizeof(appConfig.mqttHost));
+    if (!doc["mqttPort"].isNull())  appConfig.mqttPort = doc["mqttPort"].as<int>();
+    if (doc["mqttUser"].is<const char*>())
+        strlcpy(appConfig.mqttUser,  doc["mqttUser"].as<const char*>(),  sizeof(appConfig.mqttUser));
+    if (doc["mqttPass"].is<const char*>())
+        strlcpy(appConfig.mqttPass,  doc["mqttPass"].as<const char*>(),  sizeof(appConfig.mqttPass));
+    if (doc["mqttTopic"].is<const char*>())
+        strlcpy(appConfig.mqttTopic, doc["mqttTopic"].as<const char*>(), sizeof(appConfig.mqttTopic));
+    if (!doc["mqttRetain"].isNull())      appConfig.mqttRetain      = doc["mqttRetain"].as<bool>();
+    if (!doc["mqttHaDiscovery"].isNull()) appConfig.mqttHaDiscovery = doc["mqttHaDiscovery"].as<bool>();
+    if (!doc["mqttOpenDtu"].isNull())     appConfig.mqttOpenDtu     = doc["mqttOpenDtu"].as<bool>();
+
+    // GPIO Relay
+    if (!doc["relayPin"].isNull())      appConfig.relay.pin      = doc["relayPin"].as<int>();
+    if (!doc["relayInverted"].isNull()) appConfig.relay.inverted = doc["relayInverted"].as<bool>();
+
+    // GPIO GP1–GP4
+    const char* keys[] = {"gp1","gp2","gp3","gp4"};
     for (int i = 0; i < 4; i++) {
-        JsonObjectConst gp = doc["gpio"][gpKeys[i]];
-        if (!gp.isNull()) {
-            appConfig.gp[i].pin      = gp["pin"]      | (int)gpPins[i];
-            appConfig.gp[i].isOutput = gp["output"]   | false;
-            appConfig.gp[i].pullup   = gp["pullup"]   | true;
-            appConfig.gp[i].inverted = gp["inverted"] | false;
-        }
+        JsonObjectConst gp = doc[keys[i]];
+        if (gp.isNull()) continue;
+        if (!gp["pin"].isNull())      appConfig.gp[i].pin      = gp["pin"].as<int>();
+        if (!gp["mode"].isNull())     appConfig.gp[i].mode     = (GpMode)gp["mode"].as<int>();
+        if (!gp["inverted"].isNull()) appConfig.gp[i].inverted = gp["inverted"].as<bool>();
+        if (!gp["pullup"].isNull())   appConfig.gp[i].pullup   = gp["pullup"].as<bool>();
     }
 
-    appConfig.tzOffset        = doc["system"]["tz"]            | 3600;
-    appConfig.ledBrightness   = doc["system"]["ledBrightness"] | (int)NEOPIXEL_BRIGHTNESS_DEF;
-    appConfig.logLevel        = doc["system"]["logLevel"]      | (int)LOG_LEVEL_DEFAULT;
-    appConfig.protectSettings = doc["system"]["protect"]       | false;
-    appConfig.webPort         = doc["system"]["webPort"]       | (int)WEB_DEFAULT_PORT;
-    strlcpy(appConfig.apSsid, doc["system"]["apSsid"] | AP_DEFAULT_SSID, sizeof(appConfig.apSsid));
+    // LED
+    if (!doc["ledPin"].isNull())        appConfig.ledPin        = doc["ledPin"].as<int>();
+    if (!doc["ledBrightness"].isNull()) appConfig.ledBrightness = doc["ledBrightness"].as<int>();
 
-    if (appConfig.dtuInterval < DTU_MIN_INTERVAL) appConfig.dtuInterval = DTU_MIN_INTERVAL;
+    // System
+    if (!doc["tzOffset"].isNull())  appConfig.tzOffset  = doc["tzOffset"].as<int>();
+    if (doc["ntpServer"].is<const char*>())
+        strlcpy(appConfig.ntpServer, doc["ntpServer"].as<const char*>(), sizeof(appConfig.ntpServer));
+    if (!doc["logLevel"].isNull()) appConfig.logLevel = doc["logLevel"].as<int>();
 
-    LOG_I(MOD_CFG, "Config loaded. SSID=%s  DTU=%s  MQTT=%s",
-          appConfig.wifiSsid, appConfig.dtuHost, appConfig.mqttHost);
-    return true;
+    LOG_I(MOD_CFG, "Config loaded: ssid=%s  dtu=%s:%d  mqtt=%s:%d",
+          appConfig.wifiSsid, appConfig.dtuHost, appConfig.dtuPort,
+          appConfig.mqttHost, appConfig.mqttPort);
 }
 
-bool configSave() {
+void configSave() {
     JsonDocument doc;
 
-    doc["wifi"]["ssid"]     = appConfig.wifiSsid;
-    doc["wifi"]["password"] = appConfig.wifiPassword;
-    doc["wifi"]["hostname"] = appConfig.hostname;
+    doc["wifiSsid"]        = appConfig.wifiSsid;
+    doc["wifiPass"]        = appConfig.wifiPass;
+    doc["wifiApFallback"]  = appConfig.wifiApFallback;
 
-    doc["dtu"]["host"]             = appConfig.dtuHost;
-    doc["dtu"]["port"]             = appConfig.dtuPort;
-    doc["dtu"]["interval"]         = appConfig.dtuInterval;
-    doc["dtu"]["cloudPause"]       = appConfig.dtuCloudPause;
-    doc["dtu"]["rebootAfterFails"] = appConfig.dtuRebootAfterFails;
+    doc["dtuHost"]             = appConfig.dtuHost;
+    doc["dtuPort"]             = appConfig.dtuPort;
+    doc["dtuInterval"]         = appConfig.dtuInterval;
+    doc["dtuCloudPause"]       = appConfig.dtuCloudPause;
+    doc["dtuRebootAfterFails"] = appConfig.dtuRebootAfterFails;
 
-    doc["mqtt"]["host"]    = appConfig.mqttHost;
-    doc["mqtt"]["port"]    = appConfig.mqttPort;
-    doc["mqtt"]["user"]    = appConfig.mqttUser;
-    doc["mqtt"]["pass"]    = appConfig.mqttPass;
-    doc["mqtt"]["topic"]   = appConfig.mqttTopic;
-    doc["mqtt"]["tls"]     = appConfig.mqttTls;
-    doc["mqtt"]["ha"]      = appConfig.mqttHaDiscovery;
-    doc["mqtt"]["openDTU"] = appConfig.mqttOpenDtu;
-    doc["mqtt"]["qos"]     = appConfig.mqttQos;
-    doc["mqtt"]["retain"]  = appConfig.mqttRetain;
+    doc["powerLimitDefault"] = appConfig.powerLimitDefault;
+    doc["powerLimitTimeout"] = appConfig.powerLimitTimeout;
 
-    doc["gpio"]["relay"]["pin"]      = appConfig.relay.pin;
-    doc["gpio"]["relay"]["output"]   = appConfig.relay.isOutput;
-    doc["gpio"]["relay"]["inverted"] = appConfig.relay.inverted;
-    const char* gpKeys[] = {"gp1","gp2","gp3","gp4"};
+    doc["mqttHost"]        = appConfig.mqttHost;
+    doc["mqttPort"]        = appConfig.mqttPort;
+    doc["mqttUser"]        = appConfig.mqttUser;
+    doc["mqttPass"]        = appConfig.mqttPass;
+    doc["mqttTopic"]       = appConfig.mqttTopic;
+    doc["mqttRetain"]      = appConfig.mqttRetain;
+    doc["mqttHaDiscovery"] = appConfig.mqttHaDiscovery;
+    doc["mqttOpenDtu"]     = appConfig.mqttOpenDtu;
+
+    doc["relayPin"]      = appConfig.relay.pin;
+    doc["relayInverted"] = appConfig.relay.inverted;
+
+    const char* keys[] = {"gp1","gp2","gp3","gp4"};
     for (int i = 0; i < 4; i++) {
-        doc["gpio"][gpKeys[i]]["pin"]      = appConfig.gp[i].pin;
-        doc["gpio"][gpKeys[i]]["output"]   = appConfig.gp[i].isOutput;
-        doc["gpio"][gpKeys[i]]["pullup"]   = appConfig.gp[i].pullup;
-        doc["gpio"][gpKeys[i]]["inverted"] = appConfig.gp[i].inverted;
+        doc[keys[i]]["pin"]      = appConfig.gp[i].pin;
+        doc[keys[i]]["mode"]     = (int)appConfig.gp[i].mode;
+        doc[keys[i]]["inverted"] = appConfig.gp[i].inverted;
+        doc[keys[i]]["pullup"]   = appConfig.gp[i].pullup;
     }
 
-    doc["system"]["tz"]            = appConfig.tzOffset;
-    doc["system"]["ledBrightness"] = appConfig.ledBrightness;
-    doc["system"]["logLevel"]      = appConfig.logLevel;
-    doc["system"]["protect"]       = appConfig.protectSettings;
-    doc["system"]["webPort"]       = appConfig.webPort;
-    doc["system"]["apSsid"]        = appConfig.apSsid;
+    doc["ledPin"]        = appConfig.ledPin;
+    doc["ledBrightness"] = appConfig.ledBrightness;
+
+    doc["tzOffset"]  = appConfig.tzOffset;
+    doc["ntpServer"] = appConfig.ntpServer;
+    doc["logLevel"]  = appConfig.logLevel;
 
     File f = LittleFS.open(CONFIG_FILE, "w");
-    if (!f) { LOG_E(MOD_CFG, "Cannot write config"); return false; }
+    if (!f) { LOG_E(MOD_CFG, "Cannot write %s", CONFIG_FILE); return; }
     serializeJson(doc, f);
     f.close();
     LOG_I(MOD_CFG, "Config saved");
-    return true;
 }

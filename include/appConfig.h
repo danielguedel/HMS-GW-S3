@@ -1,57 +1,67 @@
 #pragma once
 #include <Arduino.h>
+#include "config.h"
 
-// ─── GPIO pin config ──────────────────────────────────────────────────────────
-struct GpioPinConfig {
-    uint8_t pin;
-    bool    isOutput;
-    bool    pullup;
-    bool    inverted;
+// GP-Pin-Modus (Spec §8)
+enum GpMode : uint8_t {
+    GP_OUTPUT = 0,
+    GP_INPUT,
+    GP_I2C_RESERVED     // Pin für zukünftige I2C-Nutzung reserviert
 };
 
-// ─── Full application configuration ──────────────────────────────────────────
+// ─── Application Configuration ────────────────────────────────────────────────
 struct AppConfig {
     // WiFi
-    char wifiSsid[64];
-    char wifiPassword[64];
-    char hostname[32];
+    char wifiSsid[33];
+    char wifiPass[65];
+    bool wifiApFallback;        // AP-Modus wenn WiFi nicht erreichbar
 
     // DTU
-    char    dtuHost[64];
-    uint16_t dtuPort;
-    uint16_t dtuInterval;       // seconds, min 31
-    uint8_t  dtuCloudPause;     // seconds
-    uint8_t  dtuRebootAfterFails;
+    char     dtuHost[40];
+    uint16_t dtuPort;           // default: 10081
+    int      dtuInterval;       // Abfrage-Intervall [s], default: 31
+    int      dtuCloudPause;     // Wartezeit bei Cloud-Sync [s], default: 30
+    int      dtuRebootAfterFails; // Reconnect nach N Fehlern, default: 3
+
+    // Power Limit
+    int  powerLimitDefault;     // Rückfall-Wert [%], default: 100
+    int  powerLimitTimeout;     // Timeout [s], 0 = deaktiviert
 
     // MQTT
-    char     mqttHost[64];
-    uint16_t mqttPort;
-    char     mqttUser[64];
-    char     mqttPass[64];
-    char     mqttTopic[64];
-    bool     mqttTls;
-    bool     mqttHaDiscovery;
-    bool     mqttOpenDtu;
-    uint8_t  mqttQos;
+    char     mqttHost[40];
+    uint16_t mqttPort;          // default: 1883
+    char     mqttUser[33];
+    char     mqttPass[65];
+    char     mqttTopic[33];     // default: "hmsgws3"
     bool     mqttRetain;
+    bool     mqttHaDiscovery;   // HA Auto-Discovery aktivieren
+    bool     mqttOpenDtu;       // OpenDTU-kompatible Topics
 
-    // GPIO
-    GpioPinConfig relay;
-    GpioPinConfig gp[4];        // gp[0]=GP1 … gp[3]=GP4
+    // GPIO — Default-Pinbelegung (anpassbar im Web-GUI)
+    struct {
+        uint8_t pin;            // default: GPIO1
+        bool    inverted;
+    } relay;
+
+    struct {
+        uint8_t pin;            // defaults: GPIO0, GPIO2, GPIO3, (frei)
+        GpMode  mode;           // GP_OUTPUT / GP_INPUT / GP_I2C_RESERVED
+        bool    inverted;
+        bool    pullup;
+    } gp[4];
+
+    // LED
+    uint8_t ledPin;             // default: GPIO38 (WS2812B onboard)
+    uint8_t ledBrightness;      // 0–255, default: 80
 
     // System
-    int32_t  tzOffset;          // seconds from UTC
-    uint8_t  ledBrightness;     // 0–255
-    uint8_t  logLevel;          // 0–3
-    bool     protectSettings;
-    uint16_t webPort;
-    char     apSsid[32];
+    int  tzOffset;              // Zeitzone-Offset [s], default: 3600 (UTC+1)
+    char ntpServer[65];         // default: "pool.ntp.org"
+    int  logLevel;              // 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
 };
 
-// Global config instance (access via configMutex)
 extern AppConfig appConfig;
 
-// Load/save
-bool configLoad();
-bool configSave();
+void configLoad();
+void configSave();
 void configSetDefaults();
