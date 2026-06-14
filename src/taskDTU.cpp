@@ -295,12 +295,14 @@ static void onDisconnect(void*, AsyncClient*) {
     xEventGroupClearBits(systemStateEvents, EVT_DTU_ONLINE);
     LOG_W(MOD_DTU, "TCP disconnected");
 }
-static volatile int _lastError = 0;
+static volatile int      _lastError      = 0;
+static volatile uint32_t _lastCloudPause = 0;  // millis() of last RST-14 (cloud sync)
 
 static void onError(void*, AsyncClient*, err_t e) {
     _connected = false;
     _lastError = (int)e;
     if (e == -14) {  // ERR_RST — DTU busy with Hoymiles cloud sync
+        _lastCloudPause = millis();
         LOG_W(MOD_DTU, "TCP RST (-14) — DTU busy with cloud sync, will retry");
     } else {
         LOG_E(MOD_DTU, "TCP error: %d", (int)e);
@@ -399,6 +401,15 @@ void taskDTU(void* pvParameters) {
     for (;;) {
         // ── Maintain connection ────────────────────────────────────────────
         if (!_connected) {
+            // Cloud pause: if DTU sent RST-14 (cloud sync), wait out the remaining pause
+            if (appConfig.dtuCloudPause > 0 && _lastCloudPause > 0) {
+                uint32_t elapsed  = millis() - _lastCloudPause;
+                uint32_t pauseMs  = (uint32_t)appConfig.dtuCloudPause * 1000;
+                if (elapsed < pauseMs) {
+                    LOG_I(MOD_DTU, "Cloud-sync pause: waiting %lums", (unsigned long)(pauseMs - elapsed));
+                    vTaskDelay(pdMS_TO_TICKS(pauseMs - elapsed));
+                }
+            }
             dtuConnect();
             vTaskDelay(pdMS_TO_TICKS(3000));
             if (!_connected) {
@@ -420,10 +431,6 @@ void taskDTU(void* pvParameters) {
             continue;
         }
         lastPoll = now;
-
-        // ── Cloud pause ────────────────────────────────────────────────────
-        if (appConfig.dtuCloudPause > 0)
-            vTaskDelay(pdMS_TO_TICKS((uint32_t)appConfig.dtuCloudPause * 1000));
 
         if (!_connected) continue;
 

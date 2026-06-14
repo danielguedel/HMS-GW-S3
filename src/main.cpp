@@ -34,7 +34,7 @@ void setup() {
 
     // FreeRTOS primitives
     systemStateEvents = xEventGroupCreate();
-    dtuDataQueue      = xQueueCreate(5,  sizeof(DtuData_t));
+    dtuDataQueue      = xQueueCreate(1,  sizeof(DtuData_t));  // xQueueOverwrite requires length=1
     gpioCommandQueue  = xQueueCreate(10, sizeof(GpioCommand_t));
     configMutex       = xSemaphoreCreateMutex();
     otaSemaphore      = xSemaphoreCreateBinary();
