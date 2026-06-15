@@ -435,7 +435,7 @@ Discovery-Nachrichten werden 5 Sekunden nach MQTT-Connect gesendet, eine pro 500
 | LED_NO_MQTT | Cyan | Langsamer Puls 4s | WiFi+DTU OK, MQTT offline |
 | LED_OPERATIONAL | Grün | Herzschlag 5s | Vollbetrieb, PV aktiv (≥ 1W) |
 | LED_STANDBY | Grün (10%) | Sehr langer Puls 10s | Kein PV-Ertrag (Nacht/bewölkt) |
-| LED_DATA_FLASH | Weiss | 1× 80ms | Neue DTU-Daten empfangen (transient) |
+| LED_DATA_FLASH | Orange | 1× 80ms | Neue DTU-Daten empfangen (transient) |
 | LED_OTA | Magenta | Schnell 5 Hz | OTA-Update läuft |
 | LED_ERROR | Rot | 4 Hz | Kritischer Fehler |
 | LED_FACTORY_RESET | Rot | Dauerhaft | Factory Reset läuft |

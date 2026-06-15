@@ -121,7 +121,7 @@ esptool.py --chip esp32s3 --baud 921600 \
 | No MQTT | Cyan | 4 s pulse | WiFi + DTU ok, MQTT disconnected |
 | Operational | Green | 5 s heartbeat | Everything working |
 | Standby | Green (dim) | 10 s slow pulse | No PV output (night) |
-| Data received | White | 80 ms flash | New measurement arrived |
+| Data received | Orange | 80 ms flash | New measurement arrived |
 | OTA update | Magenta | 5 Hz fast blink | Firmware update in progress |
 | Error | Red | 4 Hz blink | Critical error |
 | Factory reset | Red | Steady | Config erased, rebooting |
