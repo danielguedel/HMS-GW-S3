@@ -3,9 +3,9 @@
 // setLedState() is only used for one-shot transients (LED_DATA_FLASH).
 //
 // Colour semantics:
-//   Weiss   → Neutral        (BOOT, DATA_FLASH)
+//   Weiss   → Neutral        (BOOT)
 //   Blau    → Wartend        (WIFI_CONNECTING, AP_MODE)
-//   Orange  → Teilausfall    (DTU_OFFLINE)
+//   Orange  → Teilausfall    (DTU_OFFLINE, DATA_FLASH)
 //   Cyan    → Nebenkanal     (NO_MQTT)
 //   Grün    → OK             (OPERATIONAL, STANDBY)
 //   Magenta → Systemvorgang  (OTA)
@@ -175,10 +175,10 @@ void taskLED(void* pvParameters) {
     _currentState = deriveState();
 
     for (;;) {
-        // ── One-shot data flash (white, 80 ms) ───────────────────────────────
+        // ── One-shot data flash (orange, 80 ms) ──────────────────────────────
         if (_dataFlash) {
             _dataFlash = false;
-            setColor(COL_WHITE);
+            setColor(COL_ORANGE);
             vTaskDelay(pdMS_TO_TICKS(80));
             ledOff();
             _currentState = deriveState();
