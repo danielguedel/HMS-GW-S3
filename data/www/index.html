@@ -444,6 +444,7 @@ async function refreshData() {
   try {
     const d = await fetch('/api/data.json').then(r => r.json());
     if (!d.valid) return;
+    document.title = `${d.grid.p.toFixed(0)} W — HMS-GW-S3`;
 
     txt('grid-p',  d.grid.p.toFixed(0));
     txt('grid-ui', d.grid.v.toFixed(1) + ' V / ' + d.grid.i.toFixed(2) + ' A');
