@@ -34,10 +34,9 @@ static void cmdHelp() {
     Serial.println("  gpio              GPIO states");
     Serial.println("  config            Current configuration");
     Serial.println("  relay on|off      Set relay");
-    Serial.println("  gpio1 on|off      Set GP1");
-    Serial.println("  gpio2 on|off      Set GP2");
-    Serial.println("  gpio3 on|off      Set GP3");
-    Serial.println("  gpio4 on|off      Set GP4");
+    Serial.println("  io1 on|off        Set IO1");
+    Serial.println("  io2 on|off        Set IO2");
+    Serial.println("  io3 on|off        Set IO3");
     Serial.println("  loglevel error|warn|info|debug");
     Serial.println("  restart           Reboot gateway");
     Serial.println("  reset             Factory reset (clears config.json)");
@@ -109,16 +108,16 @@ static void cmdMqtt() {
 
 static void cmdGpio() {
     DataStore::GpioState gpio = dsGetGpio();
-    const char* modes[]       = {"OUTPUT", "INPUT", "I2C_RESERVED"};
+    const char* modes[]       = {"OUTPUT", "INPUT", "RESERVED"};
     printf_("Relay  (GPIO%d, inv=%d): %s\n",
             appConfig.relay.pin, appConfig.relay.inverted,
             gpio.relay ? "ON" : "OFF");
-    for (int i = 0; i < 4; i++) {
-        uint8_t m = (uint8_t)appConfig.gp[i].mode;
+    for (int i = 0; i < 3; i++) {
+        uint8_t m = (uint8_t)appConfig.io[i].mode;
         if (m > 2) m = 2;
-        printf_("GP%d    (GPIO%d, mode=%s, inv=%d): %s\n",
-                i + 1, appConfig.gp[i].pin, modes[m],
-                appConfig.gp[i].inverted, gpio.gpio[i] ? "ON" : "OFF");
+        printf_("IO%d    (GPIO%d, mode=%s, alt=%s, inv=%d): %s\n",
+                i + 1, appConfig.io[i].pin, modes[m], appConfig.io[i].altFunction,
+                appConfig.io[i].inverted, gpio.gpio[i] ? "ON" : "OFF");
     }
 }
 
@@ -160,12 +159,12 @@ static void cmdRelaySet(const char* arg) {
     printf_("Relay -> %s\n", arg);
 }
 
-static void cmdGpioSet(int gpIdx, const char* arg) {
+static void cmdGpioSet(int ioIdx, const char* arg) {
     if (!arg || (strcmp(arg, "on") != 0 && strcmp(arg, "off") != 0)) {
-        printf_("Usage: gpio%d on|off\n", gpIdx); return;
+        printf_("Usage: io%d on|off\n", ioIdx); return;
     }
-    dsSetGpioCommand(gpIdx, strcmp(arg, "on") == 0);
-    printf_("GPIO%d -> %s\n", gpIdx, arg);
+    dsSetGpioCommand(ioIdx, strcmp(arg, "on") == 0);
+    printf_("IO%d -> %s\n", ioIdx, arg);
 }
 
 static void cmdLoglevel(const char* arg) {
@@ -246,10 +245,9 @@ static void dispatch(char* line) {
     else if (strcmp(verb, "gpio")     == 0 && !arg) cmdGpio();
     else if (strcmp(verb, "config")   == 0) cmdConfig();
     else if (strcmp(verb, "relay")    == 0) cmdRelaySet(arg);
-    else if (strcmp(verb, "gpio1")    == 0) cmdGpioSet(1, arg);
-    else if (strcmp(verb, "gpio2")    == 0) cmdGpioSet(2, arg);
-    else if (strcmp(verb, "gpio3")    == 0) cmdGpioSet(3, arg);
-    else if (strcmp(verb, "gpio4")    == 0) cmdGpioSet(4, arg);
+    else if (strcmp(verb, "io1")      == 0) cmdGpioSet(1, arg);
+    else if (strcmp(verb, "io2")      == 0) cmdGpioSet(2, arg);
+    else if (strcmp(verb, "io3")      == 0) cmdGpioSet(3, arg);
     else if (strcmp(verb, "loglevel") == 0) cmdLoglevel(arg);
     else if (strcmp(verb, "ledtest")  == 0) cmdLedTest();
     else if (strcmp(verb, "restart")  == 0) cmdRestart();

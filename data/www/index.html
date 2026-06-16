@@ -232,37 +232,29 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
       </label>
       <span class="badge b-off" id="lbl-relay">–</span>
     </div>
-    <div class="gpio-card" id="card-gpio1">
-      <div class="gpio-name">GP1</div>
+    <div class="gpio-card" id="card-io1">
+      <div class="gpio-name">IO1</div>
       <label class="toggle">
-        <input type="checkbox" id="sw-gpio1" onchange="setGpio('gpio1',this.checked)">
+        <input type="checkbox" id="sw-io1" onchange="setGpio('io1',this.checked)">
         <span class="slider"></span>
       </label>
-      <span class="badge b-off" id="lbl-gpio1">–</span>
+      <span class="badge b-off" id="lbl-io1">–</span>
     </div>
-    <div class="gpio-card" id="card-gpio2">
-      <div class="gpio-name">GP2</div>
+    <div class="gpio-card" id="card-io2">
+      <div class="gpio-name">IO2</div>
       <label class="toggle">
-        <input type="checkbox" id="sw-gpio2" onchange="setGpio('gpio2',this.checked)">
+        <input type="checkbox" id="sw-io2" onchange="setGpio('io2',this.checked)">
         <span class="slider"></span>
       </label>
-      <span class="badge b-off" id="lbl-gpio2">–</span>
+      <span class="badge b-off" id="lbl-io2">–</span>
     </div>
-    <div class="gpio-card" id="card-gpio3">
-      <div class="gpio-name">GP3</div>
+    <div class="gpio-card" id="card-io3">
+      <div class="gpio-name">IO3</div>
       <label class="toggle">
-        <input type="checkbox" id="sw-gpio3" onchange="setGpio('gpio3',this.checked)">
+        <input type="checkbox" id="sw-io3" onchange="setGpio('io3',this.checked)">
         <span class="slider"></span>
       </label>
-      <span class="badge b-off" id="lbl-gpio3">–</span>
-    </div>
-    <div class="gpio-card" id="card-gpio4">
-      <div class="gpio-name">GP4</div>
-      <label class="toggle">
-        <input type="checkbox" id="sw-gpio4" onchange="setGpio('gpio4',this.checked)">
-        <span class="slider"></span>
-      </label>
-      <span class="badge b-off" id="lbl-gpio4">–</span>
+      <span class="badge b-off" id="lbl-io3">–</span>
     </div>
   </div>
 </div>
@@ -504,7 +496,7 @@ async function refreshGpio() {
   try {
     const d = await fetch('/api/gpio').then(r => r.json());
     applyGpio('relay', d.relay);
-    for (let i = 1; i <= 4; i++) applyGpio('gpio' + i, d['gpio' + i]);
+    for (let i = 1; i <= 3; i++) applyGpio('io' + i, d['io' + i]);
   } catch (e) {}
 }
 

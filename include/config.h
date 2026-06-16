@@ -16,17 +16,16 @@
 #ifndef RELAY_PIN
   #define RELAY_PIN        1    // GPIO1
 #endif
-// GP1–GP4
-#ifndef GP1_PIN
-  #define GP1_PIN          0    // GPIO0 — INPUT
+// IO1–IO3 (generische IO-Pins, frei konfigurierbar im Web-GUI)
+#ifndef IO1_PIN
+  #define IO1_PIN          2    // GPIO2 — laut ESP32-S3-Datasheet für I2C SDA geeignet
 #endif
-#ifndef GP2_PIN
-  #define GP2_PIN          2    // GPIO2 — I2C_RESERVED (SDA)
+#ifndef IO2_PIN
+  #define IO2_PIN          3    // GPIO3 — laut ESP32-S3-Datasheet für I2C SCL geeignet
 #endif
-#ifndef GP3_PIN
-  #define GP3_PIN          3    // GPIO3 — I2C_RESERVED (SCL)
+#ifndef IO3_PIN
+  #define IO3_PIN          4    // GPIO4 — laut ESP32-S3-Datasheet für ADC1_CH3 geeignet
 #endif
-// GP4 — kein Default-Pin zugewiesen (konfigurierbar im Web-GUI)
 
 // LED (WS2812B onboard)
 #ifndef LED_PIN
@@ -35,7 +34,7 @@
 #define NEOPIXEL_PIN      LED_PIN   // Rückwärts-Kompatibilität
 
 // Boot / Factory Reset
-#define BOOT_PIN           0        // BOOT-Taste (GPIO0, auch GP1 im Default)
+#define BOOT_PIN           0        // BOOT-Taste (GPIO0, intern — nicht Teil des IO-Arrays)
 
 // ─── NeoPixel / LED ───────────────────────────────────────────────────────────
 #define LED_COUNT               1

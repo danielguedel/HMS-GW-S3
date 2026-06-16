@@ -2,11 +2,11 @@
 #include <Arduino.h>
 #include "config.h"
 
-// GP-Pin-Modus (Spec §8)
-enum GpMode : uint8_t {
-    GP_OUTPUT = 0,
-    GP_INPUT,
-    GP_I2C_RESERVED     // Pin für zukünftige I2C-Nutzung reserviert
+// IO-Pin-Modus (Spec §8)
+enum IoMode : uint8_t {
+    IO_OUTPUT = 0,
+    IO_INPUT,
+    IO_RESERVED         // Pin für eine Zusatzfunktion reserviert (siehe altFunction)
 };
 
 // ─── Application Configuration ────────────────────────────────────────────────
@@ -44,11 +44,12 @@ struct AppConfig {
     } relay;
 
     struct {
-        uint8_t pin;            // defaults: GPIO0, GPIO2, GPIO3, (frei)
-        GpMode  mode;           // GP_OUTPUT / GP_INPUT / GP_I2C_RESERVED
+        uint8_t pin;             // defaults: GPIO2, GPIO3, GPIO4
+        IoMode  mode;            // IO_OUTPUT / IO_INPUT / IO_RESERVED
+        char    altFunction[16]; // rein informativ, z.B. "I2C_SDA" — ändert kein Verhalten
         bool    inverted;
         bool    pullup;
-    } gp[4];
+    } io[3];
 
     // LED
     uint8_t ledPin;             // default: GPIO38 (WS2812B onboard)

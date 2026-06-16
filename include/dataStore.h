@@ -57,13 +57,13 @@ struct DataStore {
     // ── GPIO-Zustand (written by taskGPIO) ────────────────────────────────────
     struct GpioState {
         bool relay;                          // Relay-Zustand
-        bool gpio[4];                        // GP1–GP4 Zustände
+        bool gpio[3];                        // IO1–IO3 Zustände
     } gpio;
 
     // ── GPIO-Befehle (written by taskMQTT / taskWeb / taskSerial) ─────────────
     struct GpioCommand {
         bool    pending;
-        int     target;                      // 0=Relay, 1-4=GP1-GP4
+        int     target;                      // 0=Relay, 1-3=IO1-IO3
         bool    state;
     } gpioCmd;
 

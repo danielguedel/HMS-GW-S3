@@ -19,10 +19,10 @@ static void applyRelay(bool state, DataStore::GpioState& gpio) {
     gpio.relay = state;
 }
 
-// ─── Apply GP output ──────────────────────────────────────────────────────────
-static void applyGp(int idx, bool state, DataStore::GpioState& gpio) {
-    bool out = appConfig.gp[idx].inverted ? !state : state;
-    digitalWrite(appConfig.gp[idx].pin, out ? HIGH : LOW);
+// ─── Apply IO output ──────────────────────────────────────────────────────────
+static void applyIo(int idx, bool state, DataStore::GpioState& gpio) {
+    bool out = appConfig.io[idx].inverted ? !state : state;
+    digitalWrite(appConfig.io[idx].pin, out ? HIGH : LOW);
     gpio.gpio[idx] = state;
 }
 
@@ -53,20 +53,20 @@ void taskGPIO(void* pvParameters) {
     pinMode(appConfig.relay.pin, OUTPUT);
     applyRelay(false, gpio);
 
-    for (int i = 0; i < 4; i++) {
-        switch (appConfig.gp[i].mode) {
-            case GP_OUTPUT:
-                pinMode(appConfig.gp[i].pin, OUTPUT);
-                applyGp(i, false, gpio);
+    for (int i = 0; i < 3; i++) {
+        switch (appConfig.io[i].mode) {
+            case IO_OUTPUT:
+                pinMode(appConfig.io[i].pin, OUTPUT);
+                applyIo(i, false, gpio);
                 break;
-            case GP_INPUT:
-                pinMode(appConfig.gp[i].pin, appConfig.gp[i].pullup ? INPUT_PULLUP : INPUT);
-                gpio.gpio[i] = (digitalRead(appConfig.gp[i].pin) == HIGH);
-                if (appConfig.gp[i].inverted) gpio.gpio[i] = !gpio.gpio[i];
+            case IO_INPUT:
+                pinMode(appConfig.io[i].pin, appConfig.io[i].pullup ? INPUT_PULLUP : INPUT);
+                gpio.gpio[i] = (digitalRead(appConfig.io[i].pin) == HIGH);
+                if (appConfig.io[i].inverted) gpio.gpio[i] = !gpio.gpio[i];
                 break;
-            case GP_I2C_RESERVED:
-                // Initialize as high-impedance input — I2C init in future version
-                pinMode(appConfig.gp[i].pin, INPUT);
+            case IO_RESERVED:
+                // Initialize as high-impedance input — siehe altFunction für vorgesehenen Zweck
+                pinMode(appConfig.io[i].pin, INPUT);
                 break;
         }
     }
@@ -74,15 +74,14 @@ void taskGPIO(void* pvParameters) {
 
     dsSetGpio(gpio);
 
-    LOG_I(MOD_GPIO, "GPIO ready — Relay=GPIO%d  GP1-4=GPIO%d,%d,%d,%d",
+    LOG_I(MOD_GPIO, "GPIO ready — Relay=GPIO%d  IO1-3=GPIO%d,%d,%d",
           appConfig.relay.pin,
-          appConfig.gp[0].pin, appConfig.gp[1].pin,
-          appConfig.gp[2].pin, appConfig.gp[3].pin);
+          appConfig.io[0].pin, appConfig.io[1].pin, appConfig.io[2].pin);
 
     // Debounce state for INPUT pins
-    bool     lastRaw[4]      = {};
-    uint32_t lastChangeMs[4] = {};
-    for (int i = 0; i < 4; i++) lastRaw[i] = gpio.gpio[i];
+    bool     lastRaw[3]      = {};
+    uint32_t lastChangeMs[3] = {};
+    for (int i = 0; i < 3; i++) lastRaw[i] = gpio.gpio[i];
 
     for (;;) {
         // ── Process pending GPIO command from DataStore ────────────────────────
@@ -98,13 +97,13 @@ void taskGPIO(void* pvParameters) {
                 if (target == 0) {
                     applyRelay(state, gpio);
                     LOG_I(MOD_GPIO, "Relay -> %s", state ? "ON" : "OFF");
-                } else if (target >= 1 && target <= 4) {
+                } else if (target >= 1 && target <= 3) {
                     int idx = target - 1;
-                    if (appConfig.gp[idx].mode == GP_OUTPUT) {
-                        applyGp(idx, state, gpio);
-                        LOG_I(MOD_GPIO, "GP%d -> %s", target, state ? "HIGH" : "LOW");
+                    if (appConfig.io[idx].mode == IO_OUTPUT) {
+                        applyIo(idx, state, gpio);
+                        LOG_I(MOD_GPIO, "io%d -> %s", target, state ? "HIGH" : "LOW");
                     } else {
-                        LOG_W(MOD_GPIO, "GP%d command ignored (not OUTPUT)", target);
+                        LOG_W(MOD_GPIO, "io%d command ignored (not OUTPUT)", target);
                     }
                 }
                 dsSetGpio(gpio);
@@ -113,10 +112,10 @@ void taskGPIO(void* pvParameters) {
 
         // ── Debounce INPUT pins → update DataStore on change ─────────────────
         bool inputChanged = false;
-        for (int i = 0; i < 4; i++) {
-            if (appConfig.gp[i].mode != GP_INPUT) continue;
-            bool raw = (digitalRead(appConfig.gp[i].pin) == HIGH);
-            if (appConfig.gp[i].inverted) raw = !raw;
+        for (int i = 0; i < 3; i++) {
+            if (appConfig.io[i].mode != IO_INPUT) continue;
+            bool raw = (digitalRead(appConfig.io[i].pin) == HIGH);
+            if (appConfig.io[i].inverted) raw = !raw;
             if (raw != lastRaw[i]) {
                 lastRaw[i]      = raw;
                 lastChangeMs[i] = millis();
@@ -124,7 +123,7 @@ void taskGPIO(void* pvParameters) {
             if ((millis() - lastChangeMs[i]) >= DEBOUNCE_MS && raw != gpio.gpio[i]) {
                 gpio.gpio[i] = raw;
                 inputChanged  = true;
-                LOG_D(MOD_GPIO, "GP%d input -> %s", i + 1, raw ? "HIGH" : "LOW");
+                LOG_D(MOD_GPIO, "io%d input -> %s", i + 1, raw ? "HIGH" : "LOW");
             }
         }
         if (inputChanged) dsSetGpio(gpio);

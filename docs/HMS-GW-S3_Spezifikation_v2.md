@@ -15,7 +15,7 @@ Stabile, wartbare Gateway-Firmware die:
 - Daten vom Hoymiles HMS-800W-2T DTU über TCP/Protobuf empfängt
 - Daten per MQTT an Home Assistant publiziert (HA Auto-Discovery)
 - Ein Web-Dashboard bereitstellt
-- GPIO (Relay, 4x GP) steuert
+- GPIO (Relay, 3x IO) steuert
 - Ohne Abhängigkeiten zwischen Tasks auskommt
 
 ---
@@ -85,13 +85,13 @@ struct DataStore {
     // ── GPIO-Zustand (geschrieben von taskGPIO) ───────────────────────────
     struct GpioState {
         bool relay;                          // Relay-Zustand
-        bool gpio[4];                        // GP1–GP4 Zustände
+        bool gpio[3];                        // IO1–IO3 Zustände
     } gpio;
 
     // ── GPIO-Befehle (geschrieben von taskMQTT / taskWeb / taskSerial) ───
     struct GpioCommand {
         bool    pending;
-        int     target;                      // 0=Relay, 1-4=GP1-GP4
+        int     target;                      // 0=Relay, 1-3=IO1-IO3
         bool    state;
     } gpioCmd;
 
@@ -149,7 +149,7 @@ bool dsPvValid();
 | taskDTU | 1 | 4 | 8192 | DTU TCP-Verbindung, Protokoll, Daten |
 | taskMQTT | 1 | 3 | 6144 | MQTT-Verbindung, Publish, Subscribe |
 | taskWebServer | 1 | 3 | 8192 | HTTP-API, OTA, Static Files |
-| taskGPIO | 1 | 4 | 4096 | Relay/GP Ein-/Ausgabe |
+| taskGPIO | 1 | 4 | 4096 | Relay/IO Ein-/Ausgabe |
 | taskLED | 1 | 2 | 3072 | NeoPixel Status-Anzeige |
 | taskSerial | 1 | 2 | 4096 | Konsolen-Kommandos |
 | taskSysMonitor | 1 | 1 | 3072 | Heap-Überwachung, Uptime |
@@ -356,14 +356,14 @@ Alle Callbacks laufen asynchron — kein Blocking, kein Watchdog.
 {mqttTopic}/inverter/Temp          Temperatur [°C]
 {mqttTopic}/inverter/PowerLimit    Leistungsgrenze [%]
 {mqttTopic}/relay/state            Relay-Zustand (0/1)
-{mqttTopic}/gpio{1-4}/state        GPIO-Zustand (0/1)
+{mqttTopic}/io{1-3}/state          GPIO-Zustand (0/1)
 {mqttTopic}/system/uptime          Uptime [s]
 {mqttTopic}/system/rssi            WLAN-RSSI [dBm]
 {mqttTopic}/system/heap            Freier Heap [Bytes]
 
 # Steuertopics (Subscribe)
 {mqttTopic}/relay/set              Relay setzen (0/1)
-{mqttTopic}/gpio{1-4}/set         GPIO setzen (0/1)
+{mqttTopic}/io{1-3}/set           GPIO setzen (0/1)
 {mqttTopic}/inverter/PowerLimitSet/set  Leistungsgrenze setzen [%]
 {mqttTopic}/inverter/On/set        Wechselrichter ein/aus (0/1)
 {mqttTopic}/inverter/RebootDtu/set DTU neustarten (1)
@@ -482,12 +482,12 @@ struct AppConfig {
         bool inverted;
     } relay;
     struct {
-        uint8_t pin;            // default: GPIO0, GPIO2, GPIO3, (frei)
-        enum { GPIO_OUTPUT, GPIO_INPUT, GPIO_I2C_RESERVED } mode;
-                                // GPIO_I2C_RESERVED: Pin für zukünftige I2C-Nutzung reserviert
+        uint8_t pin;             // default: GPIO2, GPIO3, GPIO4
+        enum { IO_OUTPUT, IO_INPUT, IO_RESERVED } mode;
+        char    altFunction[16]; // rein informativ, z.B. "I2C_SDA" — ändert kein Verhalten
         bool inverted;
         bool pullup;
-    } gp[4];
+    } io[3];
 
     // LED
     uint8_t ledPin;             // default: GPIO38 (WS2812B onboard)
@@ -502,14 +502,18 @@ struct AppConfig {
 
 ### 8.1 GPIO Default-Pinbelegung
 
-| Funktion | Pin | Mode (Default) | Konfigurierbar |
-|---|---|---|---|
-| Relay | GPIO1 | OUTPUT | ✅ |
-| GP1 | GPIO0 | INPUT | ✅ |
-| GP2 | GPIO2 | I2C_RESERVED (SDA) | ✅ |
-| GP3 | GPIO3 | I2C_RESERVED (SCL) | ✅ |
-| GP4 | — | — | ✅ |
-| LED (WS2812B) | GPIO38 | — | ✅ |
+| Funktion | Pin | Mode (Default) | Alt-Funktion (Label) | Konfigurierbar |
+|---|---|---|---|---|
+| Relay | GPIO1 | OUTPUT | — | ✅ |
+| *(intern)* | GPIO0 | BOOT / Factory-Reset | — | — |
+| IO1 | GPIO2 | OUTPUT | "I2C_SDA" | ✅ |
+| IO2 | GPIO3 | OUTPUT | "I2C_SCL" | ✅ |
+| IO3 | GPIO4 | OUTPUT | "ADC1_CH3" | ✅ |
+| LED (WS2812B) | GPIO38 | — | — | ✅ |
+
+GPIO0 ist exklusiv für die BOOT-Taste/Factory-Reset reserviert (siehe `BOOT_PIN` in `config.h`) und nicht Teil des IO-Arrays — kein API-/MQTT-Zugriff.
+
+`altFunction` ist ein freies Textfeld (max. 16 Zeichen), rein informativ. Es zeigt an, wofür der Pin laut ESP32-S3-Datenblatt zusätzlich geeignet wäre, ändert aber die Firmware-Logik nicht — IO1–IO3 starten alle im Modus `OUTPUT` und sind frei umkonfigurierbar.
 
 GPIO2 (SDA) und GPIO3 (SCL) sind für zukünftige I2C-Sensoren (Temperatur, Feuchte usw.) reserviert. Im Mode `I2C_RESERVED` werden die Pins als Standard-GPIO initialisiert aber im Web-GUI als "reserviert" gekennzeichnet. Die eigentliche I2C-Implementierung erfolgt in einer späteren Version.
 
@@ -548,7 +552,7 @@ Anlehnung an **Shelly Web-UI**: modern, aufgeräumt, professionell.
 │  │  Tagesertrag: 3.04 kWh  Total: 241 kWh ││  ← Energie-Übersicht
 │  └─────────────────────────────────────────┘│
 │  ┌──────────────┐  ┌──────────────────────┐ │
-│  │  Relay  [●]  │  │  GP1 [●]  GP2 [○]   │ │  ← GPIO-Steuerung
+│  │  Relay  [●]  │  │  IO1 [●]  IO2 [○]   │ │  ← GPIO-Steuerung
 │  └──────────────┘  └──────────────────────┘ │
 │  ┌─────────────────────────────────────────┐│
 │  │  Status: WiFi ✅  DTU ✅  MQTT ✅       ││  ← Verbindungsstatus
@@ -646,7 +650,7 @@ dtu               # DTU-Status und letzte Daten
 mqtt              # MQTT-Status
 gpio              # GPIO-Zustand
 relay on|off      # Relay schalten
-gpio1 on|off      # GP1 schalten
+io1 on|off        # IO1 schalten
 loglevel <lvl>    # Log-Level setzen
 version           # Firmware-Version
 uptime            # Laufzeit
@@ -684,7 +688,7 @@ HMS-GW-S3/
     ├── taskDTU.cpp             (TCP + manuelles Protobuf, kein Nanopb)
     ├── taskMQTT.cpp            (esp-mqtt, non-blocking, ESP-IDF 4.x flat API)
     ├── taskWebServer.cpp       (ESPAsyncWebServer)
-    ├── taskGPIO.cpp            (Relay + GP1-4)
+    ├── taskGPIO.cpp            (Relay + IO1-3)
     ├── taskNeoPixel.cpp        (WS2812B GPIO38, Zustands-Auto-Derivierung)
     ├── taskSerial.cpp          (Konsole)
     └── taskSysMonitor.cpp      (Heap, Uptime)
@@ -718,7 +722,7 @@ HMS-GW-S3/
     ├── taskDTU.cpp             (TCP + manuelles Protobuf, kein Nanopb)
     ├── taskMQTT.cpp            (esp-mqtt non-blocking, ESP-IDF 4.x flat API)
     ├── taskWebServer.cpp       (HTTP-API, OTA File+URL, Static Files)
-    ├── taskGPIO.cpp            (Relay GPIO1, GP1-4)
+    ├── taskGPIO.cpp            (Relay GPIO1, IO1-3)
     ├── taskNeoPixel.cpp        (WS2812B GPIO38, Zustands-Auto-Derivierung)
     ├── taskSerial.cpp          (Konsole mit Kommandos)
     └── taskSysMonitor.cpp      (Heap, Uptime)

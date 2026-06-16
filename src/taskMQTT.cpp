@@ -93,8 +93,8 @@ static void publishPvData(const DataStore::PvData& pv) {
 static void publishGpioState(const DataStore::GpioState& gpio) {
     bool r = appConfig.mqttRetain;
     pub("relay/state", gpio.relay ? "1" : "0", r);
-    for (int i = 0; i < 4; i++) {
-        char topic[24]; snprintf(topic, sizeof(topic), "gpio%d/state", i + 1);
+    for (int i = 0; i < 3; i++) {
+        char topic[24]; snprintf(topic, sizeof(topic), "io%d/state", i + 1);
         pub(topic, gpio.gpio[i] ? "1" : "0", r);
     }
 }
@@ -171,11 +171,10 @@ static void haDiscoveryStep() {
         case  8: publishHaSensor("pv1_u",   "PV2 Voltage",       "pv1/U",             "V",   "voltage");     break;
         case  9: publishHaSensor("temp",    "Inverter Temp",     "inverter/Temp",     "°C",  "temperature"); break;
         case 10: publishHaSensor("pwr_lim", "Power Limit",       "inverter/PowerLimit","%",  nullptr);       break;
-        case 11: publishHaSwitch("relay",   "Relay",  "relay/state",  "relay/set");  break;
-        case 12: publishHaSwitch("gpio1",   "GPIO 1", "gpio1/state",  "gpio1/set");  break;
-        case 13: publishHaSwitch("gpio2",   "GPIO 2", "gpio2/state",  "gpio2/set");  break;
-        case 14: publishHaSwitch("gpio3",   "GPIO 3", "gpio3/state",  "gpio3/set");  break;
-        case 15: publishHaSwitch("gpio4",   "GPIO 4", "gpio4/state",  "gpio4/set");  break;
+        case 11: publishHaSwitch("relay", "Relay", "relay/state", "relay/set"); break;
+        case 12: publishHaSwitch("io1",   "IO 1",  "io1/state",   "io1/set");   break;
+        case 13: publishHaSwitch("io2",   "IO 2",  "io2/state",   "io2/set");   break;
+        case 14: publishHaSwitch("io3",   "IO 3",  "io3/state",   "io3/set");   break;
         default:
             LOG_I(MOD_MQTT, "HA discovery complete (%d entities)", _haIdx);
             _haIdx = -1;
@@ -210,8 +209,8 @@ static void onMessage(const char* topic, const char* data) {
     } else if (t == base + "relay/set") {
         dsSetGpioCommand(0, atoi(data) == 1);
     } else {
-        for (int i = 1; i <= 4; i++) {
-            char sub[32]; snprintf(sub, sizeof(sub), "gpio%d/set", i);
+        for (int i = 1; i <= 3; i++) {
+            char sub[32]; snprintf(sub, sizeof(sub), "io%d/set", i);
             if (t == base + sub) {
                 dsSetGpioCommand(i, atoi(data) == 1);
                 break;
@@ -247,8 +246,8 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
             };
             for (auto s : subs)
                 esp_mqtt_client_subscribe(_client, (base + s).c_str(), 0);
-            for (int i = 1; i <= 4; i++) {
-                char sub[48]; snprintf(sub, sizeof(sub), "%sgpio%d/set", base.c_str(), i);
+            for (int i = 1; i <= 3; i++) {
+                char sub[48]; snprintf(sub, sizeof(sub), "%sio%d/set", base.c_str(), i);
                 esp_mqtt_client_subscribe(_client, sub, 0);
             }
 

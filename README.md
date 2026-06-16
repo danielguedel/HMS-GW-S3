@@ -21,7 +21,7 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | 📡 MQTT | Full publish/subscribe · Home Assistant auto-discovery · OpenDTU-compatible mode |
 | 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/config` |
 | 🌈 NeoPixel LED | Onboard WS2812B (GPIO38) — 11 states via colour & animation |
-| 🔀 Relay + 4 GPIO | Switchable via Web GUI, REST API and MQTT · GPIO2/3 reserved for future I2C sensors |
+| 🔀 Relay + 3 IO | Switchable via Web GUI, REST API and MQTT · IO1/IO2 (GPIO2/3) suited for future I2C per datasheet |
 | 🔧 Web config | All settings in browser — WiFi, DTU, MQTT, GPIO, System |
 | 🔄 OTA updates | Firmware and filesystem update via web file upload or HTTP URL |
 | 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 18 commands at 115200 baud |
@@ -40,13 +40,13 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 |---|---|---|---|
 | 38 | NeoPixel LED (onboard WS2812B) | Output | ✅ |
 | 1 | Relay output | Output (ext. driver required) | ✅ |
-| 0 | GP1 / BOOT button | Input (factory reset: hold > 5 s) | ✅ |
-| 2 | GP2 — I2C SDA (reserved) | Reserved for future I2C sensors | ✅ |
-| 3 | GP3 — I2C SCL (reserved) | Reserved for future I2C sensors | ✅ |
-| — | GP4 | Unassigned | ✅ |
+| 0 | BOOT button (internal, not user-configurable) | Input (factory reset: hold > 5 s) | — |
+| 2 | IO1 — generic, suited for I2C SDA per datasheet | Output (default) | ✅ |
+| 3 | IO2 — generic, suited for I2C SCL per datasheet | Output (default) | ✅ |
+| 4 | IO3 — generic, suited for ADC1_CH3 per datasheet | Output (default) | ✅ |
 | 43/44 | Serial TX/RX | Console 115200 baud | — |
 
-> All GPIO assignments (except Serial TX/RX) are configurable via the web GUI and saved to `config.json`.
+> All GPIO assignments (except Serial TX/RX and BOOT) are configurable via the web GUI and saved to `config.json`. IO1–IO3 are generic — the "suited for" hint is informational (`altFunction` field) and does not restrict usage.
 
 > GPIO2 and GPIO3 are reserved for future I2C sensor support (temperature, humidity etc.) and initialised as high-impedance inputs.
 
@@ -154,10 +154,9 @@ esptool.py --chip esp32s3 --baud 921600 \
 | `gpio` | GPIO states |
 | `config` | Current configuration |
 | `relay on\|off` | Set relay |
-| `gpio1 on\|off` | Set GP1 |
-| `gpio2 on\|off` | Set GP2 |
-| `gpio3 on\|off` | Set GP3 |
-| `gpio4 on\|off` | Set GP4 |
+| `io1 on\|off` | Set IO1 |
+| `io2 on\|off` | Set IO2 |
+| `io3 on\|off` | Set IO3 |
 | `loglevel error\|warn\|info\|debug` | Set log level |
 | `ledtest` | Cycle through all LED states |
 | `restart` | Reboot gateway |
@@ -180,7 +179,7 @@ All topics under `<mqttTopic>/` (default: `hmsgws3_XXXXXX`).
 | `inverter/Temp` | float °C | Every DTU update |
 | `inverter/PowerLimit` | int % | Every DTU update |
 | `inverter/warningsActive` | int | Every DTU update |
-| `relay/state`, `gpio1/state` … `gpio4/state` | 0 or 1 | On change |
+| `relay/state`, `io1/state` … `io3/state` | 0 or 1 | On change |
 | `system/uptime`, `system/rssi`, `system/heap` | int | Every 60 s |
 | `system/status` | `online` / `offline` | Connect / LWT |
 
@@ -193,7 +192,7 @@ All topics under `<mqttTopic>/` (default: `hmsgws3_XXXXXX`).
 | `inverter/RebootGw/set` | 1 | Reboot gateway |
 | `inverter/On/set` | 0 or 1 | Inverter on/off |
 | `relay/set` | 0 or 1 | Switch relay |
-| `gpio1/set` … `gpio4/set` | 0 or 1 | Set GPIO output |
+| `io1/set` … `io3/set` | 0 or 1 | Set GPIO output |
 
 ### Home Assistant Auto-Discovery
 
@@ -224,7 +223,7 @@ taskSysMonitor ──►       ◄── taskLED
 |---|---|---|---|---|
 | taskWiFi | 1 | 5 | 6144 | WiFi connection, AP mode, NTP sync |
 | taskDTU | 1 | 4 | 8192 | DTU TCP/Protobuf, data polling |
-| taskGPIO | 1 | 4 | 4096 | Relay, GP1–GP4, factory reset |
+| taskGPIO | 1 | 4 | 4096 | Relay, IO1–IO3, factory reset |
 | taskMQTT | 1 | 3 | 6144 | MQTT publish/subscribe, HA discovery |
 | taskWebServer | 1 | 3 | 8192 | HTTP server, REST API, OTA, captive portal |
 | taskLED | 1 | 2 | 3072 | NeoPixel state machine |

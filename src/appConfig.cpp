@@ -44,26 +44,24 @@ void configSetDefaults() {
     appConfig.relay.pin      = RELAY_PIN;
     appConfig.relay.inverted = false;
 
-    // GPIO — GP1–GP4 (GP2/GP3 = I2C_RESERVED)
-    appConfig.gp[0].pin      = GP1_PIN;
-    appConfig.gp[0].mode     = GP_INPUT;
-    appConfig.gp[0].inverted = false;
-    appConfig.gp[0].pullup   = true;
+    // GPIO — IO1–IO3 (generisch, Default-Modus immer OUTPUT)
+    appConfig.io[0].pin      = IO1_PIN;
+    appConfig.io[0].mode     = IO_OUTPUT;
+    strlcpy(appConfig.io[0].altFunction, "I2C_SDA", sizeof(appConfig.io[0].altFunction));
+    appConfig.io[0].inverted = false;
+    appConfig.io[0].pullup   = false;
 
-    appConfig.gp[1].pin      = GP2_PIN;
-    appConfig.gp[1].mode     = GP_I2C_RESERVED;
-    appConfig.gp[1].inverted = false;
-    appConfig.gp[1].pullup   = false;
+    appConfig.io[1].pin      = IO2_PIN;
+    appConfig.io[1].mode     = IO_OUTPUT;
+    strlcpy(appConfig.io[1].altFunction, "I2C_SCL", sizeof(appConfig.io[1].altFunction));
+    appConfig.io[1].inverted = false;
+    appConfig.io[1].pullup   = false;
 
-    appConfig.gp[2].pin      = GP3_PIN;
-    appConfig.gp[2].mode     = GP_I2C_RESERVED;
-    appConfig.gp[2].inverted = false;
-    appConfig.gp[2].pullup   = false;
-
-    appConfig.gp[3].pin      = 255;              // GP4: no default pin
-    appConfig.gp[3].mode     = GP_OUTPUT;
-    appConfig.gp[3].inverted = false;
-    appConfig.gp[3].pullup   = false;
+    appConfig.io[2].pin      = IO3_PIN;
+    appConfig.io[2].mode     = IO_OUTPUT;
+    strlcpy(appConfig.io[2].altFunction, "ADC1_CH3", sizeof(appConfig.io[2].altFunction));
+    appConfig.io[2].inverted = false;
+    appConfig.io[2].pullup   = false;
 
     // LED
     appConfig.ledPin        = LED_PIN;
@@ -140,15 +138,17 @@ void configLoad() {
     if (!doc["relayPin"].isNull())      appConfig.relay.pin      = doc["relayPin"].as<int>();
     if (!doc["relayInverted"].isNull()) appConfig.relay.inverted = doc["relayInverted"].as<bool>();
 
-    // GPIO GP1–GP4
-    const char* keys[] = {"gp1","gp2","gp3","gp4"};
-    for (int i = 0; i < 4; i++) {
-        JsonObjectConst gp = doc[keys[i]];
-        if (gp.isNull()) continue;
-        if (!gp["pin"].isNull())      appConfig.gp[i].pin      = gp["pin"].as<int>();
-        if (!gp["mode"].isNull())     appConfig.gp[i].mode     = (GpMode)gp["mode"].as<int>();
-        if (!gp["inverted"].isNull()) appConfig.gp[i].inverted = gp["inverted"].as<bool>();
-        if (!gp["pullup"].isNull())   appConfig.gp[i].pullup   = gp["pullup"].as<bool>();
+    // GPIO io1–io3
+    const char* keys[] = {"io1","io2","io3"};
+    for (int i = 0; i < 3; i++) {
+        JsonObjectConst io = doc[keys[i]];
+        if (io.isNull()) continue;
+        if (!io["pin"].isNull())      appConfig.io[i].pin      = io["pin"].as<int>();
+        if (!io["mode"].isNull())     appConfig.io[i].mode     = (IoMode)io["mode"].as<int>();
+        if (io["altFunction"].is<const char*>())
+            strlcpy(appConfig.io[i].altFunction, io["altFunction"].as<const char*>(), sizeof(appConfig.io[i].altFunction));
+        if (!io["inverted"].isNull()) appConfig.io[i].inverted = io["inverted"].as<bool>();
+        if (!io["pullup"].isNull())   appConfig.io[i].pullup   = io["pullup"].as<bool>();
     }
 
     // LED
@@ -194,12 +194,13 @@ void configSave() {
     doc["relayPin"]      = appConfig.relay.pin;
     doc["relayInverted"] = appConfig.relay.inverted;
 
-    const char* keys[] = {"gp1","gp2","gp3","gp4"};
-    for (int i = 0; i < 4; i++) {
-        doc[keys[i]]["pin"]      = appConfig.gp[i].pin;
-        doc[keys[i]]["mode"]     = (int)appConfig.gp[i].mode;
-        doc[keys[i]]["inverted"] = appConfig.gp[i].inverted;
-        doc[keys[i]]["pullup"]   = appConfig.gp[i].pullup;
+    const char* keys[] = {"io1","io2","io3"};
+    for (int i = 0; i < 3; i++) {
+        doc[keys[i]]["pin"]         = appConfig.io[i].pin;
+        doc[keys[i]]["mode"]        = (int)appConfig.io[i].mode;
+        doc[keys[i]]["altFunction"] = appConfig.io[i].altFunction;
+        doc[keys[i]]["inverted"]    = appConfig.io[i].inverted;
+        doc[keys[i]]["pullup"]      = appConfig.io[i].pullup;
     }
 
     doc["ledPin"]        = appConfig.ledPin;

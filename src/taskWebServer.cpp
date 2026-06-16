@@ -72,8 +72,8 @@ static void handleApiGpioGet(AsyncWebServerRequest* req) {
     DataStore::GpioState gpio = dsGetGpio();
     JsonDocument doc;
     doc["relay"] = gpio.relay ? 1 : 0;
-    for (int i = 0; i < 4; i++) {
-        char key[8]; snprintf(key, sizeof(key), "gpio%d", i + 1);
+    for (int i = 0; i < 3; i++) {
+        char key[8]; snprintf(key, sizeof(key), "io%d", i + 1);
         doc[key] = gpio.gpio[i] ? 1 : 0;
     }
     String out; serializeJson(doc, out);
@@ -88,8 +88,8 @@ static void handleApiGpioPost(AsyncWebServerRequest* req, uint8_t* data,
         req->send(400, "application/json", "{\"error\":\"invalid json\"}"); return;
     }
     if (!doc["relay"].isNull()) dsSetGpioCommand(0, doc["relay"].as<int>() == 1);
-    for (int i = 1; i <= 4; i++) {
-        char key[8]; snprintf(key, sizeof(key), "gpio%d", i);
+    for (int i = 1; i <= 3; i++) {
+        char key[8]; snprintf(key, sizeof(key), "io%d", i);
         if (!doc[key].isNull()) dsSetGpioCommand(i, doc[key].as<int>() == 1);
     }
     req->send(200, "application/json", "{\"ok\":true}");
@@ -163,12 +163,13 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
     doc["mqttOpenDtu"]     = appConfig.mqttOpenDtu;
     doc["relayPin"]        = appConfig.relay.pin;
     doc["relayInverted"]   = appConfig.relay.inverted;
-    const char* gpKeys[] = {"gp1","gp2","gp3","gp4"};
-    for (int i = 0; i < 4; i++) {
-        doc[gpKeys[i]]["pin"]      = appConfig.gp[i].pin;
-        doc[gpKeys[i]]["mode"]     = (int)appConfig.gp[i].mode;
-        doc[gpKeys[i]]["inverted"] = appConfig.gp[i].inverted;
-        doc[gpKeys[i]]["pullup"]   = appConfig.gp[i].pullup;
+    const char* ioKeys[] = {"io1","io2","io3"};
+    for (int i = 0; i < 3; i++) {
+        doc[ioKeys[i]]["pin"]         = appConfig.io[i].pin;
+        doc[ioKeys[i]]["mode"]        = (int)appConfig.io[i].mode;
+        doc[ioKeys[i]]["altFunction"] = appConfig.io[i].altFunction;
+        doc[ioKeys[i]]["inverted"]    = appConfig.io[i].inverted;
+        doc[ioKeys[i]]["pullup"]      = appConfig.io[i].pullup;
     }
     doc["ledPin"]        = appConfig.ledPin;
     doc["ledBrightness"] = appConfig.ledBrightness;
@@ -223,12 +224,14 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     if (!doc["relayPin"].isNull())      appConfig.relay.pin      = doc["relayPin"].as<int>();
     if (!doc["relayInverted"].isNull()) appConfig.relay.inverted = doc["relayInverted"].as<bool>();
 
-    const char* gpKeys[] = {"gp1","gp2","gp3","gp4"};
-    for (int i = 0; i < 4; i++) {
-        if (!doc[gpKeys[i]]["pin"].isNull())      appConfig.gp[i].pin      = doc[gpKeys[i]]["pin"].as<int>();
-        if (!doc[gpKeys[i]]["mode"].isNull())     appConfig.gp[i].mode     = (GpMode)doc[gpKeys[i]]["mode"].as<int>();
-        if (!doc[gpKeys[i]]["inverted"].isNull()) appConfig.gp[i].inverted = doc[gpKeys[i]]["inverted"].as<bool>();
-        if (!doc[gpKeys[i]]["pullup"].isNull())   appConfig.gp[i].pullup   = doc[gpKeys[i]]["pullup"].as<bool>();
+    const char* ioKeys[] = {"io1","io2","io3"};
+    for (int i = 0; i < 3; i++) {
+        if (!doc[ioKeys[i]]["pin"].isNull())      appConfig.io[i].pin      = doc[ioKeys[i]]["pin"].as<int>();
+        if (!doc[ioKeys[i]]["mode"].isNull())     appConfig.io[i].mode     = (IoMode)doc[ioKeys[i]]["mode"].as<int>();
+        if (doc[ioKeys[i]]["altFunction"].is<const char*>())
+            strlcpy(appConfig.io[i].altFunction, doc[ioKeys[i]]["altFunction"].as<const char*>(), sizeof(appConfig.io[i].altFunction));
+        if (!doc[ioKeys[i]]["inverted"].isNull()) appConfig.io[i].inverted = doc[ioKeys[i]]["inverted"].as<bool>();
+        if (!doc[ioKeys[i]]["pullup"].isNull())   appConfig.io[i].pullup   = doc[ioKeys[i]]["pullup"].as<bool>();
     }
 
     if (!doc["ledPin"].isNull())        appConfig.ledPin        = doc["ledPin"].as<int>();
