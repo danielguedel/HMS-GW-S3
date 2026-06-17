@@ -10,6 +10,7 @@
 #include "logger.h"
 #include "taskLED.h"
 #include <Arduino.h>
+#include <esp_ota_ops.h>
 
 // --- Output helpers -----------------------------------------------------------
 
@@ -41,6 +42,7 @@ static void cmdHelp() {
     Serial.println("  tasks             FreeRTOS task list");
     Serial.println("  heap              Heap statistics");
     Serial.println("  uptime            Uptime (seconds + d/h/m/s)");
+    Serial.println("  otainfo           OTA partition state (running + next slot)");
     Serial.println("  restart           Reboot gateway");
     Serial.println("  reset             Factory reset (clears config.json)");
     Serial.println("  ledtest           Cycle through all LED states");
@@ -49,6 +51,45 @@ static void cmdHelp() {
 static void cmdVersion() {
     printf_("HMS-GW-S3  fw=%s  build=%d  date=%s\n",
             FW_VERSION, BUILD_NUMBER, FW_DATE);
+}
+
+static const char* otaStateName(esp_ota_img_states_t s) {
+    switch (s) {
+        case ESP_OTA_IMG_NEW:            return "NEW";
+        case ESP_OTA_IMG_PENDING_VERIFY: return "PENDING_VERIFY";
+        case ESP_OTA_IMG_VALID:          return "VALID";
+        case ESP_OTA_IMG_INVALID:        return "INVALID";
+        case ESP_OTA_IMG_ABORTED:        return "ABORTED";
+        default:                         return "UNDEFINED";
+    }
+}
+
+// Diagnostic for the OTA-revert bug: dumps which app partition is actually
+// running and the otadata state of both OTA slots, so a failed update can be
+// told apart from "wrote fine but bootloader silently picked the other slot".
+static void cmdOtaInfo() {
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    const esp_partition_t* next    = esp_ota_get_next_update_partition(NULL);
+
+    if (running) {
+        esp_ota_img_states_t st = ESP_OTA_IMG_UNDEFINED;
+        esp_ota_get_state_partition(running, &st);
+        printf_("Running : %-8s  addr=0x%06x  size=0x%06x  state=%s\n",
+                running->label, (unsigned)running->address, (unsigned)running->size,
+                otaStateName(st));
+    } else {
+        printf_("Running : <unknown>\n");
+    }
+
+    if (next) {
+        esp_ota_img_states_t st = ESP_OTA_IMG_UNDEFINED;
+        esp_ota_get_state_partition(next, &st);
+        printf_("Next OTA: %-8s  addr=0x%06x  size=0x%06x  state=%s\n",
+                next->label, (unsigned)next->address, (unsigned)next->size,
+                otaStateName(st));
+    } else {
+        printf_("Next OTA: <unavailable>\n");
+    }
 }
 
 static void cmdStatus() {
@@ -283,6 +324,7 @@ static void dispatch(char* line) {
     else if (strcmp(verb, "tasks")    == 0) cmdTasks();
     else if (strcmp(verb, "heap")     == 0) cmdHeap();
     else if (strcmp(verb, "uptime")   == 0) cmdUptime();
+    else if (strcmp(verb, "otainfo")  == 0) cmdOtaInfo();
     else if (strcmp(verb, "loglevel") == 0) cmdLoglevel(arg);
     else if (strcmp(verb, "ledtest")  == 0) cmdLedTest();
     else if (strcmp(verb, "restart")  == 0) cmdRestart();
