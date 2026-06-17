@@ -47,6 +47,14 @@ jobs:
           echo "tag=build-${BUILD}" >> $GITHUB_OUTPUT
           echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
 
+      - name: Compute MD5 checksums
+        id: md5
+        run: |
+          FW_MD5=$(md5sum .pio/build/esp32-s3-devkitc-1/firmware.bin | cut -d' ' -f1)
+          FS_MD5=$(md5sum .pio/build/esp32-s3-devkitc-1/littlefs.bin | cut -d' ' -f1)
+          echo "fw_md5=${FW_MD5}" >> $GITHUB_OUTPUT
+          echo "fs_md5=${FS_MD5}" >> $GITHUB_OUTPUT
+
       - name: Update manifest.json
         run: |
           cat > release/manifest.json << EOF
@@ -55,6 +63,8 @@ jobs:
             "buildNumber": ${{ steps.meta.outputs.build }},
             "url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/firmware.bin",
             "fs_url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/littlefs.bin",
+            "md5": "${{ steps.md5.outputs.fw_md5 }}",
+            "fs_md5": "${{ steps.md5.outputs.fs_md5 }}",
             "notes": "${{ github.event.inputs.notes }}"
           }
           EOF

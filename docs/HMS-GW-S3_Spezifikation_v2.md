@@ -113,6 +113,8 @@ struct DataStore {
         int      buildNumber;        // Build-Nummer aus Manifest
         char     url[256];           // Firmware-Download-URL
         char     fsUrl[256];         // Filesystem-Download-URL (leer = kein FS-Update)
+        char     md5[33];            // erwarteter MD5-Hash der Firmware (leer = keine Prüfung)
+        char     fsMd5[33];          // erwarteter MD5-Hash des Filesystem-Images (leer = keine Prüfung)
         char     notes[128];         // Release-Notes
         uint32_t lastCheckMs;        // millis() des letzten Checks (0 = noch nie)
     } otaInfo;
@@ -633,14 +635,15 @@ Im Web-GUI unter System → OTA:
 - Stream wird in 512-Byte-Blöcken gelesen und per `Update.write()` geschrieben; Fortschritt alle 10% als `LOG_I` ausgegeben
 - Firmware- und Filesystem-Update laufen sequenziell — beide Flags werden vor jedem `LOG_I` gesetzt, um eine Race Condition mit dem Reboot zu vermeiden (Fix in Commit `07ffd0d`)
 - Kein WebSocket/Live-Fortschritt im Browser — Status wird über `GET /api/ota/check` gepollt
-- Keine Signatur-/Hash-Prüfung implementiert
+- MD5-Hash-Prüfung optional (siehe unten) — keine kryptografische Signaturprüfung
 - **Config-Erhalt bei Filesystem-Update:** Ein Filesystem-OTA (`U_SPIFFS`) überschreibt die komplette LittleFS-Partition mit dem CI-Build-Image (nur `data/www/*`, kein `/config.json`). Seit dem Fix vom 2026-06-17 (Produktionsvorfall, siehe `docs/code_review.md` §0) wird `/config.json` vor dem Schreiben in den RAM gesichert und danach zurückgeschrieben (`backupConfigBeforeFsOta()`/`restoreConfigAfterFsOta()` in `taskWebServer.cpp`) — sowohl beim lokalen Upload (`/updatefs`) als auch beim Internet-URL-OTA.
+- **MD5-Verifikation:** `POST /api/ota/url` akzeptiert optional `md5`/`fsMd5` (32-Zeichen-Hex). Wird einer übergeben, ruft `doUrlOtaPartition()` vor dem Schreiben `Update.setMD5()` auf — `Update.end()` prüft dann den Hash und schlägt mit klarer Fehlermeldung fehl, statt dass ein beschädigter Download nur die Byte-Anzahl erfüllt, scheinbar erfolgreich durchläuft, aber vom Bootloader beim nächsten Boot mangels gültiger Prüfsumme stillschweigend verworfen wird (genau dieser Fall trat 2026-06-17 produktiv auf: Build 208 wurde "erfolgreich" geschrieben, das Gerät bootete aber unbemerkt zurück auf den alten Build). Die Hashes stammen aus dem Manifest (`md5`/`fs_md5`, vom Release-Workflow per `md5sum` berechnet) und werden über `GET /api/ota/check` (`md5`/`fsMd5`) bis zur Web-GUI durchgereicht.
 
 ### 10.3 Internet-OTA-Versionscheck (Manifest)
 
 - `appConfig.otaManifestUrl` zeigt auf ein JSON-Manifest (Default: `https://raw.githubusercontent.com/danielguedel/HMS-GW-S3/main/release/manifest.json`)
 - Automatischer Check nach WiFi-Connect; manueller Trigger via `POST /api/ota/check`
-- Ergebnis landet in `DataStore::OtaInfo` (`available`, `version`, `buildNumber`, `url`, `fsUrl`, `notes`, `lastCheckMs`) und wird via `GET /api/ota/check` ausgeliefert
+- Ergebnis landet in `DataStore::OtaInfo` (`available`, `version`, `buildNumber`, `url`, `fsUrl`, `md5`, `fsMd5`, `notes`, `lastCheckMs`) und wird via `GET /api/ota/check` ausgeliefert
 - Web-GUI "Internet Update"-Kachel zeigt Ergebnis an und bietet "Jetzt installieren" (löst `POST /api/ota/url` mit den Manifest-URLs aus)
 - GitHub Actions Release-Workflow (`workflow_dispatch` mit `version` + `notes`) erzeugt Release + aktualisiert `manifest.json`
 

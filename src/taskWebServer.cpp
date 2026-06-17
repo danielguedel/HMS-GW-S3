@@ -25,6 +25,8 @@ static bool           _otaFwError  = false;
 static bool           _otaFsError  = false;
 static char           _otaUrl[512]   = "";
 static char           _otaFsUrl[512] = "";
+static char           _otaMd5[33]    = "";
+static char           _otaFsMd5[33]  = "";
 static volatile bool  _otaUrlPending   = false;
 static volatile bool  _otaFsUrlPending = false;
 static volatile bool  _otaCheckPending = false;
@@ -396,10 +398,15 @@ static void doOtaCheck() {
     const char* ver   = doc["version"].as<const char*>();
     const char* url   = doc["url"].as<const char*>();
     const char* fsUrl = doc["fs_url"].as<const char*>();
+    const char* md5   = doc["md5"].as<const char*>();
+    const char* fsMd5 = doc["fs_md5"].as<const char*>();
     const char* notes = doc["notes"].as<const char*>();
     strlcpy(info.version, ver   ? ver   : "", sizeof(info.version));
     strlcpy(info.url,     url   ? url   : "", sizeof(info.url));
     strlcpy(info.fsUrl,   fsUrl ? fsUrl : "", sizeof(info.fsUrl));
+    // Only accept well-formed 32-char hex MD5 values  -  anything else means "no check"
+    strlcpy(info.md5,   (md5   && strlen(md5)   == 32) ? md5   : "", sizeof(info.md5));
+    strlcpy(info.fsMd5, (fsMd5 && strlen(fsMd5) == 32) ? fsMd5 : "", sizeof(info.fsMd5));
     strlcpy(info.notes,   notes ? notes : "", sizeof(info.notes));
     dsSetOtaInfo(info);
 
@@ -420,6 +427,8 @@ static void handleApiOtaCheckGet(AsyncWebServerRequest* req) {
     doc["buildNumber"]    = info.buildNumber;
     doc["url"]            = info.url;
     doc["fsUrl"]          = info.fsUrl;
+    doc["md5"]            = info.md5;
+    doc["fsMd5"]          = info.fsMd5;
     doc["notes"]          = info.notes;
     doc["lastCheckMs"]    = info.lastCheckMs;
     doc["currentVersion"] = FW_VERSION;
@@ -442,7 +451,7 @@ static void handleApiOtaCheckPost(AsyncWebServerRequest* req) {
 // --- POST /api/ota/url  (Internet OTA  -  Spec §10.2) ------------------------
 static void handleApiOtaUrl(AsyncWebServerRequest* req, uint8_t* data,
                              size_t len, size_t index, size_t total) {
-    static uint8_t bodyBuf[600];
+    static uint8_t bodyBuf[768];
     if (index + len > sizeof(bodyBuf)) {
         if (index + len >= total)
             req->send(413, "application/json", "{\"error\":\"url too long\"}");
@@ -457,11 +466,16 @@ static void handleApiOtaUrl(AsyncWebServerRequest* req, uint8_t* data,
     }
     const char* url   = doc["url"].as<const char*>();
     const char* fsUrl = doc["fsUrl"].as<const char*>();
+    const char* md5   = doc["md5"].as<const char*>();
+    const char* fsMd5 = doc["fsMd5"].as<const char*>();
     if ((!url || strlen(url) == 0) && (!fsUrl || strlen(fsUrl) == 0)) {
         req->send(400, "application/json", "{\"error\":\"url missing\"}"); return;
     }
     // Set both flags before any LOG_I to avoid race with task loop on Core 1
     // (LOG_I blocks ~8ms at 115200 baud, enough for Core 1 to see a partial state)
+    _otaMd5[0] = _otaFsMd5[0] = '\0';
+    if (md5   && strlen(md5)   == 32) strlcpy(_otaMd5,   md5,   sizeof(_otaMd5));
+    if (fsMd5 && strlen(fsMd5) == 32) strlcpy(_otaFsMd5, fsMd5, sizeof(_otaFsMd5));
     if (url && strlen(url)) {
         strlcpy(_otaUrl, url, sizeof(_otaUrl));
         _otaUrlPending = true;
@@ -470,14 +484,18 @@ static void handleApiOtaUrl(AsyncWebServerRequest* req, uint8_t* data,
         strlcpy(_otaFsUrl, fsUrl, sizeof(_otaFsUrl));
         _otaFsUrlPending = true;
     }
-    if (_otaUrlPending)   LOG_I(MOD_OTA, "FW-URL queued: %s", _otaUrl);
-    if (_otaFsUrlPending) LOG_I(MOD_OTA, "FS-URL queued: %s", _otaFsUrl);
+    if (_otaUrlPending)   LOG_I(MOD_OTA, "FW-URL queued: %s%s", _otaUrl, _otaMd5[0] ? " (MD5 checked)" : "");
+    if (_otaFsUrlPending) LOG_I(MOD_OTA, "FS-URL queued: %s%s", _otaFsUrl, _otaFsMd5[0] ? " (MD5 checked)" : "");
     req->send(200, "application/json", "{\"ok\":true}");
 }
 
 // Download a binary from URL and flash to given partition (U_FLASH or U_SPIFFS).
+// expectedMd5 (32 hex chars, optional) is verified by Update.end() -  a corrupted
+// download that still matches the expected byte count would otherwise "succeed"
+// at the app level while producing an unbootable image (silently rejected by the
+// bootloader's own checksum check, with no error visible to us).
 // Returns true on success. Does not trigger reboot — caller is responsible.
-static bool doUrlOtaPartition(const char* url, int partition) {
+static bool doUrlOtaPartition(const char* url, int partition, const char* expectedMd5 = nullptr) {
     const char* tag = (partition == U_SPIFFS) ? "FS" : "FW";
     LOG_I(MOD_OTA, "URL-OTA %s: %s", tag, url);
 
@@ -506,6 +524,11 @@ static bool doUrlOtaPartition(const char* url, int partition) {
         LOG_E(MOD_OTA, "URL-OTA %s Update.begin failed: %s", tag, Update.errorString());
         http.end();
         return false;
+    }
+
+    if (expectedMd5 && strlen(expectedMd5) == 32) {
+        Update.setMD5(expectedMd5);
+        LOG_I(MOD_OTA, "URL-OTA %s MD5 check enabled: %s", tag, expectedMd5);
     }
 
     WiFiClient* stream = http.getStreamPtr();
@@ -647,8 +670,8 @@ void taskWebServer(void* pvParameters) {
             setLedState(LED_OTA);
             xEventGroupSetBits(systemStateEvents, EVT_OTA_RUNNING);
             bool ok = true;
-            if (fwPending) ok = doUrlOtaPartition(_otaUrl,   U_FLASH);
-            if (ok && fsPending) ok = doUrlOtaPartition(_otaFsUrl, U_SPIFFS);
+            if (fwPending) ok = doUrlOtaPartition(_otaUrl,   U_FLASH,  _otaMd5);
+            if (ok && fsPending) ok = doUrlOtaPartition(_otaFsUrl, U_SPIFFS, _otaFsMd5);
             xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
             if (ok) xEventGroupSetBits(systemStateEvents, EVT_REBOOT);
         }

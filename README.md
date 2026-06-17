@@ -225,11 +225,15 @@ release/manifest.json
   "buildNumber": 202,
   "url":    "https://github.com/<owner>/<repo>/releases/download/<tag>/firmware.bin",
   "fs_url": "https://github.com/<owner>/<repo>/releases/download/<tag>/littlefs.bin",
+  "md5":    "<md5 of firmware.bin>",
+  "fs_md5": "<md5 of littlefs.bin>",
   "notes": "..."
 }
 ```
 
-> Note: the external manifest uses `fs_url` (snake_case); the internal `/api/ota/check` and `/api/ota/url` endpoints use `fsUrl` (camelCase) — two distinct JSON schemas for two different purposes.
+> Note: the external manifest uses `fs_url`/`fs_md5` (snake_case); the internal `/api/ota/check` and `/api/ota/url` endpoints use `fsUrl`/`fsMd5` (camelCase) — two distinct JSON schemas for two different purposes.
+>
+> `md5`/`fs_md5` are optional but recommended: if present, the gateway calls `Update.setMD5()` before flashing, so a corrupted download (right byte count, wrong content) is rejected with a clear error instead of silently producing an unbootable image that the ESP32 bootloader rejects on its own — falling back to the previous firmware without any visible error.
 
 `.github/workflows/release.yml` (manually triggered, `version` + `notes` inputs) builds firmware and filesystem, publishes a GitHub Release, and updates `release/manifest.json` — so tagging a release is enough to make it discoverable by every deployed gateway.
 

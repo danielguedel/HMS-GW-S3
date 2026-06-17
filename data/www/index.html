@@ -696,6 +696,8 @@ function updateOtaCard(d) {
     btn.style.display  = '';
     btn.dataset.url    = d.url;
     btn.dataset.fsUrl  = d.fsUrl || '';
+    btn.dataset.md5    = d.md5   || '';
+    btn.dataset.fsMd5  = d.fsMd5 || '';
     btn.disabled       = false;
     btn.textContent    = d.fsUrl ? 'Firmware + FS installieren' : 'Jetzt installieren';
     box.classList.add('ota-avail');
@@ -741,11 +743,15 @@ function pollOtaCheck() {
 async function installUpdate() {
   const url   = $('btn-ota-install').dataset.url;
   const fsUrl = $('btn-ota-install').dataset.fsUrl;
+  const md5   = $('btn-ota-install').dataset.md5;
+  const fsMd5 = $('btn-ota-install').dataset.fsMd5;
   if (!url) { toast('Keine URL verfügbar', false); return; }
   const label = fsUrl ? 'Firmware + Filesystem installieren?' : 'Firmware installieren?';
   if (!confirm(label + '\n' + url)) return;
   const body = { url };
   if (fsUrl) body.fsUrl = fsUrl;
+  if (md5)   body.md5   = md5;
+  if (fsMd5) body.fsMd5 = fsMd5;
   try {
     await fetch('/api/ota/url', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
