@@ -1,7 +1,9 @@
 {
   "version": "0.2.0",
-  "buildNumber": 208,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-208/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-208/littlefs.bin",
-  "notes": "Internet OTA Versionscheck 5"
+  "buildNumber": 211,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-211/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-211/littlefs.bin",
+  "md5": "5853b7a641a0b7453a5bf53da31435d2",
+  "fs_md5": "dc66b37eca2e074f5cb762bc2b2a5205",
+  "notes": "Internet OTA Versionscheck 6"
 }
