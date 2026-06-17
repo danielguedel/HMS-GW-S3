@@ -28,6 +28,16 @@ Nach diesem Review trat auf einem produktiven Gateway ein realer Vorfall auf: ei
 
 **Fix:** `backupConfigBeforeFsOta()`/`restoreConfigAfterFsOta()` in `taskWebServer.cpp` — sichert `/config.json` vor dem `Update.begin(..., U_SPIFFS)`-Aufruf in den RAM, remounted LittleFS nach `Update.end()` und schreibt die Config zurück. In beiden FS-OTA-Pfaden (Upload + URL) sowie deren Fehlerpfaden (best effort) verdrahtet.
 
+## 0.1 Update 2026-06-17 (Nachtrag) — Vermeintlicher "OTA-Revert"-Bug war ein Versionierungsfehler im Release-Workflow
+
+Nach dem Config-Fix wurde wiederholt beobachtet, dass ein Internet-OTA (z. B. auf "Build 211") nach Download/Schreiben/`Update.end()` — allesamt erfolgreich, inkl. MD5-Verifikation — nach dem Reboot eine ÄLTERE Build-Nummer meldete. Tiefe Diagnose (otadata-Status-Logging via neuem `otainfo`-Konsolenbefehl, direkte Flash-Auslese der OTA-Partitionen per `esptool read_flash` + MD5-Vergleich, vollständiger Werks-Reflash von Bootloader+Partitionstabelle, Timing-Variation vor `ESP.restart()`) zeigte: **die OTA-Partition (`app1`) enthielt durchgehend exakt das korrekte, MD5-verifizierte Firmware-Image** — kein Schreib-, Bootloader- oder Partitions-Problem.
+
+**Tatsächliche Ursache:** `extra_scripts = pre:version_inc.py` (`platformio.ini`) inkrementiert `include/buildnumber.txt` bei **jedem** `pio run`-Aufruf, ohne Rücksicht auf das Target. Der Release-Workflow rief `pio run` (Firmware) **und separat** `pio run -t buildfs` (Filesystem) auf — das inkrementiert den Zähler zweimal pro Release. `firmware.bin` für "Build N" hatte dadurch tatsächlich `BUILD_NUMBER=N-1` einkompiliert, während Manifest und Git-Tag den Wert NACH dem zweiten (Filesystem-)Lauf zeigten (`N`). Die Firmware lief die ganze Zeit korrekt — nur mit einer um 1 niedrigeren, aber intern konsistenten Versionsnummer als im Manifest behauptet.
+
+**Fix:** `.github/workflows/release.yml` liest die Build-Nummer jetzt sofort nach dem Firmware-Build (vor `buildfs`) und schreibt sie nach dem Filesystem-Build explizit zurück in `include/buildnumber.txt`, damit der committete Wert wieder mit dem tatsächlich einkompilierten `BUILD_NUMBER` übereinstimmt.
+
+**Lektion:** Bei einem reproduzierbaren, aber unplausiblen Befund (Schreiben erfolgreich, Inhalt verifiziert korrekt, trotzdem "falsches" Verhalten) zuerst die Versionsbuchhaltung selbst hinterfragen, bevor tiefer in Firmware-/Hardware-Ebenen gegraben wird — der Fehler lag hier nie im Code, der tatsächlich ausgeführt wurde, sondern in der Beschriftung.
+
 Dieser Befund hätte bei der vorherigen Review-Runde auffallen können/sollen — die Internet-OTA-Implementierung wurde zwar gegen die Spec abgeglichen, aber nicht gegen den Effekt eines `U_SPIFFS`-Updates auf bereits vorhandene Laufzeitdateien auf derselben Partition geprüft.
 
 ---

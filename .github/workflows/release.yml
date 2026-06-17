@@ -36,9 +36,13 @@ jobs:
       - name: Build firmware
         run: pio run -e esp32-s3-devkitc-1
 
-      - name: Build filesystem image
-        run: pio run -e esp32-s3-devkitc-1 -t buildfs
-
+      # version_inc.py (extra_scripts = pre:...) increments include/buildnumber.txt
+      # on EVERY `pio run` invocation, including the buildfs step below. Capture the
+      # number right here, immediately after the firmware build, so it matches what
+      # is actually compiled into firmware.bin -  not whatever buildfs bumps it to
+      # afterward (it has no compiled BUILD_NUMBER of its own, but used to throw the
+      # manifest/tag one version ahead of the real firmware -  see commit history
+      # around 2026-06-17 for the resulting OTA-revert false alarm).
       - name: Read build number
         id: meta
         run: |
@@ -46,6 +50,12 @@ jobs:
           echo "build=${BUILD}" >> $GITHUB_OUTPUT
           echo "tag=build-${BUILD}" >> $GITHUB_OUTPUT
           echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Build filesystem image
+        run: pio run -e esp32-s3-devkitc-1 -t buildfs
+
+      - name: Pin buildnumber.txt to the firmware's actual build number
+        run: echo "${{ steps.meta.outputs.build }}" > include/buildnumber.txt
 
       - name: Compute MD5 checksums
         id: md5

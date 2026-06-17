@@ -17,6 +17,7 @@
 #include <DNSServer.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <esp_ota_ops.h>
 
 static AsyncWebServer server(WEB_DEFAULT_PORT);
 static DNSServer      dnsServer;
@@ -43,6 +44,25 @@ static void backupConfigBeforeFsOta() {
     _fsOtaConfigBackup = f.readString();
     f.close();
     LOG_I(MOD_OTA, "Backed up %s (%u B) before filesystem OTA", CONFIG_FILE, (unsigned)_fsOtaConfigBackup.length());
+}
+
+// Diagnostic for the OTA-revert bug: logs the otadata state of both OTA slots
+// right after a firmware write claims success, so we can see whether the
+// bootloader's boot-partition pointer was actually persisted before the
+// reboot happens (vs. silently staying on the currently-running slot).
+static void logOtaPartitionState(const char* when) {
+    static const char* stateName[] = {"NEW", "PENDING_VERIFY", "VALID", "INVALID", "ABORTED"};
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    const esp_partition_t* next    = esp_ota_get_next_update_partition(NULL);
+    esp_ota_img_states_t runSt = ESP_OTA_IMG_UNDEFINED, nextSt = ESP_OTA_IMG_UNDEFINED;
+    if (running) esp_ota_get_state_partition(running, &runSt);
+    if (next)    esp_ota_get_state_partition(next, &nextSt);
+    auto name = [](esp_ota_img_states_t s) {
+        return (s <= ESP_OTA_IMG_ABORTED) ? stateName[s] : "UNDEFINED";
+    };
+    LOG_I(MOD_OTA, "otadata %s: running=%s(%s)  next=%s(%s)", when,
+          running ? running->label : "?", name(runSt),
+          next    ? next->label    : "?", name(nextSt));
 }
 
 static void restoreConfigAfterFsOta() {
@@ -319,8 +339,12 @@ static void handleOtaUpload(AsyncWebServerRequest* /*req*/, String filename,
     if (_otaFwError) return;
     if (Update.write(data, len) != len) LOG_E(MOD_OTA, "Write error at %zu", index);
     if (final) {
-        if (Update.end(true)) LOG_I(MOD_OTA, "OTA OK: %zu B", index + len);
-        else                  LOG_E(MOD_OTA, "OTA error: %s", Update.errorString());
+        if (Update.end(true)) {
+            LOG_I(MOD_OTA, "OTA OK: %zu B", index + len);
+            logOtaPartitionState("after FW write");
+        } else {
+            LOG_E(MOD_OTA, "OTA error: %s", Update.errorString());
+        }
         xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
     }
 }
@@ -572,6 +596,7 @@ static bool doUrlOtaPartition(const char* url, int partition, const char* expect
     if (Update.end(true)) {
         LOG_I(MOD_OTA, "URL-OTA %s complete: %zu B", tag, written);
         if (partition == U_SPIFFS) restoreConfigAfterFsOta();
+        else                       logOtaPartitionState("after FW write");
         return true;
     }
     LOG_E(MOD_OTA, "URL-OTA %s end failed: %s", tag, Update.errorString());
@@ -635,6 +660,7 @@ static void setupRoutes() {
 void taskWebServer(void* pvParameters) {
     LOG_I(MOD_WEB, "Task started (Core %d)", xPortGetCoreID());
     // LittleFS, config, and WiFi are already initialized in main.cpp
+    logOtaPartitionState("at boot");
     setupRoutes();
 
     for (;;) {
