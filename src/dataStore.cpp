@@ -66,6 +66,21 @@ DataStore::GpioState dsGetGpio() {
     return copy;
 }
 
+DataStore::GpioCommand dsGetGpioCommand() {
+    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    DataStore::GpioCommand copy = ds.gpioCmd;
+    if (copy.pending) ds.gpioCmd.pending = false;
+    xSemaphoreGive(ds.mutex);
+    return copy;
+}
+
+DataStore::DtuCommand dsGetDtuCommand() {
+    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    DataStore::DtuCommand copy = ds.dtuCmd;
+    xSemaphoreGive(ds.mutex);
+    return copy;
+}
+
 // ─── Schreiben ────────────────────────────────────────────────────────────────
 
 void dsSetPv(const DataStore::PvData& data) {

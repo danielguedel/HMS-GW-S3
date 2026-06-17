@@ -92,6 +92,8 @@ void dsInit();
 DataStore::PvData       dsGetPv();
 DataStore::SystemStatus dsGetSystem();
 DataStore::GpioState    dsGetGpio();
+DataStore::GpioCommand  dsGetGpioCommand();  // atomic read + clears pending
+DataStore::DtuCommand   dsGetDtuCommand();
 
 // Schreiben (atomisch mit Mutex)
 void dsSetPv(const DataStore::PvData& data);

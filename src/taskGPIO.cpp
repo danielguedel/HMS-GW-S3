@@ -86,24 +86,18 @@ void taskGPIO(void* pvParameters) {
     for (;;) {
         // ── Process pending GPIO command from DataStore ────────────────────────
         {
-            xSemaphoreTake(ds.mutex, portMAX_DELAY);
-            bool pending = ds.gpioCmd.pending;
-            int  target  = ds.gpioCmd.target;
-            bool state   = ds.gpioCmd.state;
-            if (pending) ds.gpioCmd.pending = false;
-            xSemaphoreGive(ds.mutex);
-
-            if (pending) {
-                if (target == 0) {
-                    applyRelay(state, gpio);
-                    LOG_I(MOD_GPIO, "Relay -> %s", state ? "ON" : "OFF");
-                } else if (target >= 1 && target <= 3) {
-                    int idx = target - 1;
+            DataStore::GpioCommand cmd = dsGetGpioCommand();
+            if (cmd.pending) {
+                if (cmd.target == 0) {
+                    applyRelay(cmd.state, gpio);
+                    LOG_I(MOD_GPIO, "Relay -> %s", cmd.state ? "ON" : "OFF");
+                } else if (cmd.target >= 1 && cmd.target <= 3) {
+                    int idx = cmd.target - 1;
                     if (appConfig.io[idx].mode == IO_OUTPUT) {
-                        applyIo(idx, state, gpio);
-                        LOG_I(MOD_GPIO, "io%d -> %s", target, state ? "HIGH" : "LOW");
+                        applyIo(idx, cmd.state, gpio);
+                        LOG_I(MOD_GPIO, "io%d -> %s", cmd.target, cmd.state ? "HIGH" : "LOW");
                     } else {
-                        LOG_W(MOD_GPIO, "io%d command ignored (not OUTPUT)", target);
+                        LOG_W(MOD_GPIO, "io%d command ignored (not OUTPUT)", cmd.target);
                     }
                 }
                 dsSetGpio(gpio);

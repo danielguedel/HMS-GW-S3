@@ -248,7 +248,8 @@ static volatile bool   _appReady  = false;  // AppInfo response received
 static uint8_t            _rxBuf[2048];
 static volatile size_t    _rxLen     = 0;
 static volatile int       _lastError = 0;
-static SemaphoreHandle_t  _rxMutex   = nullptr;
+static SemaphoreHandle_t  _rxMutex      = nullptr;
+static volatile uint32_t  _ntpTimeCache = 0;  // updated by task loop, read by onConnect without lock
 static volatile uint32_t _cloudPauseAt = 0;  // millis() of last ERR_RST -14
 
 static void onData(void*, AsyncClient*, void* data, size_t len) {
@@ -271,7 +272,7 @@ static void onConnect(void*, AsyncClient* c) {
     _dataReady = false;
     _cfgReady  = false;
     // Send AppInformation immediately — DTU has very short first-byte timeout
-    uint32_t ntpTime = dsGetSystem().ntpTime;
+    uint32_t ntpTime = _ntpTimeCache;  // cached by task loop before connect — no mutex needed here
     uint8_t pb[64], msg[80];
     size_t pbLen  = buildAppInfoReq(pb, sizeof(pb), ntpTime);
     size_t msgLen = buildMsg(msg, sizeof(msg), 0xa3, 0x01, pb, pbLen);
@@ -403,12 +404,7 @@ void taskDTU(void* pvParameters) {
 
         // ── Process pending DTU commands from DataStore ────────────────────────
         {
-            DataStore::DtuCommand cmd;
-            {
-                xSemaphoreTake(ds.mutex, portMAX_DELAY);
-                cmd = ds.dtuCmd;
-                xSemaphoreGive(ds.mutex);
-            }
+            DataStore::DtuCommand cmd = dsGetDtuCommand();
             if (cmd.setPowerLimit && _connected) {
                 uint32_t t = dsGetSystem().ntpTime;
                 sendSetPowerLimit(t, cmd.powerLimitValue);
@@ -443,6 +439,7 @@ void taskDTU(void* pvParameters) {
 
         // ── Connect if disconnected ────────────────────────────────────────────
         if (!_connected) {
+            _ntpTimeCache = dsGetSystem().ntpTime;  // cache before connect so onConnect can read without mutex
             dtuConnect();
             vTaskDelay(pdMS_TO_TICKS(3000));
             if (!_connected) {

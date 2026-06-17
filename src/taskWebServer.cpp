@@ -18,7 +18,9 @@
 
 static AsyncWebServer server(WEB_DEFAULT_PORT);
 static DNSServer      dnsServer;
-static bool           _dnsStarted = false;
+static bool           _dnsStarted  = false;
+static bool           _otaFwError  = false;
+static bool           _otaFsError  = false;
 
 // ─── GET /api/data.json  (Spec §6.2) ─────────────────────────────────────────
 static void handleApiData(AsyncWebServerRequest* req) {
@@ -263,11 +265,17 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
 static void handleOtaUpload(AsyncWebServerRequest* /*req*/, String filename,
                              size_t index, uint8_t* data, size_t len, bool final) {
     if (index == 0) {
+        _otaFwError = false;
         LOG_I(MOD_OTA, "OTA start: %s", filename.c_str());
         xEventGroupSetBits(systemStateEvents, EVT_OTA_RUNNING);
         setLedState(LED_OTA);
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) LOG_E(MOD_OTA, "Update.begin failed");
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            LOG_E(MOD_OTA, "Update.begin failed");
+            _otaFwError = true;
+            return;
+        }
     }
+    if (_otaFwError) return;
     if (Update.write(data, len) != len) LOG_E(MOD_OTA, "Write error at %zu", index);
     if (final) {
         if (Update.end(true)) LOG_I(MOD_OTA, "OTA OK: %zu B", index + len);
@@ -288,11 +296,17 @@ static void handleOtaDone(AsyncWebServerRequest* req) {
 static void handleFsUpload(AsyncWebServerRequest* /*req*/, String filename,
                             size_t index, uint8_t* data, size_t len, bool final) {
     if (index == 0) {
+        _otaFsError = false;
         LOG_I(MOD_OTA, "FS OTA start: %s", filename.c_str());
         xEventGroupSetBits(systemStateEvents, EVT_OTA_RUNNING);
         setLedState(LED_OTA);
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) LOG_E(MOD_OTA, "FS Update.begin failed");
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
+            LOG_E(MOD_OTA, "FS Update.begin failed");
+            _otaFsError = true;
+            return;
+        }
     }
+    if (_otaFsError) return;
     if (Update.write(data, len) != len) LOG_E(MOD_OTA, "FS write error at %zu", index);
     if (final) {
         if (Update.end(true)) LOG_I(MOD_OTA, "FS OTA OK: %zu B", index + len);
