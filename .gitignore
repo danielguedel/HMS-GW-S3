@@ -22,8 +22,6 @@ include/secrets.h
 # Runtime config written by device — not part of source
 data/config.json
 
-# Build number — auto-incremented, not for version control
-include/buildnumber.txt
 
 # macOS
 .DS_Store

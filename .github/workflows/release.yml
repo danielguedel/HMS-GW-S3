@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (z.B. 0.2.1)'
+        required: true
+        default: '0.2.0'
+      notes:
+        description: 'Release Notes (optional)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build firmware
+        run: pio run -e esp32-s3-devkitc-1
+
+      - name: Read build number
+        id: meta
+        run: |
+          BUILD=$(cat include/buildnumber.txt)
+          echo "build=${BUILD}" >> $GITHUB_OUTPUT
+          echo "tag=build-${BUILD}" >> $GITHUB_OUTPUT
+          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Update manifest.json
+        run: |
+          cat > release/manifest.json << EOF
+          {
+            "version": "${{ steps.meta.outputs.version }}",
+            "buildNumber": ${{ steps.meta.outputs.build }},
+            "url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/firmware.bin",
+            "notes": "${{ github.event.inputs.notes }}"
+          }
+          EOF
+
+      - name: Commit manifest + buildnumber
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add release/manifest.json include/buildnumber.txt
+          git commit -m "release: v${{ steps.meta.outputs.version }} build ${{ steps.meta.outputs.build }}" || echo "nothing to commit"
+          git push origin HEAD:main
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: v${{ steps.meta.outputs.version }} (Build ${{ steps.meta.outputs.build }})
+          body: ${{ github.event.inputs.notes }}
+          files: .pio/build/esp32-s3-devkitc-1/firmware.bin
+          make_latest: true
