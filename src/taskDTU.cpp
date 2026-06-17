@@ -184,11 +184,11 @@ static bool parseRealDataNew(const uint8_t* data, size_t len, DataStore::PvData&
     pv.grid_tE = pv.pv0_tE + pv.pv1_tE;
     pv.valid   = true;
 
-    LOG_I(MOD_DATA, "PV1: %.1fV/%.2fA/%.0fW  PV2: %.1fV/%.2fA/%.0fW",
+    LOG_I(MOD_DATA, "PV1: %.1f V / %.2f A / %.0f W  PV2: %.1f V / %.2f A / %.0f W",
           pv.pv0_v, pv.pv0_i, pv.pv0_p, pv.pv1_v, pv.pv1_i, pv.pv1_p);
-    LOG_I(MOD_DATA, "Grid: %.1fV/%.2fA/%.0fW  Temp: %.1f C",
+    LOG_I(MOD_DATA, "Grid: %.1f V / %.2f A / %.0f W  Temp: %.1f Grad Celsius",
           pv.grid_v, pv.grid_i, pv.grid_p, pv.temp);
-    LOG_I(MOD_DATA, "Energy today: %.3fkWh  Total: %.3fkWh", pv.grid_dE, pv.grid_tE);
+    LOG_I(MOD_DATA, "Energy today: %.3f kWh  Total: %.3f kWh", pv.grid_dE, pv.grid_tE);
     return true;
 }
 
