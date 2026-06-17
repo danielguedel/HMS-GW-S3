@@ -381,7 +381,7 @@ void taskDTU(void* pvParameters) {
 
     uint32_t lastPollMs = 0;
     int      failCount  = 0;
-    uint8_t  localBuf[2048];
+    static uint8_t  localBuf[2048];
     size_t   localLen;
 
     for (;;) {
@@ -441,7 +441,7 @@ void taskDTU(void* pvParameters) {
         if (!_connected) {
             _ntpTimeCache = dsGetSystem().ntpTime;  // cache before connect so onConnect can read without mutex
             dtuConnect();
-            vTaskDelay(pdMS_TO_TICKS(3000));
+            vTaskDelay(pdMS_TO_TICKS(DTU_CONNECT_TIMEOUT_MS));
             if (!_connected) {
                 failCount++;
                 LOG_W(MOD_DTU, "Connect failed (%d/%d)", failCount, appConfig.dtuRebootAfterFails);

@@ -149,7 +149,10 @@ void configLoad() {
         JsonObjectConst io = doc[keys[i]];
         if (io.isNull()) continue;
         if (!io["pin"].isNull())      appConfig.io[i].pin      = io["pin"].as<int>();
-        if (!io["mode"].isNull())     appConfig.io[i].mode     = (IoMode)io["mode"].as<int>();
+        if (!io["mode"].isNull()) {
+            int m = io["mode"].as<int>();
+            appConfig.io[i].mode = (m >= 0 && m <= (int)IO_RESERVED) ? (IoMode)m : IO_INPUT;
+        }
         if (io["altFunction"].is<const char*>())
             strlcpy(appConfig.io[i].altFunction, io["altFunction"].as<const char*>(), sizeof(appConfig.io[i].altFunction));
         if (!io["inverted"].isNull()) appConfig.io[i].inverted = io["inverted"].as<bool>();

@@ -8,7 +8,6 @@
 #include "config.h"
 #include "logger.h"
 #include <Arduino.h>
-#include <LittleFS.h>
 
 static const uint32_t DEBOUNCE_MS = 50;
 
@@ -36,8 +35,7 @@ static void checkFactoryReset() {
             LOG_W(MOD_GPIO, "Factory reset triggered!");
             xEventGroupSetBits(systemStateEvents, EVT_FACTORY_RESET);
             setLedState(LED_FACTORY_RESET);
-            vTaskDelay(pdMS_TO_TICKS(1500));
-            LittleFS.remove(CONFIG_FILE);
+            vTaskDelay(pdMS_TO_TICKS(3000));    // main.cpp removes config; allow LED + log to settle
             ESP.restart();
         }
     }
@@ -66,6 +64,10 @@ void taskGPIO(void* pvParameters) {
                 break;
             case IO_RESERVED:
                 // Initialize as high-impedance input — siehe altFunction für vorgesehenen Zweck
+                pinMode(appConfig.io[i].pin, INPUT);
+                break;
+            default:
+                LOG_W(MOD_GPIO, "io%d: unknown mode %d — defaulting to INPUT", i + 1, (int)appConfig.io[i].mode);
                 pinMode(appConfig.io[i].pin, INPUT);
                 break;
         }

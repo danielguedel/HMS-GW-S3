@@ -53,9 +53,6 @@ void setup() {
 
     // ── 4. Config ─────────────────────────────────────────────────────────────
     configLoad();
-    LOG_I(MOD_SYS, "Config loaded: ssid=%s  dtu=%s:%d  mqtt=%s:%d",
-          appConfig.wifiSsid, appConfig.dtuHost, appConfig.dtuPort,
-          appConfig.mqttHost, appConfig.mqttPort);
 
     // ── 5. FreeRTOS synchronisation ───────────────────────────────────────────
     systemStateEvents = xEventGroupCreate();

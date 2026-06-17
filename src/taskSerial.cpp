@@ -38,6 +38,9 @@ static void cmdHelp() {
     Serial.println("  io2 on|off        Set IO2");
     Serial.println("  io3 on|off        Set IO3");
     Serial.println("  loglevel error|warn|info|debug");
+    Serial.println("  tasks             FreeRTOS task list");
+    Serial.println("  heap              Heap statistics");
+    Serial.println("  uptime            Uptime (seconds + d/h/m/s)");
     Serial.println("  restart           Reboot gateway");
     Serial.println("  reset             Factory reset (clears config.json)");
     Serial.println("  ledtest           Cycle through all LED states");
@@ -205,6 +208,35 @@ static void cmdLedTest() {
     Serial.println("LED test done.");
 }
 
+static void cmdTasks() {
+    static const char* names[] = {
+        "WiFi", "LED", "GPIO", "Serial", "SysMonitor", "DTU", "MQTT", "WebServer"
+    };
+    printf_("%-14s  HWM (words)\n", "Task");
+    for (const char* n : names) {
+        TaskHandle_t h = xTaskGetHandle(n);
+        if (h) printf_("%-14s  %u\n", n, (unsigned)uxTaskGetStackHighWaterMark(h));
+        else   printf_("%-14s  (not running)\n", n);
+    }
+    printf_("Total tasks: %u\n", (unsigned)uxTaskGetNumberOfTasks());
+}
+
+static void cmdHeap() {
+    printf_("Free heap     : %lu B\n",  (unsigned long)ESP.getFreeHeap());
+    printf_("Min free heap : %lu B\n",  (unsigned long)ESP.getMinFreeHeap());
+    printf_("Max alloc heap: %lu B\n",  (unsigned long)ESP.getMaxAllocHeap());
+}
+
+static void cmdUptime() {
+    uint32_t s = dsGetSystem().uptimeS;
+    printf_("Uptime: %lu s  (%lud %02lu:%02lu:%02lu)\n",
+            (unsigned long)s,
+            (unsigned long)(s / 86400),
+            (unsigned long)((s % 86400) / 3600),
+            (unsigned long)((s % 3600) / 60),
+            (unsigned long)(s % 60));
+}
+
 static void cmdReset() {
     Serial.println("Factory reset — setting EVT_FACTORY_RESET and rebooting...");
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -248,6 +280,9 @@ static void dispatch(char* line) {
     else if (strcmp(verb, "io1")      == 0) cmdGpioSet(1, arg);
     else if (strcmp(verb, "io2")      == 0) cmdGpioSet(2, arg);
     else if (strcmp(verb, "io3")      == 0) cmdGpioSet(3, arg);
+    else if (strcmp(verb, "tasks")    == 0) cmdTasks();
+    else if (strcmp(verb, "heap")     == 0) cmdHeap();
+    else if (strcmp(verb, "uptime")   == 0) cmdUptime();
     else if (strcmp(verb, "loglevel") == 0) cmdLoglevel(arg);
     else if (strcmp(verb, "ledtest")  == 0) cmdLedTest();
     else if (strcmp(verb, "restart")  == 0) cmdRestart();
@@ -258,7 +293,8 @@ static void dispatch(char* line) {
 // ─── Task ─────────────────────────────────────────────────────────────────────
 void taskSerial(void* pvParameters) {
     static char    buf[128];
-    static uint8_t pos = 0;
+    static uint8_t pos    = 0;
+    static bool    skipLf = false;  // swallow LF after CR in CR+LF pairs
 
     LOG_I(MOD_SYS, "Serial console ready at %d baud", SERIAL_BAUD);
     Serial.print("\r\nHMS-GW-S3 serial console — type 'help'\r\n> ");
@@ -267,9 +303,8 @@ void taskSerial(void* pvParameters) {
         while (Serial.available()) {
             char c = (char)Serial.read();
 
-            if (c == '\r') continue;
-
             if (c == '\n') {
+                if (skipLf) { skipLf = false; continue; }  // was CR+LF — already dispatched
                 buf[pos] = '\0';
                 Serial.println();
                 if (pos > 0) dispatch(buf);
@@ -277,6 +312,18 @@ void taskSerial(void* pvParameters) {
                 prompt();
                 continue;
             }
+
+            if (c == '\r') {
+                skipLf = true;
+                buf[pos] = '\0';
+                Serial.println();
+                if (pos > 0) dispatch(buf);
+                pos = 0;
+                prompt();
+                continue;
+            }
+
+            skipLf = false;
 
             // Backspace / DEL
             if (c == 0x7F || c == '\b') {
