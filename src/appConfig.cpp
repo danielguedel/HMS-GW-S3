@@ -71,7 +71,9 @@ void configSetDefaults() {
     appConfig.tzOffset  = 3600;                 // UTC+1
     strlcpy(appConfig.ntpServer, "pool.ntp.org", sizeof(appConfig.ntpServer));
     appConfig.logLevel  = LOG_LEVEL_INFO;
-    appConfig.otaManifestUrl[0] = '\0';
+    strlcpy(appConfig.otaManifestUrl,
+            "https://raw.githubusercontent.com/danielguedel/HMS-GW-S3/main/release/manifest.json",
+            sizeof(appConfig.otaManifestUrl));
 }
 
 void configLoad() {
