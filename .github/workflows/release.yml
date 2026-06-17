@@ -36,6 +36,9 @@ jobs:
       - name: Build firmware
         run: pio run -e esp32-s3-devkitc-1
 
+      - name: Build filesystem image
+        run: pio run -e esp32-s3-devkitc-1 -t buildfs
+
       - name: Read build number
         id: meta
         run: |
@@ -51,6 +54,7 @@ jobs:
             "version": "${{ steps.meta.outputs.version }}",
             "buildNumber": ${{ steps.meta.outputs.build }},
             "url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/firmware.bin",
+            "fs_url": "https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/littlefs.bin",
             "notes": "${{ github.event.inputs.notes }}"
           }
           EOF
@@ -70,5 +74,7 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: v${{ steps.meta.outputs.version }} (Build ${{ steps.meta.outputs.build }})
           body: ${{ github.event.inputs.notes }}
-          files: .pio/build/esp32-s3-devkitc-1/firmware.bin
+          files: |
+            .pio/build/esp32-s3-devkitc-1/firmware.bin
+            .pio/build/esp32-s3-devkitc-1/littlefs.bin
           make_latest: true

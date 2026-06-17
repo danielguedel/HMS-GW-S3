@@ -682,10 +682,11 @@ function updateOtaCard(d) {
   if (d.available) {
     const notes = d.notes ? ' — ' + d.notes : '';
     txt('ota-check-info', 'Update verfügbar: v' + d.version + ' (Build ' + d.buildNumber + ')' + notes);
-    btn.style.display = '';
-    btn.dataset.url   = d.url;
-    btn.disabled      = false;
-    btn.textContent   = 'Jetzt installieren';
+    btn.style.display  = '';
+    btn.dataset.url    = d.url;
+    btn.dataset.fsUrl  = d.fsUrl || '';
+    btn.disabled       = false;
+    btn.textContent    = d.fsUrl ? 'Firmware + FS installieren' : 'Jetzt installieren';
     box.classList.add('ota-avail');
   } else {
     txt('ota-check-info', 'Aktuell — v' + d.currentVersion + ' (Build ' + d.currentBuild + ')');
@@ -727,13 +728,17 @@ function pollOtaCheck() {
 }
 
 async function installUpdate() {
-  const url = $('btn-ota-install').dataset.url;
+  const url   = $('btn-ota-install').dataset.url;
+  const fsUrl = $('btn-ota-install').dataset.fsUrl;
   if (!url) { toast('Keine URL verfügbar', false); return; }
-  if (!confirm('Firmware jetzt installieren?\n' + url)) return;
+  const label = fsUrl ? 'Firmware + Filesystem installieren?' : 'Firmware installieren?';
+  if (!confirm(label + '\n' + url)) return;
+  const body = { url };
+  if (fsUrl) body.fsUrl = fsUrl;
   try {
     await fetch('/api/ota/url', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }) });
+      body: JSON.stringify(body) });
     toast('Update gestartet — Gateway startet nach dem Flash neu');
     txt('btn-ota-install', 'Lädt…');
     $('btn-ota-install').disabled = true;

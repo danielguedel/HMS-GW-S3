@@ -23,8 +23,10 @@ static DNSServer      dnsServer;
 static bool           _dnsStarted  = false;
 static bool           _otaFwError  = false;
 static bool           _otaFsError  = false;
-static char           _otaUrl[512] = "";
+static char           _otaUrl[512]   = "";
+static char           _otaFsUrl[512] = "";
 static volatile bool  _otaUrlPending   = false;
+static volatile bool  _otaFsUrlPending = false;
 static volatile bool  _otaCheckPending = false;
 static bool           _bootCheckDone   = false;
 
@@ -359,9 +361,11 @@ static void doOtaCheck() {
     info.available    = (info.buildNumber > BUILD_NUMBER);
     const char* ver   = doc["version"].as<const char*>();
     const char* url   = doc["url"].as<const char*>();
+    const char* fsUrl = doc["fs_url"].as<const char*>();
     const char* notes = doc["notes"].as<const char*>();
     strlcpy(info.version, ver   ? ver   : "", sizeof(info.version));
     strlcpy(info.url,     url   ? url   : "", sizeof(info.url));
+    strlcpy(info.fsUrl,   fsUrl ? fsUrl : "", sizeof(info.fsUrl));
     strlcpy(info.notes,   notes ? notes : "", sizeof(info.notes));
     dsSetOtaInfo(info);
 
@@ -381,6 +385,7 @@ static void handleApiOtaCheckGet(AsyncWebServerRequest* req) {
     doc["version"]        = info.version;
     doc["buildNumber"]    = info.buildNumber;
     doc["url"]            = info.url;
+    doc["fsUrl"]          = info.fsUrl;
     doc["notes"]          = info.notes;
     doc["lastCheckMs"]    = info.lastCheckMs;
     doc["currentVersion"] = FW_VERSION;
@@ -416,48 +421,53 @@ static void handleApiOtaUrl(AsyncWebServerRequest* req, uint8_t* data,
     if (deserializeJson(doc, bodyBuf, index + len) != DeserializationError::Ok) {
         req->send(400, "application/json", "{\"error\":\"invalid json\"}"); return;
     }
-    const char* url = doc["url"].as<const char*>();
-    if (!url || strlen(url) == 0) {
+    const char* url   = doc["url"].as<const char*>();
+    const char* fsUrl = doc["fsUrl"].as<const char*>();
+    if ((!url || strlen(url) == 0) && (!fsUrl || strlen(fsUrl) == 0)) {
         req->send(400, "application/json", "{\"error\":\"url missing\"}"); return;
     }
-    strlcpy(_otaUrl, url, sizeof(_otaUrl));
-    _otaUrlPending = true;
+    if (url && strlen(url)) {
+        strlcpy(_otaUrl, url, sizeof(_otaUrl));
+        _otaUrlPending = true;
+        LOG_I(MOD_OTA, "FW-URL queued: %s", _otaUrl);
+    }
+    if (fsUrl && strlen(fsUrl)) {
+        strlcpy(_otaFsUrl, fsUrl, sizeof(_otaFsUrl));
+        _otaFsUrlPending = true;
+        LOG_I(MOD_OTA, "FS-URL queued: %s", _otaFsUrl);
+    }
     req->send(200, "application/json", "{\"ok\":true}");
-    LOG_I(MOD_OTA, "URL-OTA queued: %s", _otaUrl);
 }
 
-// Download firmware from URL and flash (runs in task context, not in callback)
-static void doUrlOta() {
-    LOG_I(MOD_OTA, "URL-OTA start: %s", _otaUrl);
-    setLedState(LED_OTA);
-    xEventGroupSetBits(systemStateEvents, EVT_OTA_RUNNING);
+// Download a binary from URL and flash to given partition (U_FLASH or U_SPIFFS).
+// Returns true on success. Does not trigger reboot — caller is responsible.
+static bool doUrlOtaPartition(const char* url, int partition) {
+    const char* tag = (partition == U_SPIFFS) ? "FS" : "FW";
+    LOG_I(MOD_OTA, "URL-OTA %s: %s", tag, url);
 
     WiFiClientSecure client;
-    client.setInsecure();  // GitHub uses HTTPS; skip cert verification
+    client.setInsecure();
     HTTPClient http;
     http.setTimeout(30000);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);  // GitHub releases redirect to CDN
-    if (!http.begin(client, _otaUrl)) {
-        LOG_E(MOD_OTA, "URL-OTA http.begin failed");
-        xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
-        return;
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    if (!http.begin(client, url)) {
+        LOG_E(MOD_OTA, "URL-OTA %s http.begin failed", tag);
+        return false;
     }
     int code = http.GET();
     if (code != HTTP_CODE_OK) {
-        LOG_E(MOD_OTA, "URL-OTA HTTP %d", code);
+        LOG_E(MOD_OTA, "URL-OTA %s HTTP %d", tag, code);
         http.end();
-        xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
-        return;
+        return false;
     }
 
     int contentLen = http.getSize();
-    LOG_I(MOD_OTA, "URL-OTA size: %d B", contentLen);
+    LOG_I(MOD_OTA, "URL-OTA %s size: %d B", tag, contentLen);
 
-    if (!Update.begin(contentLen > 0 ? (size_t)contentLen : UPDATE_SIZE_UNKNOWN)) {
-        LOG_E(MOD_OTA, "URL-OTA Update.begin failed: %s", Update.errorString());
+    if (!Update.begin(contentLen > 0 ? (size_t)contentLen : UPDATE_SIZE_UNKNOWN, partition)) {
+        LOG_E(MOD_OTA, "URL-OTA %s Update.begin failed: %s", tag, Update.errorString());
         http.end();
-        xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
-        return;
+        return false;
     }
 
     WiFiClient* stream = http.getStreamPtr();
@@ -473,14 +483,14 @@ static void doUrlOta() {
             int n = stream->readBytes(dlBuf, toRead);
             if (n > 0) {
                 if (Update.write(dlBuf, (size_t)n) != (size_t)n) {
-                    LOG_E(MOD_OTA, "URL-OTA write error at %zu B", written);
+                    LOG_E(MOD_OTA, "URL-OTA %s write error at %zu B", tag, written);
                     writeErr = true; break;
                 }
                 written += (size_t)n;
                 if (contentLen > 0) {
                     int pct = (int)((written * 100) / (size_t)contentLen);
                     if (pct / 10 != lastPct / 10) {
-                        LOG_I(MOD_OTA, "URL-OTA: %d%% (%zu / %d B)", pct, written, contentLen);
+                        LOG_I(MOD_OTA, "URL-OTA %s: %d%% (%zu / %d B)", tag, pct, written, contentLen);
                         lastPct = pct;
                     }
                 }
@@ -492,16 +502,14 @@ static void doUrlOta() {
     }
 
     http.end();
-    xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
-
-    if (writeErr) { Update.abort(); return; }
+    if (writeErr) { Update.abort(); return false; }
 
     if (Update.end(true)) {
-        LOG_I(MOD_OTA, "URL-OTA complete: %zu B  -  rebooting", written);
-        xEventGroupSetBits(systemStateEvents, EVT_REBOOT);
-    } else {
-        LOG_E(MOD_OTA, "URL-OTA end failed: %s", Update.errorString());
+        LOG_I(MOD_OTA, "URL-OTA %s complete: %zu B", tag, written);
+        return true;
     }
+    LOG_E(MOD_OTA, "URL-OTA %s end failed: %s", tag, Update.errorString());
+    return false;
 }
 
 // --- Captive portal redirect --------------------------------------------------
@@ -584,9 +592,18 @@ void taskWebServer(void* pvParameters) {
         }
 
         // URL-OTA: download and flash in task context (not in lwIP callback)
-        if (_otaUrlPending) {
-            _otaUrlPending = false;
-            doUrlOta();
+        if (_otaUrlPending || _otaFsUrlPending) {
+            bool fwPending = _otaUrlPending;
+            bool fsPending = _otaFsUrlPending;
+            _otaUrlPending   = false;
+            _otaFsUrlPending = false;
+            setLedState(LED_OTA);
+            xEventGroupSetBits(systemStateEvents, EVT_OTA_RUNNING);
+            bool ok = true;
+            if (fwPending) ok = doUrlOtaPartition(_otaUrl,   U_FLASH);
+            if (ok && fsPending) ok = doUrlOtaPartition(_otaFsUrl, U_SPIFFS);
+            xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
+            if (ok) xEventGroupSetBits(systemStateEvents, EVT_REBOOT);
         }
 
         // Start DNS captive portal on first AP mode detection

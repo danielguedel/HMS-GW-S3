@@ -84,6 +84,7 @@ struct DataStore {
         char     version[32];        // Version aus Manifest
         int      buildNumber;        // Build-Nummer aus Manifest
         char     url[256];           // Firmware-Download-URL
+        char     fsUrl[256];         // Filesystem-Download-URL (leer = kein FS-Update)
         char     notes[128];         // Release-Notes
         uint32_t lastCheckMs;        // millis() des letzten Checks (0 = noch nie)
     } otaInfo;
