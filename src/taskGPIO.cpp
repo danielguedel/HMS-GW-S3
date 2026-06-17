@@ -1,4 +1,4 @@
-// taskGPIO.cpp — v2 (DataStore pattern)
+// taskGPIO.cpp  -  v2 (DataStore pattern)
 
 #include "taskGPIO.h"
 #include "dataStore.h"
@@ -11,21 +11,21 @@
 
 static const uint32_t DEBOUNCE_MS = 50;
 
-// ─── Apply relay ──────────────────────────────────────────────────────────────
+// --- Apply relay --------------------------------------------------------------
 static void applyRelay(bool state, DataStore::GpioState& gpio) {
     bool out = appConfig.relay.inverted ? !state : state;
     digitalWrite(appConfig.relay.pin, out ? HIGH : LOW);
     gpio.relay = state;
 }
 
-// ─── Apply IO output ──────────────────────────────────────────────────────────
+// --- Apply IO output ----------------------------------------------------------
 static void applyIo(int idx, bool state, DataStore::GpioState& gpio) {
     bool out = appConfig.io[idx].inverted ? !state : state;
     digitalWrite(appConfig.io[idx].pin, out ? HIGH : LOW);
     gpio.gpio[idx] = state;
 }
 
-// ─── Factory reset via long BOOT press ───────────────────────────────────────
+// --- Factory reset via long BOOT press ---------------------------------------
 static void checkFactoryReset() {
     if (digitalRead(BOOT_PIN) != LOW) return;
     uint32_t pressStart = millis();
@@ -41,11 +41,11 @@ static void checkFactoryReset() {
     }
 }
 
-// ─── Task ─────────────────────────────────────────────────────────────────────
+// --- Task ---------------------------------------------------------------------
 void taskGPIO(void* pvParameters) {
-    // Config is loaded in main.cpp before tasks start — no wait needed here
+    // Config is loaded in main.cpp before tasks start  -  no wait needed here
 
-    // ── Pin setup ─────────────────────────────────────────────────────────────
+    // -- Pin setup -------------------------------------------------------------
     DataStore::GpioState gpio = {};
 
     pinMode(appConfig.relay.pin, OUTPUT);
@@ -63,11 +63,11 @@ void taskGPIO(void* pvParameters) {
                 if (appConfig.io[i].inverted) gpio.gpio[i] = !gpio.gpio[i];
                 break;
             case IO_RESERVED:
-                // Initialize as high-impedance input — siehe altFunction für vorgesehenen Zweck
+                // Initialize as high-impedance input  -  siehe altFunction für vorgesehenen Zweck
                 pinMode(appConfig.io[i].pin, INPUT);
                 break;
             default:
-                LOG_W(MOD_GPIO, "io%d: unknown mode %d — defaulting to INPUT", i + 1, (int)appConfig.io[i].mode);
+                LOG_W(MOD_GPIO, "io%d: unknown mode %d  -  defaulting to INPUT", i + 1, (int)appConfig.io[i].mode);
                 pinMode(appConfig.io[i].pin, INPUT);
                 break;
         }
@@ -76,7 +76,7 @@ void taskGPIO(void* pvParameters) {
 
     dsSetGpio(gpio);
 
-    LOG_I(MOD_GPIO, "GPIO ready — Relay=GPIO%d  IO1-3=GPIO%d,%d,%d",
+    LOG_I(MOD_GPIO, "GPIO ready  -  Relay=GPIO%d  IO1-3=GPIO%d,%d,%d",
           appConfig.relay.pin,
           appConfig.io[0].pin, appConfig.io[1].pin, appConfig.io[2].pin);
 
@@ -86,7 +86,7 @@ void taskGPIO(void* pvParameters) {
     for (int i = 0; i < 3; i++) lastRaw[i] = gpio.gpio[i];
 
     for (;;) {
-        // ── Process pending GPIO command from DataStore ────────────────────────
+        // -- Process pending GPIO command from DataStore ------------------------
         {
             DataStore::GpioCommand cmd = dsGetGpioCommand();
             if (cmd.pending) {
@@ -106,7 +106,7 @@ void taskGPIO(void* pvParameters) {
             }
         }
 
-        // ── Debounce INPUT pins → update DataStore on change ─────────────────
+        // -- Debounce INPUT pins → update DataStore on change -----------------
         bool inputChanged = false;
         for (int i = 0; i < 3; i++) {
             if (appConfig.io[i].mode != IO_INPUT) continue;
@@ -124,7 +124,7 @@ void taskGPIO(void* pvParameters) {
         }
         if (inputChanged) dsSetGpio(gpio);
 
-        // ── Factory reset check ───────────────────────────────────────────────
+        // -- Factory reset check -----------------------------------------------
         checkFactoryReset();
 
         vTaskDelay(pdMS_TO_TICKS(20));

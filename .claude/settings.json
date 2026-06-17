@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"C:\\\\Users\\\\gueda\\\\Documents\\\\PlatformIO\\\\Projects\\\\HMS-GW-S3\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run 2>&1)",
+      "PowerShell(cd \"C:\\\\Users\\\\gueda\\\\Documents\\\\PlatformIO\\\\Projects\\\\HMS-GW-S3\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run --target uploadfs 2>&1)",
+      "PowerShell($handle = \\(& \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\python.exe\" -c \"import serial; s = serial.Serial\\('COM14'\\); print\\('opened'\\); s.close\\(\\)\" 2>&1\\); Write-Host $handle)",
+      "PowerShell(& \"C:\\\\Windows\\\\System32\\\\handle64.exe\" COM14 2>$null; if \\(-not $?\\) { Write-Host \"handle64 not found, trying handle.exe\"; & \"C:\\\\Windows\\\\System32\\\\handle.exe\" COM14 2>$null }; Write-Host \"---\"; Get-Process | Where-Object { $_.Name -match \"platformio|pio|python|code|monitor|serial\" } | Select-Object Name, Id | Format-Table -AutoSize)",
+      "PowerShell(cd \"C:\\\\Users\\\\gueda\\\\Documents\\\\PlatformIO\\\\Projects\\\\HMS-GW-S3\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run --target upload 2>&1)",
+      "PowerShell(cd \"C:\\\\Users\\\\gueda\\\\Documents\\\\PlatformIO\\\\Projects\\\\HMS-GW-S3\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" device monitor --port COM14 --baud 115200 2>&1 | Select-Object -First 80)",
+      "PowerShell($body = '{\"dtuHost\":\"10.1.1.143\"}'; $wc = New-Object System.Net.WebClient; $wc.Headers[\"Content-Type\"] = \"application/json\"; $wc.UploadString\\(\"http://10.1.1.145/api/config\", \"POST\", $body\\))",
+      "PowerShell(Start-Sleep -Seconds 5; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" device monitor --port COM14 --baud 115200 2>&1 | Select-Object -First 100)",
+      "PowerShell($wc = New-Object System.Net.WebClient; Write-Host \"=== /api/info.json ===\"; $wc.DownloadString\\(\"http://10.1.1.145/api/info.json\"\\); Write-Host \"`n=== /api/data.json ===\"; $wc2 = New-Object System.Net.WebClient; $wc2.DownloadString\\(\"http://10.1.1.145/api/data.json\"\\))",
+      "PowerShell($wc = New-Object System.Net.WebClient; $wc.DownloadString\\(\"http://10.1.1.145/api/config\"\\))",
+      "PowerShell(ping -n 3 10.1.1.143 2>&1)",
+      "PowerShell($wc = New-Object System.Net.WebClient; $wc.DownloadString\\(\"http://10.1.1.145/api/info.json\"\\))",
+      "PowerShell($tcp = New-Object System.Net.Sockets.TcpClient; try { $tcp.Connect\\(\"10.1.1.143\", 10081\\); Write-Host \"Port 10081 OPEN\"; $tcp.Close\\(\\) } catch { Write-Host \"Port 10081 CLOSED: $_\" })",
+      "PowerShell($port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.Open\\(\\); Start-Sleep -Milliseconds 500; $port.WriteLine\\(\"\"\\); Start-Sleep -Milliseconds 200; $out = $port.ReadExisting\\(\\); $port.Close\\(\\); Write-Host $out)",
+      "Skill(fewer-permission-prompts)",
+      "Skill(fewer-permission-prompts:*)",
+      "Bash(ls \"$HOME/.claude/projects/\" | head -20)",
+      "Read(//c/Users/gueda/.claude/projects/**)",
+      "PowerShell($port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.Open\\(\\); Start-Sleep -Milliseconds 3000; $out = $port.ReadExisting\\(\\); $port.Close\\(\\); Write-Host $out)",
+      "PowerShell($port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.Open\\(\\); Start-Sleep -Milliseconds 500; $port.WriteLine\\(\"status\"\\); Start-Sleep -Milliseconds 1000; $port.WriteLine\\(\"dtu\"\\); Start-Sleep -Milliseconds 500; $out = $port.ReadExisting\\(\\); $port.Close\\(\\); Write-Host $out)",
+      "PowerShell($port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.ReadTimeout = 90000; $port.Open\\(\\); $lines = New-Object System.Collections.Generic.List[string]; $sw = [System.Diagnostics.Stopwatch]::StartNew\\(\\); while \\($sw.Elapsed.TotalSeconds -lt 90\\) { try { $line = $port.ReadLine\\(\\); $lines.Add\\($line.Trim\\(\\)\\) } catch {} }; $port.Close\\(\\); $lines | Where-Object { $_ -match \"DTU|MQTT|WIFI|Error|error|fail|Conn|conn\" } | Select-Object -First 40)",
+      "PowerShell(Start-Sleep -Seconds 8; $port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.ReadTimeout = 60000; $port.Open\\(\\); $lines = New-Object System.Collections.Generic.List[string]; $sw = [System.Diagnostics.Stopwatch]::StartNew\\(\\); while \\($sw.Elapsed.TotalSeconds -lt 55\\) { try { $line = $port.ReadLine\\(\\); $lines.Add\\($line.Trim\\(\\)\\) } catch {} }; $port.Close\\(\\); $lines)",
+      "PowerShell($port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.Open\\(\\); Start-Sleep -Milliseconds 500; $port.WriteLine\\(\"status\"\\); Start-Sleep -Milliseconds 800; $port.WriteLine\\(\"dtu\"\\); Start-Sleep -Milliseconds 800; $out = $port.ReadExisting\\(\\); $port.Close\\(\\); $out)",
+      "PowerShell($wc = New-Object System.Net.WebClient; Write-Host \"=== info ===\"; $wc.DownloadString\\(\"http://10.1.1.145/api/info.json\"\\); Write-Host \"`n=== data ===\"; $wc2 = New-Object System.Net.WebClient; $wc2.DownloadString\\(\"http://10.1.1.145/api/data.json\"\\))",
+      "PowerShell(cd \"C:\\\\Users\\\\gueda\\\\Documents\\\\PlatformIO\\\\Projects\\\\HMS-GW-S3\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run --target upload 2>&1 | Select-String -Pattern \"error:|SUCCESS|FAILED|Writing at 0x00010\")",
+      "PowerShell(Start-Sleep -Seconds 20; $port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.Open\\(\\); Start-Sleep -Milliseconds 500; $port.WriteLine\\(\"dtu\"\\); Start-Sleep -Milliseconds 1000; $out = $port.ReadExisting\\(\\); $port.Close\\(\\); $out)",
+      "PowerShell($wc = New-Object System.Net.WebClient; $wc.DownloadString\\(\"http://10.1.1.145/api/data.json\"\\))",
+      "PowerShell($port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.Open\\(\\); Start-Sleep -Milliseconds 300; $port.WriteLine\\(\"loglevel debug\"\\); Start-Sleep -Milliseconds 500; $out = $port.ReadExisting\\(\\); $port.Close\\(\\); $out)",
+      "PowerShell($port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.ReadTimeout = 50000; $port.Open\\(\\); $lines = New-Object System.Collections.Generic.List[string]; $sw = [System.Diagnostics.Stopwatch]::StartNew\\(\\); while \\($sw.Elapsed.TotalSeconds -lt 45\\) { try { $line = $port.ReadLine\\(\\); $lines.Add\\($line.Trim\\(\\)\\) } catch {} }; $port.Close\\(\\); $lines | Where-Object { $_ -match \"DTU|DATA|Config|RX|AppInfo|Real|Get\" })",
+      "PowerShell($port = New-Object System.IO.Ports.SerialPort \"COM14\", 115200, \"None\", 8, \"One\"; $port.Open\\(\\); Start-Sleep -Milliseconds 300; $port.WriteLine\\(\"loglevel info\"\\); Start-Sleep -Milliseconds 500; $out = $port.ReadExisting\\(\\); $port.Close\\(\\); $out)",
+      "Bash(git -C \"c:/Users/gueda/Documents/PlatformIO/Projects/HMS-GW-S3\" remote -v)",
+      "Bash(git -C \"c:/Users/gueda/Documents/PlatformIO/Projects/HMS-GW-S3\" log --oneline -5)",
+      "Bash(git -C \"c:/Users/gueda/Documents/PlatformIO/Projects/HMS-GW-S3\" status --short)",
+      "Bash(git -C c:/Users/gueda/Documents/PlatformIO/Projects/HMS-GW-S3 add data/www/index.html docs/HMS-GW-S3_Spezifikation_v2.md include/appConfig.h include/buildnumber.txt include/config.h include/systemState.h include/taskDTU.h include/taskGPIO.h include/taskMQTT.h include/taskNeoPixel.h include/dataStore.h include/taskLED.h include/taskWiFi.h platformio.ini src/appConfig.cpp src/main.cpp src/taskDTU.cpp src/taskGPIO.cpp src/taskMQTT.cpp src/taskNeoPixel.cpp src/taskSerial.cpp src/taskSysMonitor.cpp src/taskWebServer.cpp src/dataStore.cpp src/taskWiFi.cpp)",
+      "Bash(git -C c:/Users/gueda/Documents/PlatformIO/Projects/HMS-GW-S3 commit -m ' *)",
+      "Bash(git -C \"c:/Users/gueda/Documents/PlatformIO/Projects/HMS-GW-S3\" push origin main)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

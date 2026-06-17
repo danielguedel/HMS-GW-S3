@@ -7,11 +7,11 @@ void dsInit() {
     ds.mutex = xSemaphoreCreateMutex();
     configASSERT(ds.mutex);
 
-    // PvData — Nullwerte / ungültig
+    // PvData  -  Nullwerte / ungültig
     memset(&ds.pv, 0, sizeof(ds.pv));
     ds.pv.valid = false;
 
-    // SystemStatus — Nullwerte / offline
+    // SystemStatus  -  Nullwerte / offline
     ds.system.wifiConnected   = false;
     ds.system.wifiApMode      = false;
     ds.system.wifiIp          = "";
@@ -30,20 +30,20 @@ void dsInit() {
     ds.system.macAddress      = "";
     ds.system.ntpTime         = 0;
 
-    // GpioState — alles aus
+    // GpioState  -  alles aus
     ds.gpio.relay = false;
     memset(ds.gpio.gpio, 0, sizeof(ds.gpio.gpio));
 
-    // GpioCommand — kein Befehl ausstehend
+    // GpioCommand  -  kein Befehl ausstehend
     ds.gpioCmd.pending = false;
     ds.gpioCmd.target  = 0;
     ds.gpioCmd.state   = false;
 
-    // DtuCommand — kein Befehl ausstehend
+    // DtuCommand  -  kein Befehl ausstehend
     memset(&ds.dtuCmd, 0, sizeof(ds.dtuCmd));
 }
 
-// ─── Lesen ────────────────────────────────────────────────────────────────────
+// --- Lesen --------------------------------------------------------------------
 
 DataStore::PvData dsGetPv() {
     xSemaphoreTake(ds.mutex, portMAX_DELAY);
@@ -81,7 +81,7 @@ DataStore::DtuCommand dsGetDtuCommand() {
     return copy;
 }
 
-// ─── Schreiben ────────────────────────────────────────────────────────────────
+// --- Schreiben ----------------------------------------------------------------
 
 void dsSetPv(const DataStore::PvData& data) {
     xSemaphoreTake(ds.mutex, portMAX_DELAY);
@@ -121,7 +121,7 @@ void dsClearDtuCommand() {
     xSemaphoreGive(ds.mutex);
 }
 
-// ─── Convenience ──────────────────────────────────────────────────────────────
+// --- Convenience --------------------------------------------------------------
 
 bool dsIsDtuOnline() {
     xSemaphoreTake(ds.mutex, portMAX_DELAY);

@@ -10,10 +10,10 @@ static SemaphoreHandle_t _logMutex = nullptr;
 
 static const char* levelStr[]   = { "ERR", "WRN", "INF", "DBG" };
 static const char* levelColor[] = {
-    "\033[1;31m",   // ERR — bold red
-    "\033[33m",     // WRN — yellow
-    "\033[32m",     // INF — green
-    "\033[36m",     // DBG — cyan
+    "\033[1;31m",   // ERR  -  bold red
+    "\033[33m",     // WRN  -  yellow
+    "\033[32m",     // INF  -  green
+    "\033[36m",     // DBG  -  cyan
 };
 static const char* ANSI_RESET = "\033[0m";
 

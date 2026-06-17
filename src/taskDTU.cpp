@@ -1,6 +1,6 @@
-// taskDTU.cpp — Hoymiles HMS-800W-2T DTU communication (v2, DataStore pattern)
+// taskDTU.cpp  -  Hoymiles HMS-800W-2T DTU communication (v2, DataStore pattern)
 // Protocol: AsyncTCP raw TCP, port 10081
-// 10-byte header + Protocol Buffers (manual decode — no generated pb files needed)
+// 10-byte header + Protocol Buffers (manual decode  -  no generated pb files needed)
 // Based on ohAnd/dtuGateway (Apache 2.0)
 
 #include "taskDTU.h"
@@ -14,10 +14,10 @@
 #include <AsyncTCP.h>
 #include <time.h>
 
-// ─── Power limit timeout state ────────────────────────────────────────────────
+// --- Power limit timeout state ------------------------------------------------
 static uint32_t _powerLimitSetAt = 0;  // millis() when a non-default limit was set, 0 = inactive
 
-// ─── CRC16 MODBUS ─────────────────────────────────────────────────────────────
+// --- CRC16 MODBUS -------------------------------------------------------------
 // Initial=0xFFFF, Poly=0x8005, RefIn=true, RefOut=true, XorOut=0x0000
 static uint8_t reflectByte(uint8_t b) {
     uint8_t r = 0;
@@ -40,7 +40,7 @@ static uint16_t crc16(const uint8_t* data, size_t len) {
     return reflectWord(crc);
 }
 
-// ─── Build 10-byte header + payload ──────────────────────────────────────────
+// --- Build 10-byte header + payload ------------------------------------------
 // Header: 0x48 0x4d [cmd0] [cmd1] 0x00 0x01 [CRC-hi] [CRC-lo] [len-hi] [len-lo]
 static size_t buildMsg(uint8_t* out, size_t outSize,
                        uint8_t cmd0, uint8_t cmd1,
@@ -57,7 +57,7 @@ static size_t buildMsg(uint8_t* out, size_t outSize,
     return total;
 }
 
-// ─── Manual Protobuf encoder ──────────────────────────────────────────────────
+// --- Manual Protobuf encoder --------------------------------------------------
 static size_t encodeVarint(uint8_t* buf, uint64_t val) {
     size_t n = 0;
     do { buf[n++] = (val & 0x7F) | (val > 0x7F ? 0x80 : 0); val >>= 7; } while (val);
@@ -69,7 +69,7 @@ static size_t encodeField(uint8_t* buf, uint8_t fieldNum, uint8_t wireType, uint
     return n;
 }
 
-// ─── Manual Protobuf decoder ──────────────────────────────────────────────────
+// --- Manual Protobuf decoder --------------------------------------------------
 struct PbReader {
     const uint8_t* buf;
     size_t         len;
@@ -102,7 +102,7 @@ struct PbReader {
     }
 };
 
-// ─── Parse SGSMO (grid data) ──────────────────────────────────────────────────
+// --- Parse SGSMO (grid data) --------------------------------------------------
 struct SGSMO { int32_t voltage=0,frequency=0,active_power=0,current=0,temperature=0,warning_number=0,power_limit=0,wifi_rssi=0; };
 static SGSMO parseSGSMO(const uint8_t* buf, size_t len) {
     SGSMO d; PbReader r{buf,len,0};
@@ -123,7 +123,7 @@ static SGSMO parseSGSMO(const uint8_t* buf, size_t len) {
     return d;
 }
 
-// ─── Parse PvMO (PV string data) ─────────────────────────────────────────────
+// --- Parse PvMO (PV string data) ---------------------------------------------
 struct PvMO { int32_t port_number=0,voltage=0,current=0,power=0,energy_total=0,energy_daily=0; };
 static PvMO parsePvMO(const uint8_t* buf, size_t len) {
     PvMO d; PbReader r{buf,len,0};
@@ -143,7 +143,7 @@ static PvMO parsePvMO(const uint8_t* buf, size_t len) {
     return d;
 }
 
-// ─── Parse RealDataNew response ───────────────────────────────────────────────
+// --- Parse RealDataNew response -----------------------------------------------
 static bool parseRealDataNew(const uint8_t* data, size_t len, DataStore::PvData& pv) {
     if (len < 11) return false;
     PbReader r{data+10, len-10, 0};
@@ -186,13 +186,13 @@ static bool parseRealDataNew(const uint8_t* data, size_t len, DataStore::PvData&
 
     LOG_I(MOD_DATA, "PV1: %.1fV/%.2fA/%.0fW  PV2: %.1fV/%.2fA/%.0fW",
           pv.pv0_v, pv.pv0_i, pv.pv0_p, pv.pv1_v, pv.pv1_i, pv.pv1_p);
-    LOG_I(MOD_DATA, "Grid: %.1fV/%.2fA/%.0fW  Temp: %.1f°C",
+    LOG_I(MOD_DATA, "Grid: %.1fV/%.2fA/%.0fW  Temp: %.1f C",
           pv.grid_v, pv.grid_i, pv.grid_p, pv.temp);
     LOG_I(MOD_DATA, "Energy today: %.3fkWh  Total: %.3fkWh", pv.grid_dE, pv.grid_tE);
     return true;
 }
 
-// ─── Parse GetConfig response (field 3 = powerLimit, field 11 = DTU WiFi RSSI)
+// --- Parse GetConfig response (field 3 = powerLimit, field 11 = DTU WiFi RSSI)
 static void parseGetConfig(const uint8_t* data, size_t len, DataStore::PvData& pv) {
     if (len < 11) return;
     PbReader r{data+10, len-10, 0};
@@ -206,7 +206,7 @@ static void parseGetConfig(const uint8_t* data, size_t len, DataStore::PvData& p
     LOG_D(MOD_DTU, "GetConfig: powerLimit=%d%%  DTU RSSI=%d", pv.powerLimit, pv.wifiRssi);
 }
 
-// ─── Packet builders ──────────────────────────────────────────────────────────
+// --- Packet builders ----------------------------------------------------------
 static size_t buildAppInfoReq(uint8_t* buf, size_t size, uint32_t ntpTime) {
     size_t n = 0;
     n += encodeField(buf+n, 2, 0, 28800);   // offset
@@ -239,7 +239,7 @@ static size_t buildSetPowerLimitReq(uint8_t* buf, size_t size, uint32_t ntpTime,
     return n;
 }
 
-// ─── AsyncTCP state ───────────────────────────────────────────────────────────
+// --- AsyncTCP state -----------------------------------------------------------
 static AsyncClient*    _client    = nullptr;
 static volatile bool   _connected = false;
 static volatile bool   _dataReady = false;  // RealDataNew response received
@@ -271,13 +271,13 @@ static void onConnect(void*, AsyncClient* c) {
     _appReady  = false;
     _dataReady = false;
     _cfgReady  = false;
-    // Send AppInformation immediately — DTU has very short first-byte timeout
-    uint32_t ntpTime = _ntpTimeCache;  // cached by task loop before connect — no mutex needed here
+    // Send AppInformation immediately  -  DTU has very short first-byte timeout
+    uint32_t ntpTime = _ntpTimeCache;  // cached by task loop before connect  -  no mutex needed here
     uint8_t pb[64], msg[80];
     size_t pbLen  = buildAppInfoReq(pb, sizeof(pb), ntpTime);
     size_t msgLen = buildMsg(msg, sizeof(msg), 0xa3, 0x01, pb, pbLen);
     if (msgLen > 0) c->write((const char*)msg, msgLen);
-    LOG_I(MOD_DTU, "TCP connected — sent AppInfo (%zu bytes)", msgLen);
+    LOG_I(MOD_DTU, "TCP connected  -  sent AppInfo (%zu bytes)", msgLen);
 }
 
 static void onDisconnect(void*, AsyncClient*) {
@@ -288,15 +288,15 @@ static void onDisconnect(void*, AsyncClient*) {
 static void onError(void*, AsyncClient*, err_t e) {
     _connected = false;
     _lastError = (int)e;
-    if (e == -14) {  // ERR_RST — DTU busy with Hoymiles cloud sync
+    if (e == -14) {  // ERR_RST  -  DTU busy with Hoymiles cloud sync
         _cloudPauseAt = millis();
-        LOG_W(MOD_DTU, "TCP RST (-14) — DTU cloud sync, pause %ds", appConfig.dtuCloudPause);
+        LOG_W(MOD_DTU, "TCP RST (-14)  -  DTU cloud sync, pause %ds", appConfig.dtuCloudPause);
     } else {
         LOG_E(MOD_DTU, "TCP error: %d", (int)e);
     }
 }
 
-// ─── Connect ──────────────────────────────────────────────────────────────────
+// --- Connect ------------------------------------------------------------------
 static void dtuConnect() {
     if (_client) { delete _client; _client = nullptr; }
     _client = new AsyncClient();
@@ -309,7 +309,7 @@ static void dtuConnect() {
     _client->connect(appConfig.dtuHost, appConfig.dtuPort);
 }
 
-// ─── Send helpers ─────────────────────────────────────────────────────────────
+// --- Send helpers -------------------------------------------------------------
 static bool sendRealDataNew(uint32_t ntpTime) {
     uint8_t pb[32], msg[64];
     size_t pbLen  = buildRealDataNewReq(pb, sizeof(pb), ntpTime);
@@ -342,7 +342,7 @@ static bool sendSetPowerLimit(uint32_t ntpTime, int limitPct) {
     return true;
 }
 
-// ─── Wait helper with timeout ─────────────────────────────────────────────────
+// --- Wait helper with timeout -------------------------------------------------
 static bool waitFor(volatile bool& flag, uint32_t timeoutMs) {
     uint32_t t0 = millis();
     while (!flag && (millis() - t0) < timeoutMs)
@@ -350,7 +350,7 @@ static bool waitFor(volatile bool& flag, uint32_t timeoutMs) {
     return flag;
 }
 
-// ─── DataStore system update helpers ──────────────────────────────────────────
+// --- DataStore system update helpers ------------------------------------------
 static void setDtuOnline(bool online, int failCount) {
     DataStore::SystemStatus sys = dsGetSystem();
     sys.dtuOnline       = online;
@@ -365,17 +365,17 @@ static void setDtuCloudBusy(bool busy) {
     dsSetSystem(sys);
 }
 
-// ─── Task ─────────────────────────────────────────────────────────────────────
+// --- Task ---------------------------------------------------------------------
 void taskDTU(void* pvParameters) {
     _rxMutex = xSemaphoreCreateMutex();
-    LOG_I(MOD_DTU, "Task started — target: %s:%d  interval: %ds",
+    LOG_I(MOD_DTU, "Task started  -  target: %s:%d  interval: %ds",
           appConfig.dtuHost, appConfig.dtuPort, appConfig.dtuInterval);
 
     // Wait for STA WiFi only (AP mode → task idle)
     xEventGroupWaitBits(systemStateEvents, EVT_WIFI_CONNECTED | EVT_WIFI_AP_MODE,
                         pdFALSE, pdFALSE, portMAX_DELAY);
     if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE) {
-        LOG_W(MOD_DTU, "AP mode — task idle");
+        LOG_W(MOD_DTU, "AP mode  -  task idle");
         vTaskDelete(nullptr); return;
     }
 
@@ -385,12 +385,12 @@ void taskDTU(void* pvParameters) {
     size_t   localLen;
 
     for (;;) {
-        // ── Power limit timeout check (Spec §4a) ──────────────────────────────
+        // -- Power limit timeout check (Spec §4a) ------------------------------
         if (appConfig.powerLimitTimeout > 0 && _powerLimitSetAt > 0) {
             if ((millis() - _powerLimitSetAt) > (uint32_t)appConfig.powerLimitTimeout * 1000) {
                 DataStore::PvData pv = dsGetPv();
                 if (pv.powerLimit != appConfig.powerLimitDefault) {
-                    LOG_W(MOD_DTU, "Power limit timeout — reset to %d%%", appConfig.powerLimitDefault);
+                    LOG_W(MOD_DTU, "Power limit timeout  -  reset to %d%%", appConfig.powerLimitDefault);
                     if (_connected) {
                         uint32_t t = dsGetSystem().ntpTime;
                         sendSetPowerLimit(t, appConfig.powerLimitDefault);
@@ -402,7 +402,7 @@ void taskDTU(void* pvParameters) {
             }
         }
 
-        // ── Process pending DTU commands from DataStore ────────────────────────
+        // -- Process pending DTU commands from DataStore ------------------------
         {
             DataStore::DtuCommand cmd = dsGetDtuCommand();
             if (cmd.setPowerLimit && _connected) {
@@ -414,7 +414,7 @@ void taskDTU(void* pvParameters) {
                 _powerLimitSetAt = (cmd.powerLimitValue != appConfig.powerLimitDefault) ? millis() : 0;
                 dsClearDtuCommand();
             } else if (cmd.rebootDtu && _connected) {
-                LOG_W(MOD_DTU, "DTU reboot requested — closing connection");
+                LOG_W(MOD_DTU, "DTU reboot requested  -  closing connection");
                 if (_client) _client->close(true);
                 dsClearDtuCommand();
             } else if (cmd.rebootInverter || cmd.setInverterOn) {
@@ -423,7 +423,7 @@ void taskDTU(void* pvParameters) {
             }
         }
 
-        // ── Cloud-sync pause ───────────────────────────────────────────────────
+        // -- Cloud-sync pause ---------------------------------------------------
         if (!_connected && _cloudPauseAt > 0 && appConfig.dtuCloudPause > 0) {
             uint32_t elapsed = millis() - _cloudPauseAt;
             uint32_t pauseMs = (uint32_t)appConfig.dtuCloudPause * 1000;
@@ -437,7 +437,7 @@ void taskDTU(void* pvParameters) {
             setDtuCloudBusy(false);
         }
 
-        // ── Connect if disconnected ────────────────────────────────────────────
+        // -- Connect if disconnected --------------------------------------------
         if (!_connected) {
             _ntpTimeCache = dsGetSystem().ntpTime;  // cache before connect so onConnect can read without mutex
             dtuConnect();
@@ -448,18 +448,18 @@ void taskDTU(void* pvParameters) {
                 setDtuOnline(false, failCount);
                 if (failCount >= appConfig.dtuRebootAfterFails) {
                     failCount = 0;
-                    LOG_W(MOD_DTU, "Max failures reached — cooling down 30s");
+                    LOG_W(MOD_DTU, "Max failures reached  -  cooling down 30s");
                     vTaskDelay(pdMS_TO_TICKS(30000));
                 }
                 continue;
             }
             failCount = 0;
 
-            // Wait for AppInfo response immediately after connect — DTU must ack
+            // Wait for AppInfo response immediately after connect  -  DTU must ack
             // AppInfo before it will respond to RealDataNew. The connection stays
             // alive (setRxTimeout=60s), then we idle until the poll interval.
             if (!waitFor(_appReady, 8000)) {
-                LOG_W(MOD_DTU, "AppInfo timeout — reconnecting");
+                LOG_W(MOD_DTU, "AppInfo timeout  -  reconnecting");
                 if (_client) _client->close(true);
                 _connected = false;
                 failCount++;
@@ -469,7 +469,7 @@ void taskDTU(void* pvParameters) {
             LOG_I(MOD_DTU, "AppInfo ACK received");
         }
 
-        // ── Poll interval (connection stays alive between polls) ───────────────
+        // -- Poll interval (connection stays alive between polls) ---------------
         uint32_t now = millis();
         if ((now - lastPollMs) < (uint32_t)appConfig.dtuInterval * 1000) {
             vTaskDelay(pdMS_TO_TICKS(200));
@@ -481,7 +481,7 @@ void taskDTU(void* pvParameters) {
 
         uint32_t ntpTime = dsGetSystem().ntpTime;
 
-        // ── RealDataNew ───────────────────────────────────────────────────────
+        // -- RealDataNew -------------------------------------------------------
         sendRealDataNew(ntpTime);
         if (!waitFor(_dataReady, 5000)) {
             failCount++;
@@ -504,7 +504,7 @@ void taskDTU(void* pvParameters) {
             continue;
         }
 
-        // ── GetConfig ─────────────────────────────────────────────────────────
+        // -- GetConfig ---------------------------------------------------------
         vTaskDelay(pdMS_TO_TICKS(300));
         if (_connected) {
             sendGetConfig(ntpTime);
@@ -520,13 +520,13 @@ void taskDTU(void* pvParameters) {
             }
         }
 
-        // ── Commit to DataStore ───────────────────────────────────────────────
+        // -- Commit to DataStore -----------------------------------------------
         dsSetPv(newPv);
         setDtuOnline(true, 0);
         xEventGroupSetBits(systemStateEvents, EVT_DTU_ONLINE | EVT_DATA_RECEIVED);
         setLedState(LED_DATA_FLASH);
         failCount = 0;
 
-        LOG_D(MOD_DTU, "Cycle complete — next in %ds", appConfig.dtuInterval);
+        LOG_D(MOD_DTU, "Cycle complete  -  next in %ds", appConfig.dtuInterval);
     }
 }

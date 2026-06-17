@@ -2,7 +2,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 
-// ─── System EventGroup Bits (Spec §3.3) ──────────────────────────────────────
+// --- System EventGroup Bits (Spec §3.3) --------------------------------------
 #define EVT_WIFI_CONNECTED    BIT0
 #define EVT_WIFI_AP_MODE      BIT1
 #define EVT_DTU_ONLINE        BIT2
@@ -14,7 +14,7 @@
 
 extern EventGroupHandle_t systemStateEvents;
 
-// ─── LED States (Spec §7) ─────────────────────────────────────────────────────
+// --- LED States (Spec §7) -----------------------------------------------------
 typedef enum {
     LED_BOOT = 0,
     LED_WIFI_CONNECTING,
@@ -29,4 +29,4 @@ typedef enum {
     LED_FACTORY_RESET
 } LedState_t;
 
-// setLedState() is declared in taskLED.h — include that header directly
+// setLedState() is declared in taskLED.h  -  include that header directly

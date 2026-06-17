@@ -13,7 +13,7 @@ static const uint32_t MONITOR_INTERVAL_MS  = 5000;
 static const uint32_t NTP_SYNC_TIMEOUT_MS  = 10000;
 static const uint32_t NTP_REFRESH_MS       = 3600000UL;  // 1 Stunde
 
-// ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
+// --- Hilfsfunktionen ----------------------------------------------------------
 
 static void updateSystemWifi(bool connected, bool apMode) {
     DataStore::SystemStatus sys = dsGetSystem();
@@ -32,7 +32,7 @@ static void updateSystemWifi(bool connected, bool apMode) {
 }
 
 static void syncNtp() {
-    LOG_I(MOD_WIFI, "NTP sync — server: %s  tz: %d s", appConfig.ntpServer, appConfig.tzOffset);
+    LOG_I(MOD_WIFI, "NTP sync  -  server: %s  tz: %d s", appConfig.ntpServer, appConfig.tzOffset);
     configTime(appConfig.tzOffset, 0, appConfig.ntpServer);
 
     uint32_t startMs = millis();
@@ -43,7 +43,7 @@ static void syncNtp() {
     }
 
     if (now > 1700000000UL) {
-        LOG_I(MOD_WIFI, "NTP synced — %lu", (unsigned long)now);
+        LOG_I(MOD_WIFI, "NTP synced  -  %lu", (unsigned long)now);
         DataStore::SystemStatus sys = dsGetSystem();
         sys.ntpTime = (uint32_t)now;
         dsSetSystem(sys);
@@ -53,7 +53,7 @@ static void syncNtp() {
 }
 
 static void startApMode() {
-    LOG_I(MOD_WIFI, "Starting AP — SSID: %s", AP_DEFAULT_SSID);
+    LOG_I(MOD_WIFI, "Starting AP  -  SSID: %s", AP_DEFAULT_SSID);
     WiFi.mode(WIFI_AP);
     WiFi.softAP(AP_DEFAULT_SSID);
 
@@ -62,19 +62,19 @@ static void startApMode() {
     xEventGroupSetBits(systemStateEvents, EVT_WIFI_AP_MODE);
 }
 
-// ─── Task ─────────────────────────────────────────────────────────────────────
+// --- Task ---------------------------------------------------------------------
 
 void taskWiFi(void* pvParameters) {
     LOG_I(MOD_WIFI, "Task started (Core %d)", xPortGetCoreID());
 
     for (;;) {
-        // ── AP-Modus aktiv: kein weiterer Reconnect-Versuch ───────────────────
+        // -- AP-Modus aktiv: kein weiterer Reconnect-Versuch -------------------
         if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE) {
             vTaskDelay(pdMS_TO_TICKS(MONITOR_INTERVAL_MS));
             continue;
         }
 
-        // ── STA-Verbindungsversuch ─────────────────────────────────────────────
+        // -- STA-Verbindungsversuch ---------------------------------------------
         WiFi.mode(WIFI_STA);
         WiFi.begin(appConfig.wifiSsid, appConfig.wifiPass);
         LOG_I(MOD_WIFI, "Connecting to '%s'...", appConfig.wifiSsid);
@@ -96,8 +96,8 @@ void taskWiFi(void* pvParameters) {
             continue;
         }
 
-        // ── Verbunden ─────────────────────────────────────────────────────────
-        LOG_I(MOD_WIFI, "Connected — IP: %s  RSSI: %d dBm",
+        // -- Verbunden ---------------------------------------------------------
+        LOG_I(MOD_WIFI, "Connected  -  IP: %s  RSSI: %d dBm",
               WiFi.localIP().toString().c_str(), WiFi.RSSI());
 
         // MAC is only valid after WiFi driver is started
@@ -118,7 +118,7 @@ void taskWiFi(void* pvParameters) {
         uint32_t lastMonitorMs = 0;
         uint32_t lastNtpMs     = millis();
 
-        // ── Verbindungs-Monitor ───────────────────────────────────────────────
+        // -- Verbindungs-Monitor -----------------------------------------------
         while (WiFi.status() == WL_CONNECTED) {
             vTaskDelay(pdMS_TO_TICKS(1000));
             uint32_t now = millis();
@@ -140,7 +140,7 @@ void taskWiFi(void* pvParameters) {
             }
         }
 
-        // ── Verbindung verloren ───────────────────────────────────────────────
+        // -- Verbindung verloren -----------------------------------------------
         LOG_W(MOD_WIFI, "Connection lost");
         xEventGroupClearBits(systemStateEvents, EVT_WIFI_CONNECTED);
         updateSystemWifi(false, false);

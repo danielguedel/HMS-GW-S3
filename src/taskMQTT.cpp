@@ -1,5 +1,5 @@
-// taskMQTT.cpp — v2 (esp-mqtt non-blocking, DataStore pattern)
-// Uses ESP-IDF native esp_mqtt_client — no blocking connect(), no watchdog issues.
+// taskMQTT.cpp  -  v2 (esp-mqtt non-blocking, DataStore pattern)
+// Uses ESP-IDF native esp_mqtt_client  -  no blocking connect(), no watchdog issues.
 // Event handler runs in esp-mqtt's own thread; DataStore API is mutex-safe.
 
 #include "taskMQTT.h"
@@ -14,12 +14,12 @@
 
 static esp_mqtt_client_handle_t _client = nullptr;
 
-// Persistent config strings — must outlive the client handle
+// Persistent config strings  -  must outlive the client handle
 static char _uri[80];
 static char _clientId[32];
 static char _lwtTopic[80];
 
-// ─── Topic helpers ────────────────────────────────────────────────────────────
+// --- Topic helpers ------------------------------------------------------------
 static String T(const char* suffix) {
     return String(appConfig.mqttTopic) + "/" + suffix;
 }
@@ -39,7 +39,7 @@ static void pubInt(const char* suffix, int val, bool retain = false) {
     pub(suffix, buf, retain);
 }
 
-// ─── Publish PV data (Spec §5.3) ─────────────────────────────────────────────
+// --- Publish PV data (Spec §5.3) ---------------------------------------------
 static void publishPvData(const DataStore::PvData& pv) {
     bool r = appConfig.mqttRetain;
 
@@ -89,7 +89,7 @@ static void publishPvData(const DataStore::PvData& pv) {
     LOG_D(MOD_MQTT, "Published PV data (ts=%lu)", (unsigned long)pv.timestamp);
 }
 
-// ─── Publish GPIO state ───────────────────────────────────────────────────────
+// --- Publish GPIO state -------------------------------------------------------
 static void publishGpioState(const DataStore::GpioState& gpio) {
     bool r = appConfig.mqttRetain;
     pub("relay/state", gpio.relay ? "1" : "0", r);
@@ -99,7 +99,7 @@ static void publishGpioState(const DataStore::GpioState& gpio) {
     }
 }
 
-// ─── Publish system stats ─────────────────────────────────────────────────────
+// --- Publish system stats -----------------------------------------------------
 static void publishSystemStats() {
     DataStore::SystemStatus sys = dsGetSystem();
     char buf[16];
@@ -111,7 +111,7 @@ static void publishSystemStats() {
     pub("system/heap",   buf, false);
 }
 
-// ─── HA Auto-Discovery (Spec §5.4) ───────────────────────────────────────────
+// --- HA Auto-Discovery (Spec §5.4) -------------------------------------------
 static void publishHaSensor(const char* uid, const char* name,
                              const char* stateSuffix, const char* unit,
                              const char* devClass) {
@@ -184,7 +184,7 @@ static void haDiscoveryStep() {
     _haNextMs = millis() + 500;
 }
 
-// ─── Inbound message handler ──────────────────────────────────────────────────
+// --- Inbound message handler --------------------------------------------------
 static void onMessage(const char* topic, const char* data) {
     String t    = String(topic);
     String base = String(appConfig.mqttTopic) + "/";
@@ -219,7 +219,7 @@ static void onMessage(const char* topic, const char* data) {
     }
 }
 
-// ─── esp-mqtt event handler (runs in esp-mqtt internal thread) ────────────────
+// --- esp-mqtt event handler (runs in esp-mqtt internal thread) ----------------
 static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
                               int32_t eventId, void* eventData) {
     auto ev = (esp_mqtt_event_handle_t)eventData;
@@ -264,7 +264,7 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
         }
 
         case MQTT_EVENT_DISCONNECTED: {
-            LOG_W(MOD_MQTT, "Disconnected — will reconnect automatically");
+            LOG_W(MOD_MQTT, "Disconnected  -  will reconnect automatically");
             DataStore::SystemStatus sys = dsGetSystem();
             sys.mqttConnected = false;
             dsSetSystem(sys);
@@ -275,7 +275,7 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
 
         case MQTT_EVENT_DATA: {
             if (!ev->topic || ev->topic_len == 0) break;
-            // topic and data are NOT null-terminated — copy to stack buffers
+            // topic and data are NOT null-terminated  -  copy to stack buffers
             char topic[128] = {};
             char data[128]  = {};
             memcpy(topic, ev->topic, min(ev->topic_len, (int)sizeof(topic) - 1));
@@ -294,10 +294,10 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
     }
 }
 
-// ─── Task ─────────────────────────────────────────────────────────────────────
+// --- Task ---------------------------------------------------------------------
 void taskMQTT(void* pvParameters) {
     if (strlen(appConfig.mqttHost) == 0) {
-        LOG_W(MOD_MQTT, "No broker configured — task idle");
+        LOG_W(MOD_MQTT, "No broker configured  -  task idle");
         vTaskDelete(nullptr); return;
     }
 
@@ -305,7 +305,7 @@ void taskMQTT(void* pvParameters) {
     xEventGroupWaitBits(systemStateEvents, EVT_WIFI_CONNECTED | EVT_WIFI_AP_MODE,
                         pdFALSE, pdFALSE, portMAX_DELAY);
     if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE) {
-        LOG_W(MOD_MQTT, "AP mode — task idle");
+        LOG_W(MOD_MQTT, "AP mode  -  task idle");
         vTaskDelete(nullptr); return;
     }
 
@@ -317,7 +317,7 @@ void taskMQTT(void* pvParameters) {
     snprintf(_lwtTopic, sizeof(_lwtTopic),
              "%s/system/status", appConfig.mqttTopic);
 
-    LOG_I(MOD_MQTT, "Starting — broker: %s  client: %s", _uri, _clientId);
+    LOG_I(MOD_MQTT, "Starting  -  broker: %s  client: %s", _uri, _clientId);
 
     // Flat struct API (ESP-IDF 4.x / Arduino-ESP32 2.x bundled SDK)
     esp_mqtt_client_config_t cfg = {};
@@ -347,14 +347,14 @@ void taskMQTT(void* pvParameters) {
         EventBits_t bits = xEventGroupGetBits(systemStateEvents);
         bool connected   = (bits & EVT_MQTT_CONNECTED) != 0;
 
-        // ── Publish PV data when new measurement arrives ───────────────────────
+        // -- Publish PV data when new measurement arrives -----------------------
         DataStore::PvData pv = dsGetPv();
         if (connected && pv.valid && pv.timestamp != lastPvTs) {
             publishPvData(pv);
             lastPvTs = pv.timestamp;
         }
 
-        // ── Publish GPIO state on change ───────────────────────────────────────
+        // -- Publish GPIO state on change ---------------------------------------
         uint32_t now = millis();
         if (connected && now - lastGpioCkMs >= 250) {
             lastGpioCkMs = now;
@@ -365,13 +365,13 @@ void taskMQTT(void* pvParameters) {
             }
         }
 
-        // ── System stats every 60s ─────────────────────────────────────────────
+        // -- System stats every 60s ---------------------------------------------
         if (connected && now - lastSysMs >= 60000) {
             lastSysMs = now;
             publishSystemStats();
         }
 
-        // ── HA discovery — one entity per 500ms, starting 5s after connect ─────
+        // -- HA discovery  -  one entity per 500ms, starting 5s after connect -----
         haDiscoveryStep();
 
         vTaskDelay(pdMS_TO_TICKS(100));

@@ -1,4 +1,4 @@
-// taskWebServer.cpp — v2 (DataStore pattern)
+// taskWebServer.cpp  -  v2 (DataStore pattern)
 // LittleFS, config, WiFi are initialized in main.cpp before task start.
 
 #include "taskWebServer.h"
@@ -22,7 +22,7 @@ static bool           _dnsStarted  = false;
 static bool           _otaFwError  = false;
 static bool           _otaFsError  = false;
 
-// ─── GET /api/data.json  (Spec §6.2) ─────────────────────────────────────────
+// --- GET /api/data.json  (Spec §6.2) -----------------------------------------
 static void handleApiData(AsyncWebServerRequest* req) {
     DataStore::PvData pv = dsGetPv();
     JsonDocument doc;
@@ -50,7 +50,7 @@ static void handleApiData(AsyncWebServerRequest* req) {
     req->send(200, "application/json", out);
 }
 
-// ─── GET /api/info.json  (Spec §6.3) ─────────────────────────────────────────
+// --- GET /api/info.json  (Spec §6.3) -----------------------------------------
 static void handleApiInfo(AsyncWebServerRequest* req) {
     DataStore::SystemStatus sys = dsGetSystem();
     JsonDocument doc;
@@ -69,7 +69,7 @@ static void handleApiInfo(AsyncWebServerRequest* req) {
     req->send(200, "application/json", out);
 }
 
-// ─── GET /api/gpio ────────────────────────────────────────────────────────────
+// --- GET /api/gpio ------------------------------------------------------------
 static void handleApiGpioGet(AsyncWebServerRequest* req) {
     DataStore::GpioState gpio = dsGetGpio();
     JsonDocument doc;
@@ -82,7 +82,7 @@ static void handleApiGpioGet(AsyncWebServerRequest* req) {
     req->send(200, "application/json", out);
 }
 
-// ─── POST /api/gpio ───────────────────────────────────────────────────────────
+// --- POST /api/gpio -----------------------------------------------------------
 static void handleApiGpioPost(AsyncWebServerRequest* req, uint8_t* data,
                                size_t len, size_t /*index*/, size_t /*total*/) {
     JsonDocument doc;
@@ -97,7 +97,7 @@ static void handleApiGpioPost(AsyncWebServerRequest* req, uint8_t* data,
     req->send(200, "application/json", "{\"ok\":true}");
 }
 
-// ─── GET /api/dtu ─────────────────────────────────────────────────────────────
+// --- GET /api/dtu -------------------------------------------------------------
 static void handleApiDtuGet(AsyncWebServerRequest* req) {
     DataStore::SystemStatus sys = dsGetSystem();
     DataStore::PvData       pv  = dsGetPv();
@@ -112,7 +112,7 @@ static void handleApiDtuGet(AsyncWebServerRequest* req) {
     req->send(200, "application/json", out);
 }
 
-// ─── POST /api/dtu  (DTU & system commands) ──────────────────────────────────
+// --- POST /api/dtu  (DTU & system commands) ----------------------------------
 static void handleApiDtuPost(AsyncWebServerRequest* req, uint8_t* data,
                               size_t len, size_t /*index*/, size_t /*total*/) {
     JsonDocument doc;
@@ -144,7 +144,7 @@ static void handleApiDtuPost(AsyncWebServerRequest* req, uint8_t* data,
     req->send(200, "application/json", "{\"ok\":true}");
 }
 
-// ─── GET /api/config  (flat keys — matches dashboard JS + appConfig.cpp) ──────
+// --- GET /api/config  (flat keys  -  matches dashboard JS + appConfig.cpp) ------
 static void handleApiConfigGet(AsyncWebServerRequest* req) {
     JsonDocument doc;
     doc["wifiSsid"]        = appConfig.wifiSsid;
@@ -183,10 +183,10 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
     req->send(200, "application/json", out);
 }
 
-// ─── POST /api/config ─────────────────────────────────────────────────────────
+// --- POST /api/config ---------------------------------------------------------
 static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
                                  size_t len, size_t index, size_t total) {
-    // Accumulate body chunks — ESPAsyncWebServer calls this once per TCP segment
+    // Accumulate body chunks  -  ESPAsyncWebServer calls this once per TCP segment
     static uint8_t bodyBuf[2048];
     if (index + len > sizeof(bodyBuf)) {
         if (index + len >= total)
@@ -202,7 +202,7 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
         req->send(400, "application/json", "{\"error\":\"invalid json\"}"); return;
     }
 
-    // Flat keys — same layout as appConfig.cpp configLoad/configSave
+    // Flat keys  -  same layout as appConfig.cpp configLoad/configSave
     if (doc["wifiSsid"].is<const char*>())
         strlcpy(appConfig.wifiSsid, doc["wifiSsid"].as<const char*>(), sizeof(appConfig.wifiSsid));
     if (doc["wifiPass"].is<const char*>())
@@ -261,7 +261,7 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     req->send(200, "application/json", "{\"ok\":true,\"reboot\":true}");
 }
 
-// ─── OTA firmware upload ──────────────────────────────────────────────────────
+// --- OTA firmware upload ------------------------------------------------------
 static void handleOtaUpload(AsyncWebServerRequest* /*req*/, String filename,
                              size_t index, uint8_t* data, size_t len, bool final) {
     if (index == 0) {
@@ -287,12 +287,12 @@ static void handleOtaUpload(AsyncWebServerRequest* /*req*/, String filename,
 static void handleOtaDone(AsyncWebServerRequest* req) {
     if (Update.hasError()) req->send(500, "text/plain", String("OTA Error: ") + Update.errorString());
     else {
-        req->send(200, "text/plain", "OTA OK — rebooting...");
+        req->send(200, "text/plain", "OTA OK  -  rebooting...");
         xEventGroupSetBits(systemStateEvents, EVT_REBOOT);
     }
 }
 
-// ─── OTA filesystem upload ────────────────────────────────────────────────────
+// --- OTA filesystem upload ----------------------------------------------------
 static void handleFsUpload(AsyncWebServerRequest* /*req*/, String filename,
                             size_t index, uint8_t* data, size_t len, bool final) {
     if (index == 0) {
@@ -315,14 +315,14 @@ static void handleFsUpload(AsyncWebServerRequest* /*req*/, String filename,
     }
 }
 
-// ─── Captive portal redirect ──────────────────────────────────────────────────
+// --- Captive portal redirect --------------------------------------------------
 static void handleCaptive(AsyncWebServerRequest* req) {
     req->redirect("http://" AP_IP "/");
 }
 
-// ─── Route registration ───────────────────────────────────────────────────────
+// --- Route registration -------------------------------------------------------
 static void setupRoutes() {
-    // API routes MUST be registered before serveStatic — match order is FIFO
+    // API routes MUST be registered before serveStatic  -  match order is FIFO
     server.on("/api/data.json", HTTP_GET, handleApiData);
     server.on("/api/info.json", HTTP_GET, handleApiInfo);
     server.on("/api/gpio",      HTTP_GET, handleApiGpioGet);
@@ -341,7 +341,7 @@ static void setupRoutes() {
     server.on("/update",   HTTP_POST, handleOtaDone, handleOtaUpload);
     server.on("/updatefs", HTTP_POST, handleOtaDone, handleFsUpload);
 
-    // Static files — registered LAST so API routes take priority
+    // Static files  -  registered LAST so API routes take priority
     server.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
 
     // Captive portal well-known URIs
@@ -359,7 +359,7 @@ static void setupRoutes() {
     LOG_I(MOD_WEB, "Web server started on port %d", WEB_DEFAULT_PORT);
 }
 
-// ─── Task ─────────────────────────────────────────────────────────────────────
+// --- Task ---------------------------------------------------------------------
 void taskWebServer(void* pvParameters) {
     LOG_I(MOD_WEB, "Task started (Core %d)", xPortGetCoreID());
     // LittleFS, config, and WiFi are already initialized in main.cpp

@@ -10,17 +10,17 @@
 extern "C" {
 #endif
 
-// ── GridData ──────────────────────────────────────────────────────────────────
+// -- GridData ------------------------------------------------------------------
 typedef struct _GridData {
-    int32_t voltage;        // field 1 — V * 10
-    int32_t current;        // field 2 — A * 100
-    int32_t power;          // field 3 — W * 10
-    int32_t energy_daily;   // field 4 — kWh * 1000
-    int32_t energy_total;   // field 5 — kWh * 1000
-    int32_t frequency;      // field 6 — Hz * 100
+    int32_t voltage;        // field 1  -  V * 10
+    int32_t current;        // field 2  -  A * 100
+    int32_t power;          // field 3  -  W * 10
+    int32_t energy_daily;   // field 4  -  kWh * 1000
+    int32_t energy_total;   // field 5  -  kWh * 1000
+    int32_t frequency;      // field 6  -  Hz * 100
 } GridData;
 
-// ── PVData ────────────────────────────────────────────────────────────────────
+// -- PVData --------------------------------------------------------------------
 typedef struct _PVData {
     int32_t voltage;
     int32_t current;
@@ -29,7 +29,7 @@ typedef struct _PVData {
     int32_t energy_total;
 } PVData;
 
-// ── RealDataNew ───────────────────────────────────────────────────────────────
+// -- RealDataNew ---------------------------------------------------------------
 #define REALDATA_MAX_PV 2
 typedef struct _RealDataNew {
     GridData grid[1];
@@ -43,7 +43,7 @@ typedef struct _RealDataNew {
     int32_t  warnings_active;
 } RealDataNew;
 
-// ── DevInfoNew ────────────────────────────────────────────────────────────────
+// -- DevInfoNew ----------------------------------------------------------------
 typedef struct _DevInfoNew {
     uint32_t dtu_version;
     uint32_t inverter_version;
@@ -52,7 +52,7 @@ typedef struct _DevInfoNew {
     uint32_t dtu_serial_low;
 } DevInfoNew;
 
-// ── Helper: decode version uint to string "MM.mm.pp" ─────────────────────────
+// -- Helper: decode version uint to string "MM.mm.pp" -------------------------
 static inline void versionToString(uint32_t v, char* out, size_t len) {
     snprintf(out, len, "%02lu.%02lu.%02lu",
              (unsigned long)((v >> 16) & 0xFF),

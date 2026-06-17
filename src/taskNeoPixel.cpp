@@ -1,4 +1,4 @@
-// taskLED (taskNeoPixel.cpp) — v2 (DataStore-driven state derivation)
+// taskLED (taskNeoPixel.cpp)  -  v2 (DataStore-driven state derivation)
 // LED state is auto-derived from DataStore + EventGroup each cycle.
 // setLedState() is only used for one-shot transients (LED_DATA_FLASH).
 //
@@ -21,7 +21,7 @@
 
 static CRGB leds[LED_COUNT];
 
-// ─── Colours ──────────────────────────────────────────────────────────────────
+// --- Colours ------------------------------------------------------------------
 static const CRGB COL_WHITE   = CRGB(255, 255, 255);
 static const CRGB COL_BLUE    = CRGB(  0,  80, 255);
 static const CRGB COL_ORANGE  = CRGB(255,  80,   0);
@@ -30,7 +30,7 @@ static const CRGB COL_GREEN   = CRGB(  0, 220,  30);
 static const CRGB COL_MAGENTA = CRGB(255,   0, 180);
 static const CRGB COL_RED     = CRGB(255,   0,   0);
 
-// ─── Transient override — LED_DATA_FLASH only ─────────────────────────────────
+// --- Transient override  -  LED_DATA_FLASH only ---------------------------------
 static volatile bool       _dataFlash    = false;
 static volatile LedState_t _currentState = LED_BOOT;
 
@@ -39,7 +39,7 @@ void setLedState(LedState_t state) {
     else                         { _currentState = state; }
 }
 
-// ─── Derive background state from DataStore + EventGroup ─────────────────────
+// --- Derive background state from DataStore + EventGroup ---------------------
 static LedState_t deriveState() {
     EventBits_t bits = xEventGroupGetBits(systemStateEvents);
     if (bits & EVT_FACTORY_RESET) return LED_FACTORY_RESET;
@@ -63,7 +63,7 @@ static bool shouldAbort(LedState_t runningFor) {
     return deriveState() != runningFor;
 }
 
-// ─── Colour output ────────────────────────────────────────────────────────────
+// --- Colour output ------------------------------------------------------------
 static void setColor(CRGB c, uint8_t brightnessOverride = 0) {
     uint8_t b = brightnessOverride > 0
         ? brightnessOverride
@@ -79,7 +79,7 @@ static void ledOff() {
     FastLED.show();
 }
 
-// ─── Animation primitives ─────────────────────────────────────────────────────
+// --- Animation primitives -----------------------------------------------------
 
 // Single blink: on onMs, off offMs
 static bool blinkOnce(CRGB c, uint32_t onMs, uint32_t offMs, LedState_t s,
@@ -91,7 +91,7 @@ static bool blinkOnce(CRGB c, uint32_t onMs, uint32_t offMs, LedState_t s,
     return false;
 }
 
-// Triple-blink + long pause — signals "needs user action" (AP mode)
+// Triple-blink + long pause  -  signals "needs user action" (AP mode)
 static bool tripleBlink(CRGB c, LedState_t s) {
     for (int i = 0; i < 3; i++) {
         if (shouldAbort(s)) return true;
@@ -158,7 +158,7 @@ static bool heartbeat(CRGB c, uint32_t periodMs, LedState_t s) {
     return false;
 }
 
-// ─── Task ─────────────────────────────────────────────────────────────────────
+// --- Task ---------------------------------------------------------------------
 void taskLED(void* pvParameters) {
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
     FastLED.setBrightness(LED_BRIGHTNESS_DEFAULT);
@@ -175,7 +175,7 @@ void taskLED(void* pvParameters) {
     _currentState = deriveState();
 
     for (;;) {
-        // ── One-shot data flash (orange, 80 ms) ──────────────────────────────
+        // -- One-shot data flash (orange, 80 ms) ------------------------------
         if (_dataFlash) {
             _dataFlash = false;
             setColor(COL_ORANGE);
@@ -185,69 +185,69 @@ void taskLED(void* pvParameters) {
             continue;
         }
 
-        // ── Auto-derive background state ──────────────────────────────────────
+        // -- Auto-derive background state --------------------------------------
         LedState_t state = deriveState();
         if (state != _currentState) {
             LOG_D(MOD_LED, "LED state -> %d", (int)state);
             _currentState = state;
         }
 
-        // ── Animations per state ──────────────────────────────────────────────
+        // -- Animations per state ----------------------------------------------
         switch (_currentState) {
 
             case LED_BOOT:
-                // Weiss — 1 Hz blink (fallback, boot sequence runs above)
+                // Weiss  -  1 Hz blink (fallback, boot sequence runs above)
                 blinkOnce(COL_WHITE, 250, 250, _currentState);
                 break;
 
             case LED_WIFI_CONNECTING:
-                // Blau — 1 Hz blink (ruhig, wartend)
+                // Blau  -  1 Hz blink (ruhig, wartend)
                 blinkOnce(COL_BLUE, 250, 250, _currentState);
                 break;
 
             case LED_AP_MODE:
-                // Blau — 3× kurz + Pause (dringlicher: braucht Nutzeraktion)
+                // Blau  -  3× kurz + Pause (dringlicher: braucht Nutzeraktion)
                 tripleBlink(COL_BLUE, _currentState);
                 break;
 
             case LED_DTU_OFFLINE:
-                // Orange — Doppelblink (Teilausfall)
+                // Orange  -  Doppelblink (Teilausfall)
                 doubleBlink(COL_ORANGE, 150, 700, _currentState);
                 break;
 
             case LED_NO_MQTT:
-                // Cyan — langsamer Puls 4s (unkritisch, läuft weiter)
+                // Cyan  -  langsamer Puls 4s (unkritisch, läuft weiter)
                 pulse(COL_CYAN, 4000, _currentState);
                 break;
 
             case LED_OPERATIONAL:
-                // Grün — Herzschlag 5s (alles gut, ruhig)
+                // Grün  -  Herzschlag 5s (alles gut, ruhig)
                 heartbeat(COL_GREEN, 5000, _currentState);
                 break;
 
             case LED_STANDBY:
-                // Grün — sehr langer Puls 10s, 10% Helligkeit (Nacht, kaum sichtbar)
+                // Grün  -  sehr langer Puls 10s, 10% Helligkeit (Nacht, kaum sichtbar)
                 pulse(COL_GREEN, 10000, _currentState,
                       (uint8_t)(appConfig.ledBrightness * 10 / 100 + 1));
                 break;
 
             case LED_DATA_FLASH:
-                // Handled above — should not reach here
+                // Handled above  -  should not reach here
                 _currentState = deriveState();
                 break;
 
             case LED_OTA:
-                // Magenta — schnell 5 Hz (Systemvorgang, unverwechselbar)
+                // Magenta  -  schnell 5 Hz (Systemvorgang, unverwechselbar)
                 blinkOnce(COL_MAGENTA, 100, 100, _currentState);
                 break;
 
             case LED_ERROR:
-                // Rot — schnell 4 Hz (kritisch, dringend)
+                // Rot  -  schnell 4 Hz (kritisch, dringend)
                 blinkOnce(COL_RED, 125, 125, _currentState);
                 break;
 
             case LED_FACTORY_RESET:
-                // Rot — dauerhaft an (irreversibler Vorgang)
+                // Rot  -  dauerhaft an (irreversibler Vorgang)
                 setColor(COL_RED);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 break;

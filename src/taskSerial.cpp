@@ -1,4 +1,4 @@
-// taskSerial.cpp — v2 (Konsolen-Kommandos, DataStore pattern)
+// taskSerial.cpp  -  v2 (Konsolen-Kommandos, DataStore pattern)
 // Reads commands from Serial line by line, dispatches via DataStore API.
 // All command output goes to Serial directly (not routed through the logger).
 
@@ -11,7 +11,7 @@
 #include "taskLED.h"
 #include <Arduino.h>
 
-// ─── Output helpers ───────────────────────────────────────────────────────────
+// --- Output helpers -----------------------------------------------------------
 
 static void printf_(const char* fmt, ...) {
     char buf[256]; va_list ap; va_start(ap, fmt);
@@ -21,7 +21,7 @@ static void printf_(const char* fmt, ...) {
 
 static void prompt() { Serial.print("\r\n> "); }
 
-// ─── Command handlers ─────────────────────────────────────────────────────────
+// --- Command handlers ---------------------------------------------------------
 
 static void cmdHelp() {
     Serial.println("Available commands:");
@@ -125,32 +125,32 @@ static void cmdGpio() {
 }
 
 static void cmdConfig() {
-    Serial.println("─── WiFi ───────────────────────────────");
+    Serial.println("--- WiFi -------------------------------");
     printf_("  ssid        : %s\n",   appConfig.wifiSsid);
     printf_("  apFallback  : %s\n",   appConfig.wifiApFallback ? "yes" : "no");
-    Serial.println("─── DTU ────────────────────────────────");
+    Serial.println("--- DTU --------------------------------");
     printf_("  host        : %s\n",   appConfig.dtuHost);
     printf_("  port        : %d\n",   appConfig.dtuPort);
     printf_("  interval    : %d s\n", appConfig.dtuInterval);
     printf_("  cloudPause  : %d s\n", appConfig.dtuCloudPause);
     printf_("  rebootFails : %d\n",   appConfig.dtuRebootAfterFails);
-    Serial.println("─── Power ──────────────────────────────");
+    Serial.println("--- Power ------------------------------");
     printf_("  limitDefault: %d%%\n", appConfig.powerLimitDefault);
     printf_("  limitTimeout: %d s\n", appConfig.powerLimitTimeout);
-    Serial.println("─── MQTT ───────────────────────────────");
+    Serial.println("--- MQTT -------------------------------");
     printf_("  host        : %s\n",   appConfig.mqttHost);
     printf_("  port        : %d\n",   appConfig.mqttPort);
     printf_("  topic       : %s\n",   appConfig.mqttTopic);
     printf_("  haDiscovery : %s\n",   appConfig.mqttHaDiscovery ? "on" : "off");
     printf_("  openDtu     : %s\n",   appConfig.mqttOpenDtu     ? "on" : "off");
     printf_("  retain      : %s\n",   appConfig.mqttRetain      ? "on" : "off");
-    Serial.println("─── LED ────────────────────────────────");
+    Serial.println("--- LED --------------------------------");
     printf_("  pin         : GPIO%d\n", appConfig.ledPin);
     printf_("  brightness  : %d\n",     appConfig.ledBrightness);
-    Serial.println("─── NTP ────────────────────────────────");
+    Serial.println("--- NTP --------------------------------");
     printf_("  server      : %s\n",   appConfig.ntpServer);
     printf_("  tzOffset    : %d s\n", appConfig.tzOffset);
-    Serial.println("─── Misc ───────────────────────────────");
+    Serial.println("--- Misc -------------------------------");
     printf_("  logLevel    : %d\n",   appConfig.logLevel);
 }
 
@@ -199,7 +199,7 @@ static void cmdLedTest() {
         { LED_ERROR,           "ERROR"           },
         { LED_STANDBY,         "STANDBY"         },
     };
-    Serial.println("LED test — 2.5s per state...");
+    Serial.println("LED test  -  2.5s per state...");
     for (auto& s : seq) {
         printf_("  -> %s\n", s.name);
         setLedState(s.state);
@@ -238,7 +238,7 @@ static void cmdUptime() {
 }
 
 static void cmdReset() {
-    Serial.println("Factory reset — setting EVT_FACTORY_RESET and rebooting...");
+    Serial.println("Factory reset  -  setting EVT_FACTORY_RESET and rebooting...");
     vTaskDelay(pdMS_TO_TICKS(100));
     xEventGroupSetBits(systemStateEvents, EVT_FACTORY_RESET);
     vTaskDelay(pdMS_TO_TICKS(3000));    // allow LED to show red; main handles erase
@@ -251,7 +251,7 @@ static void cmdRestart() {
     ESP.restart();
 }
 
-// ─── Command dispatcher ───────────────────────────────────────────────────────
+// --- Command dispatcher -------------------------------------------------------
 static void dispatch(char* line) {
     while (*line == ' ') line++;
     if (*line == '\0') return;
@@ -290,21 +290,21 @@ static void dispatch(char* line) {
     else printf_("Unknown command: '%s'  (type 'help')\n", verb);
 }
 
-// ─── Task ─────────────────────────────────────────────────────────────────────
+// --- Task ---------------------------------------------------------------------
 void taskSerial(void* pvParameters) {
     static char    buf[128];
     static uint8_t pos    = 0;
     static bool    skipLf = false;  // swallow LF after CR in CR+LF pairs
 
     LOG_I(MOD_SYS, "Serial console ready at %d baud", SERIAL_BAUD);
-    Serial.print("\r\nHMS-GW-S3 serial console — type 'help'\r\n> ");
+    Serial.print("\r\nHMS-GW-S3 serial console  -  type 'help'\r\n> ");
 
     for (;;) {
         while (Serial.available()) {
             char c = (char)Serial.read();
 
             if (c == '\n') {
-                if (skipLf) { skipLf = false; continue; }  // was CR+LF — already dispatched
+                if (skipLf) { skipLf = false; continue; }  // was CR+LF  -  already dispatched
                 buf[pos] = '\0';
                 Serial.println();
                 if (pos > 0) dispatch(buf);

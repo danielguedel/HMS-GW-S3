@@ -1,4 +1,4 @@
-// main.cpp — v2
+// main.cpp  -  v2
 // Start sequence per Spec §3.2:
 //   dsInit → Serial → LittleFS → configLoad → systemStateEvents → tasks
 
@@ -27,10 +27,10 @@
 EventGroupHandle_t systemStateEvents;
 
 void setup() {
-    // ── 1. DataStore — must be first; tasks may start immediately after ────────
+    // -- 1. DataStore  -  must be first; tasks may start immediately after --------
     dsInit();
 
-    // ── 2. Serial ──────────────────────────────────────────────────────────────
+    // -- 2. Serial --------------------------------------------------------------
     Serial.begin(SERIAL_BAUD);
     delay(300);
     logInit();
@@ -41,9 +41,9 @@ void setup() {
           ESP.getChipCores(), ESP.getCpuFreqMHz(),
           (unsigned long)ESP.getFlashChipSize());
 
-    // ── 3. LittleFS ───────────────────────────────────────────────────────────
+    // -- 3. LittleFS -----------------------------------------------------------
     if (!LittleFS.begin(true)) {
-        LOG_E(MOD_SYS, "LittleFS mount failed — formatting");
+        LOG_E(MOD_SYS, "LittleFS mount failed  -  formatting");
         LittleFS.format();
         LittleFS.begin();
     }
@@ -51,18 +51,18 @@ void setup() {
           (unsigned long)LittleFS.totalBytes(),
           (unsigned long)LittleFS.usedBytes());
 
-    // ── 4. Config ─────────────────────────────────────────────────────────────
+    // -- 4. Config -------------------------------------------------------------
     configLoad();
 
-    // ── 5. FreeRTOS synchronisation ───────────────────────────────────────────
+    // -- 5. FreeRTOS synchronisation -------------------------------------------
     systemStateEvents = xEventGroupCreate();
     configASSERT(systemStateEvents);
 
-    // ── 6–12. Tasks (order per Spec §3.2) ────────────────────────────────────
-    // taskWiFi — first: all other net tasks wait on EVT_WIFI_CONNECTED
+    // -- 6–12. Tasks (order per Spec §3.2) ------------------------------------
+    // taskWiFi  -  first: all other net tasks wait on EVT_WIFI_CONNECTED
     xTaskCreatePinnedToCore(taskWiFi,       "WiFi",       STACK_WIFI,
                             NULL, TASK_PRIO_WIFI,       NULL, CORE_WIFI);
-    // taskLED — early: boot animation starts immediately
+    // taskLED  -  early: boot animation starts immediately
     xTaskCreatePinnedToCore(taskLED,        "LED",        STACK_LED,
                             NULL, TASK_PRIO_LED,        NULL, CORE_LED);
     // Low-latency I/O tasks
@@ -72,7 +72,7 @@ void setup() {
                             NULL, TASK_PRIO_SERIAL,     NULL, CORE_SERIAL);
     xTaskCreatePinnedToCore(taskSysMonitor, "SysMonitor", STACK_SYSMONITOR,
                             NULL, TASK_PRIO_SYSMONITOR, NULL, CORE_SYSMONITOR);
-    // Network tasks — wait internally on EVT_WIFI_CONNECTED
+    // Network tasks  -  wait internally on EVT_WIFI_CONNECTED
     xTaskCreatePinnedToCore(taskDTU,        "DTU",        STACK_DTU,
                             NULL, TASK_PRIO_DTU,        NULL, CORE_DTU);
     xTaskCreatePinnedToCore(taskMQTT,       "MQTT",       STACK_MQTT,
@@ -80,7 +80,7 @@ void setup() {
     xTaskCreatePinnedToCore(taskWebServer,  "WebServer",  STACK_WEBSERVER,
                             NULL, TASK_PRIO_WEBSERVER,  NULL, CORE_WEBSERVER);
 
-    LOG_I(MOD_SYS, "All tasks started — %lu B heap free",
+    LOG_I(MOD_SYS, "All tasks started  -  %lu B heap free",
           (unsigned long)ESP.getFreeHeap());
 }
 
@@ -91,7 +91,7 @@ void loop() {
     if (!_factoryResetHandled &&
         (xEventGroupGetBits(systemStateEvents) & EVT_FACTORY_RESET)) {
         _factoryResetHandled = true;
-        LOG_W(MOD_SYS, "Factory reset — removing %s", CONFIG_FILE);
+        LOG_W(MOD_SYS, "Factory reset  -  removing %s", CONFIG_FILE);
         LittleFS.remove(CONFIG_FILE);
         // Reboot is triggered by the task that set EVT_FACTORY_RESET (3s delay)
     }

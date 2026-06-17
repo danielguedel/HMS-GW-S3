@@ -1,6 +1,6 @@
-// taskSysMonitor.cpp — v2 (DataStore pattern)
+// taskSysMonitor.cpp  -  v2 (DataStore pattern)
 // Single responsibility: keep uptimeS and freeHeap current in DataStore.
-// LED state is auto-derived by taskLED — no state management here.
+// LED state is auto-derived by taskLED  -  no state management here.
 
 #include "taskSysMonitor.h"
 #include "dataStore.h"
@@ -12,7 +12,7 @@
 #define HEAP_LOG_INTERVAL_MS 10000   // detailed log every 10 s
 
 void taskSysMonitor(void* pvParameters) {
-    LOG_I(MOD_SYS, "SysMonitor started — heap warn threshold: %d B", HEAP_WARN_THRESHOLD);
+    LOG_I(MOD_SYS, "SysMonitor started  -  heap warn threshold: %d B", HEAP_WARN_THRESHOLD);
 
     uint32_t lastHeapLogMs = 0;
 

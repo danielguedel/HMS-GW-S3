@@ -9,7 +9,7 @@ enum IoMode : uint8_t {
     IO_RESERVED         // Pin für eine Zusatzfunktion reserviert (siehe altFunction)
 };
 
-// ─── Application Configuration ────────────────────────────────────────────────
+// --- Application Configuration ------------------------------------------------
 struct AppConfig {
     // WiFi
     char wifiSsid[33];
@@ -37,7 +37,7 @@ struct AppConfig {
     bool     mqttHaDiscovery;   // HA Auto-Discovery aktivieren
     bool     mqttOpenDtu;       // OpenDTU-kompatible Topics
 
-    // GPIO — Default-Pinbelegung (anpassbar im Web-GUI)
+    // GPIO  -  Default-Pinbelegung (anpassbar im Web-GUI)
     struct {
         uint8_t pin;            // default: GPIO1
         bool    inverted;
@@ -46,7 +46,7 @@ struct AppConfig {
     struct {
         uint8_t pin;             // defaults: GPIO2, GPIO3, GPIO4
         IoMode  mode;            // IO_OUTPUT / IO_INPUT / IO_RESERVED
-        char    altFunction[16]; // rein informativ, z.B. "I2C_SDA" — ändert kein Verhalten
+        char    altFunction[16]; // rein informativ, z.B. "I2C_SDA"  -  ändert kein Verhalten
         bool    inverted;
         bool    pullup;
     } io[3];

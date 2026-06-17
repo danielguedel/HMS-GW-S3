@@ -1,4 +1,4 @@
-// appConfig.cpp — v2 (flat JSON format, v2 AppConfig fields)
+// appConfig.cpp  -  v2 (flat JSON format, v2 AppConfig fields)
 // config.json uses the same flat keys as the web API for consistency.
 
 #include "appConfig.h"
@@ -40,11 +40,11 @@ void configSetDefaults() {
     appConfig.mqttHaDiscovery = true;
     appConfig.mqttOpenDtu     = false;
 
-    // GPIO — Relay
+    // GPIO  -  Relay
     appConfig.relay.pin      = RELAY_PIN;
     appConfig.relay.inverted = false;
 
-    // GPIO — IO1–IO3 (generisch, Default-Modus immer OUTPUT)
+    // GPIO  -  IO1–IO3 (generisch, Default-Modus immer OUTPUT)
     appConfig.io[0].pin      = IO1_PIN;
     appConfig.io[0].mode     = IO_OUTPUT;
     strlcpy(appConfig.io[0].altFunction, "I2C_SDA", sizeof(appConfig.io[0].altFunction));
@@ -79,14 +79,14 @@ void configLoad() {
             LOG_W(MOD_CFG, "Recovering config from /config.tmp");
             LittleFS.rename("/config.tmp", CONFIG_FILE);
         } else {
-            LOG_W(MOD_CFG, "No %s — using defaults", CONFIG_FILE);
+            LOG_W(MOD_CFG, "No %s  -  using defaults", CONFIG_FILE);
             configSetDefaults();
             return;
         }
     }
     File f = LittleFS.open(CONFIG_FILE, "r");
     if (!f) {
-        LOG_W(MOD_CFG, "Cannot open %s — using defaults", CONFIG_FILE);
+        LOG_W(MOD_CFG, "Cannot open %s  -  using defaults", CONFIG_FILE);
         configSetDefaults();
         return;
     }
@@ -94,7 +94,7 @@ void configLoad() {
     DeserializationError err = deserializeJson(doc, f);
     f.close();
     if (err) {
-        LOG_E(MOD_CFG, "JSON parse error: %s — using defaults", err.c_str());
+        LOG_E(MOD_CFG, "JSON parse error: %s  -  using defaults", err.c_str());
         configSetDefaults();
         return;
     }
@@ -218,7 +218,7 @@ void configSave() {
     doc["ntpServer"] = appConfig.ntpServer;
     doc["logLevel"]  = appConfig.logLevel;
 
-    // Write to temp file first, then rename — protects against config corruption on reset
+    // Write to temp file first, then rename  -  protects against config corruption on reset
     static const char* TMP_FILE = "/config.tmp";
     File f = LittleFS.open(TMP_FILE, "w");
     if (!f) { LOG_E(MOD_CFG, "Cannot write %s", TMP_FILE); return; }
