@@ -547,7 +547,9 @@ static void setupRoutes() {
     server.on("/api/ota/check", HTTP_POST, handleApiOtaCheckPost);
 
     // Static files  -  registered LAST so API routes take priority
-    server.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
+    // no-cache: forces revalidation so a Filesystem-OTA update is visible without
+    // a hard browser refresh (Ctrl+Shift+R), while still allowing conditional caching
+    server.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html").setCacheControl("no-cache");
 
     // Captive portal well-known URIs
     const char* captiveUris[] = {"/generate_204", "/hotspot-detect.html",
@@ -574,8 +576,9 @@ void taskWebServer(void* pvParameters) {
         // Deferred reboot/factory-reset (set by API callbacks to avoid vTaskDelay on lwIP thread)
         EventBits_t evBits = xEventGroupGetBits(systemStateEvents);
         if (evBits & EVT_REBOOT) {
+            // Config removal is owned solely by main.cpp's loop() (watches EVT_FACTORY_RESET);
+            // the longer delay here just gives it time to run before the restart.
             uint32_t delayMs = (evBits & EVT_FACTORY_RESET) ? 3500 : 500;
-            if (evBits & EVT_FACTORY_RESET) LittleFS.remove(CONFIG_FILE);
             vTaskDelay(pdMS_TO_TICKS(delayMs));
             ESP.restart();
         }

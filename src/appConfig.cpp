@@ -10,6 +10,13 @@
 
 AppConfig appConfig;
 
+// ESP32-S3 exposes GPIO0–GPIO48  -  reject anything outside that range
+// (catches e.g. an unset/garbage "255" pin from a malformed config) and fall
+// back to the build default instead.
+static uint8_t clampPin(int v, uint8_t def) {
+    return (v >= 0 && v <= 48) ? (uint8_t)v : def;
+}
+
 void configSetDefaults() {
     memset(&appConfig, 0, sizeof(AppConfig));
 
@@ -125,13 +132,19 @@ void configLoad() {
     if (!doc["dtuRebootAfterFails"].isNull()) appConfig.dtuRebootAfterFails = doc["dtuRebootAfterFails"].as<int>();
 
     // Power Limit
-    if (!doc["powerLimitDefault"].isNull()) appConfig.powerLimitDefault = doc["powerLimitDefault"].as<int>();
+    if (!doc["powerLimitDefault"].isNull()) {
+        int pl = doc["powerLimitDefault"].as<int>();
+        appConfig.powerLimitDefault = (pl < 0) ? 0 : (pl > 100 ? 100 : pl);
+    }
     if (!doc["powerLimitTimeout"].isNull()) appConfig.powerLimitTimeout = doc["powerLimitTimeout"].as<int>();
 
     // MQTT
     if (doc["mqttHost"].is<const char*>())
         strlcpy(appConfig.mqttHost,  doc["mqttHost"].as<const char*>(),  sizeof(appConfig.mqttHost));
-    if (!doc["mqttPort"].isNull())  appConfig.mqttPort = doc["mqttPort"].as<int>();
+    if (!doc["mqttPort"].isNull()) {
+        int mp = doc["mqttPort"].as<int>();
+        appConfig.mqttPort = (mp >= 1 && mp <= 65535) ? (uint16_t)mp : MQTT_DEFAULT_PORT;
+    }
     if (doc["mqttUser"].is<const char*>())
         strlcpy(appConfig.mqttUser,  doc["mqttUser"].as<const char*>(),  sizeof(appConfig.mqttUser));
     if (doc["mqttPass"].is<const char*>())
@@ -143,15 +156,18 @@ void configLoad() {
     if (!doc["mqttOpenDtu"].isNull())     appConfig.mqttOpenDtu     = doc["mqttOpenDtu"].as<bool>();
 
     // GPIO Relay
-    if (!doc["relayPin"].isNull())      appConfig.relay.pin      = doc["relayPin"].as<int>();
+    if (!doc["relayPin"].isNull())
+        appConfig.relay.pin = clampPin(doc["relayPin"].as<int>(), RELAY_PIN);
     if (!doc["relayInverted"].isNull()) appConfig.relay.inverted = doc["relayInverted"].as<bool>();
 
     // GPIO io1–io3
-    const char* keys[] = {"io1","io2","io3"};
+    const char*   keys[]     = {"io1","io2","io3"};
+    const uint8_t ioDefPin[] = {IO1_PIN, IO2_PIN, IO3_PIN};
     for (int i = 0; i < 3; i++) {
         JsonObjectConst io = doc[keys[i]];
         if (io.isNull()) continue;
-        if (!io["pin"].isNull())      appConfig.io[i].pin      = io["pin"].as<int>();
+        if (!io["pin"].isNull())
+            appConfig.io[i].pin = clampPin(io["pin"].as<int>(), ioDefPin[i]);
         if (!io["mode"].isNull()) {
             int m = io["mode"].as<int>();
             appConfig.io[i].mode = (m >= 0 && m <= (int)IO_RESERVED) ? (IoMode)m : IO_INPUT;
@@ -163,8 +179,12 @@ void configLoad() {
     }
 
     // LED
-    if (!doc["ledPin"].isNull())        appConfig.ledPin        = doc["ledPin"].as<int>();
-    if (!doc["ledBrightness"].isNull()) appConfig.ledBrightness = doc["ledBrightness"].as<int>();
+    if (!doc["ledPin"].isNull())
+        appConfig.ledPin = clampPin(doc["ledPin"].as<int>(), LED_PIN);
+    if (!doc["ledBrightness"].isNull()) {
+        int lb = doc["ledBrightness"].as<int>();
+        appConfig.ledBrightness = (uint8_t)(lb < 0 ? 0 : (lb > 255 ? 255 : lb));
+    }
 
     // System
     if (!doc["tzOffset"].isNull())  appConfig.tzOffset  = doc["tzOffset"].as<int>();

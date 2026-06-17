@@ -4,8 +4,8 @@
 **Hardware:** ESP32-S3-DevKitC-1-N8R8 (8MB Flash, 8MB PSRAM)  
 **Framework:** Arduino / FreeRTOS (PlatformIO)  
 **Repository:** https://github.com/danielguedel/HMS-GW-S3  
-**Datum:** 2026-06-14  
-**Status:** Implementiert und produktiv (v0.2.0, Build 150)
+**Datum:** 2026-06-17 (synchronisiert mit Commit `07ffd0d`)  
+**Status:** Implementiert und produktiv (v0.2.0, Buildnummer wird bei jedem Build automatisch inkrementiert — siehe `include/buildnumber.txt`)
 
 ---
 
@@ -105,6 +105,18 @@ struct DataStore {
         bool    inverterOnValue;
     } dtuCmd;
 
+    // ── Internet-OTA-Status (geschrieben von taskWebServer) ───────────────
+    struct OtaInfo {
+        bool     available;          // neuere Version gefunden
+        bool     checking;           // Manifest-Check läuft gerade
+        char     version[32];        // Version aus Manifest
+        int      buildNumber;        // Build-Nummer aus Manifest
+        char     url[256];           // Firmware-Download-URL
+        char     fsUrl[256];         // Filesystem-Download-URL (leer = kein FS-Update)
+        char     notes[128];         // Release-Notes
+        uint32_t lastCheckMs;        // millis() des letzten Checks (0 = noch nie)
+    } otaInfo;
+
     // ── Mutex ──────────────────────────────────────────────────────────────
     SemaphoreHandle_t mutex;
 };
@@ -119,9 +131,12 @@ extern DataStore ds;
 void dsInit();
 
 // Lesen (gibt Kopie zurück — kein langer Lock nötig)
-DataStore::PvData      dsGetPv();
+DataStore::PvData       dsGetPv();
 DataStore::SystemStatus dsGetSystem();
-DataStore::GpioState   dsGetGpio();
+DataStore::GpioState    dsGetGpio();
+DataStore::GpioCommand  dsGetGpioCommand();  // atomarer Read + löscht pending-Flag
+DataStore::DtuCommand   dsGetDtuCommand();
+DataStore::OtaInfo      dsGetOtaInfo();
 
 // Schreiben (atomisch mit Mutex)
 void dsSetPv(const DataStore::PvData& data);
@@ -130,12 +145,15 @@ void dsSetGpio(const DataStore::GpioState& state);
 void dsSetGpioCommand(int target, bool state);
 void dsSetDtuCommand(const DataStore::DtuCommand& cmd);
 void dsClearDtuCommand();
+void dsSetOtaInfo(const DataStore::OtaInfo& info);
 
 // Convenience
 bool dsIsDtuOnline();
 bool dsIsWifiConnected();
 bool dsPvValid();
 ```
+
+**Wichtig:** `ds.mutex` ist zwar Teil des öffentlichen Structs, darf aber **nie** direkt verwendet werden — ausschliesslich über die obigen API-Funktionen. `dsGetGpioCommand()`/`dsGetDtuCommand()` wurden hinzugefügt, um den früheren direkten `ds.mutex`-Zugriff in `taskGPIO`/`taskDTU` zu ersetzen.
 
 ---
 
@@ -188,9 +206,12 @@ Für systemweite Events wird ein FreeRTOS EventGroup verwendet:
 #define EVT_DATA_RECEIVED     BIT4
 #define EVT_OTA_RUNNING       BIT5
 #define EVT_FACTORY_RESET     BIT6
+#define EVT_REBOOT            BIT7
 ```
 
 Tasks setzen und lesen diese Bits. Der DataStore enthält die detaillierten Zustände.
+
+**Deferred Reboot/Factory-Reset:** AsyncWebServer-Callbacks laufen im lwIP/AsyncTCP-Thread — `vTaskDelay()` + `ESP.restart()` direkt im Callback würde diesen Thread blockieren. Stattdessen setzen die API-Handler nur `EVT_REBOOT` (bzw. `EVT_FACTORY_RESET | EVT_REBOOT`), der eigentliche Restart (inkl. Verzögerung und `LittleFS.remove()` bei Factory Reset) läuft zentral in der Task-Loop von `taskWebServer` (`taskWebServer.cpp:574–580`).
 
 ---
 
@@ -388,8 +409,13 @@ Discovery-Nachrichten werden 5 Sekunden nach MQTT-Connect gesendet, eine pro 500
 | POST | `/api/config` | Konfiguration speichern |
 | GET | `/api/gpio` | GPIO-Zustand |
 | POST | `/api/gpio` | GPIO setzen |
-| GET | `/api/dtu` | DTU-Steuerung |
-| POST | `/update` | OTA-Firmware-Update |
+| GET | `/api/dtu` | DTU-Status (PowerLimit, Inverter aktiv) |
+| POST | `/api/dtu` | DTU-Steuerbefehle (PowerLimit, Reboot, Inverter on/off) |
+| POST | `/update` | OTA-Firmware-Update (File Upload) |
+| POST | `/updatefs` | OTA-Filesystem-Update (File Upload) |
+| GET | `/api/ota/check` | Letzten Internet-OTA-Checkstatus abfragen |
+| POST | `/api/ota/check` | Internet-OTA-Versionscheck manuell anstossen |
+| POST | `/api/ota/url` | Internet-OTA: Firmware/Filesystem per URL herunterladen und flashen |
 
 ### 6.2 data.json
 
@@ -421,6 +447,12 @@ Discovery-Nachrichten werden 5 Sekunden nach MQTT-Connect gesendet, eine pro 500
   "ntpTime": 1781430913
 }
 ```
+
+### 6.4 Zugriffsschutz und Port (geplant, noch nicht implementiert)
+
+- **Benutzername/Passwort-Schutz:** Optionaler HTTP-Basic-Auth-Schutz für die gesamte Web-GUI, konfigurierbar im Config- oder System-Tab (`webAuthEnabled`, `webUser`, `webPass` in `AppConfig`, §8). Default: deaktiviert. Umsetzung via `AsyncWebServerRequest::authenticate()`/`requestAuthentication()` in `taskWebServer.cpp` — am einfachsten als globaler Check zu Beginn jedes Handlers oder als `server.addHandler()`-Filter, damit auch `/api/*` und `/update` geschützt sind, nicht nur die statischen Dateien.
+- **Konfigurierbarer Port:** `appConfig.webPort` (default: 80, ersetzt die fixe Konstante `WEB_DEFAULT_PORT` in `config.h:62`).
+- **Technische Einschränkung:** `AsyncWebServer` erhält den Port nur im Konstruktor; das aktuelle `server`-Objekt ist als globales statisches Objekt vor `configLoad()` angelegt (`taskWebServer.cpp:21`). Eine Portänderung kann daher nicht zur Laufzeit erfolgen — wie bei anderen Config-Änderungen löst das Speichern einen automatischen Neustart aus (siehe `abf7864`). Für die Umsetzung muss `server` entweder dynamisch (`AsyncWebServer* server`) nach `configLoad()` allokiert werden, oder der Port muss vor dem regulären `configLoad()`-Aufruf verfügbar sein (z. B. separat aus NVS/Preferences gelesen).
 
 ---
 
@@ -497,6 +529,15 @@ struct AppConfig {
     int  tzOffset;              // Zeitzone-Offset [s], default: 3600 (UTC+1)
     char ntpServer[65];         // default: "pool.ntp.org"
     int  logLevel;              // 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
+
+    // Internet-OTA
+    char otaManifestUrl[256];   // URL zum Versions-Manifest (leer = deaktiviert)
+
+    // Web-Server (geplant — siehe §6.4, noch nicht implementiert)
+    bool     webAuthEnabled;    // Benutzername/Passwort-Schutz aktivieren, default: false
+    char     webUser[33];       // Benutzername, default: "admin"
+    char     webPass[65];       // Passwort
+    uint16_t webPort;           // Web-GUI Port, default: 80
 };
 ```
 
@@ -537,35 +578,38 @@ Anlehnung an **Shelly Web-UI**: modern, aufgeräumt, professionell.
 - Keine externen Abhängigkeiten — alles in `index.html` (inline CSS + JS)
 - Auto-Refresh alle 10 Sekunden via Fetch API
 
-### 9.2 Dashboard-Struktur
+### 9.2 Dashboard-Tab — PV-Output-Anzeige
 
 ```
 ┌─────────────────────────────────────────────┐
 │  HMS-GW-S3          🌙  ⚙️  ℹ️              │  ← Header + Dark/Light Toggle
 ├─────────────────────────────────────────────┤
+│  Temp 45.2°C  Limit 100%  Ertrag heute 3.04  │  ← Status-Bar (Temp/Limit/
+│  Gesamt 241.4 kWh   ● Aktiv                  │     Tagesertrag/Gesamt/Active)
+├─────────────────────────────────────────────┤
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │  PV1     │  │  PV2     │  │  Grid    │  │  ← Karten mit Live-Daten
-│  │ 353 W    │  │ 296 W    │  │ 610 W    │  │
-│  │ 26.6V    │  │ 27.7V    │  │ 241.9V   │  │
+│  │  Grid    │  │  PV1     │  │  PV2     │  │  ← Power-Karten: Leistung [W]
+│  │ 610 W    │  │ 353 W    │  │ 296 W    │  │     + Balkenanzeige (% von
+│  │ ▓▓▓▓░░░  │  │ ▓▓▓░░░░  │  │ ▓▓░░░░░  │  │     einem Max-Wert) + Sub-
+│  │241.9V/2.5A│  │ 26.6V/1.3A│ │ 27.7V/1.1A│ │     Zeile Spannung/Strom
 │  └──────────┘  └──────────┘  └──────────┘  │
-│  ┌─────────────────────────────────────────┐│
-│  │  Tagesertrag: 3.04 kWh  Total: 241 kWh ││  ← Energie-Übersicht
-│  └─────────────────────────────────────────┘│
-│  ┌──────────────┐  ┌──────────────────────┐ │
-│  │  Relay  [●]  │  │  IO1 [●]  IO2 [○]   │ │  ← GPIO-Steuerung
-│  └──────────────┘  └──────────────────────┘ │
-│  ┌─────────────────────────────────────────┐│
-│  │  Status: WiFi ✅  DTU ✅  MQTT ✅       ││  ← Verbindungsstatus
-│  │  Temp: 45.2°C   Limit: 100%            ││
-│  └─────────────────────────────────────────┘│
+│  Leistungsbegrenzung                         │
+│  [════════●══] 100%          [ Setzen ]     │  ← Slider 2–100% + Button
 └─────────────────────────────────────────────┘
 ```
 
-### 9.3 Seiten
+Die Karten werden alle 10s per `GET /api/data.json` aktualisiert (`pv0`/`pv1`/`grid` → Leistung, Balkenbreite, Spannung/Strom-Subzeile; `inverter` → Status-Bar Temp/Limit/Active). Tagesertrag/Gesamtertrag in der Status-Bar stammen aus `pv0.dE+pv1.dE+grid.dE` bzw. den `tE`-Feldern.
 
-- **Dashboard** — Live-Daten, GPIO-Steuerung, Status
-- **Config** — WiFi, DTU, MQTT, GPIO, System (Tab-Navigation)
-- **System** — OTA-Update, Log-Level, Factory Reset, Reboot
+**Browser-Tab-Titel:** Bei jedem Refresh wird `document.title` auf die aktuelle Netzleistung gesetzt, z.B. `"610 W — HMS-GW-S3"` (`index.html:455`) — ermöglicht das Ablesen des aktuellen Ertrags auch bei minimiertem/inaktivem Browser-Tab (z.B. mehrere Tabs im Überblick).
+
+### 9.3 Seiten (Tabs)
+
+Vier Tabs in der Hauptnavigation (`nav button`, `showTab()`):
+
+- **Dashboard** — PV-Output (Grid/PV1/PV2-Karten), Status-Bar, Leistungsbegrenzungs-Slider (Abschnitt 9.2)
+- **GPIO / Relay** — eigener Tab (nicht Teil des Dashboards) mit Toggle-Switches für Relay, IO1–IO3 inkl. Status-Badge
+- **Config** — WiFi, DTU, MQTT, GPIO-Pinbelegung, System (innerhalb des Tabs gegliedert)
+- **System** — Firmware-OTA (File Upload), Filesystem-OTA (File Upload), Internet-Update (Manifest-Check + Install), Geräteinformationen, Danger Zone (Reboot, Factory Reset)
 
 ---
 
@@ -583,22 +627,21 @@ Im Web-GUI unter System → OTA:
 
 ### 10.2 Internet-Update (URL)
 
-- URL eines `.bin` Files eingeben → Gateway lädt direkt herunter
-- Verwendet `HTTPClient` + `Update` Library (läuft in eigenem Task)
-- Fortschritt wird per WebSocket oder Polling im Browser angezeigt
-- Signatur-Prüfung optional (MD5-Hash)
+- `POST /api/ota/url` mit JSON-Body `{"url": "...", "fsUrl": "..."}` (beide optional, mindestens eines muss gesetzt sein) — Web-GUI füllt URL und FS-URL automatisch aus dem Manifest
+- Request wird in `_otaUrl`/`_otaFsUrl` gepuffert und per Pending-Flag an die Task-Loop von `taskWebServer` übergeben (kein Download im AsyncTCP-Callback-Kontext)
+- Download via `WiFiClientSecure` (`setInsecure()`, kein Zertifikats-Pinning) + `HTTPClient` mit `HTTPC_STRICT_FOLLOW_REDIRECTS` (notwendig für GitHub-Releases-CDN-Redirects)
+- Stream wird in 512-Byte-Blöcken gelesen und per `Update.write()` geschrieben; Fortschritt alle 10% als `LOG_I` ausgegeben
+- Firmware- und Filesystem-Update laufen sequenziell — beide Flags werden vor jedem `LOG_I` gesetzt, um eine Race Condition mit dem Reboot zu vermeiden (Fix in Commit `07ffd0d`)
+- Kein WebSocket/Live-Fortschritt im Browser — Status wird über `GET /api/ota/check` gepollt
+- Keine Signatur-/Hash-Prüfung implementiert
 
-```cpp
-// Ablauf Internet-OTA
-HTTPClient http;
-http.begin(firmwareUrl);
-int len = http.GET();
-Update.begin(len);
-// Stream direkt in Update schreiben
-Update.writeStream(*http.getStreamPtr());
-Update.end(true);
-ESP.restart();
-```
+### 10.3 Internet-OTA-Versionscheck (Manifest)
+
+- `appConfig.otaManifestUrl` zeigt auf ein JSON-Manifest (Default: `https://raw.githubusercontent.com/danielguedel/HMS-GW-S3/main/release/manifest.json`)
+- Automatischer Check nach WiFi-Connect; manueller Trigger via `POST /api/ota/check`
+- Ergebnis landet in `DataStore::OtaInfo` (`available`, `version`, `buildNumber`, `url`, `fsUrl`, `notes`, `lastCheckMs`) und wird via `GET /api/ota/check` ausgeliefert
+- Web-GUI "Internet Update"-Kachel zeigt Ergebnis an und bietet "Jetzt installieren" (löst `POST /api/ota/url` mit den Manifest-URLs aus)
+- GitHub Actions Release-Workflow (`workflow_dispatch` mit `version` + `notes`) erzeugt Release + aktualisiert `manifest.json`
 
 ---
 
@@ -621,9 +664,9 @@ Format: `[HH:MM:SS.mmm] [LVL] [MODULE] Nachricht`
 
 | Level | Kürzel | Farbe (ANSI) |
 |---|---|---|
-| ERROR | ERR | Rot `\e[31m` |
+| ERROR | ERR | Rot (fett) `\e[1;31m` |
 | WARNING | WRN | Gelb `\e[33m` |
-| INFO | INF | Weiss `\e[0m` |
+| INFO | INF | Grün `\e[32m` |
 | DEBUG | DBG | Cyan `\e[36m` |
 
 ### 11.2 Log-Level
@@ -656,43 +699,12 @@ version           # Firmware-Version
 uptime            # Laufzeit
 heap              # Heap-Nutzung
 tasks             # FreeRTOS Task-Liste
+ledtest           # Alle LED-Zustände durchlaufen (Diagnose)
 ```
 
 ### 11.4 Web-Terminal (optional, Phase 2)
 
 Ein Terminal-Fenster im Web-Dashboard das Serial-Output via WebSocket spiegelt — so kann man den Log auch ohne USB-Verbindung lesen.
-
----
-
-```
-HMS-GW-S3/
-├── platformio.ini
-├── custom_partitions.csv
-├── version_inc.py
-├── data/
-│   └── www/
-│       └── index.html          (Dashboard SPA)
-├── include/
-│   ├── config.h                (Build-Konstanten, Stack-Grössen, Pin-Definitionen)
-│   ├── appConfig.h             (AppConfig struct)
-│   ├── dataStore.h             (DataStore struct + API)
-│   ├── systemState.h           (EventGroup Bits)
-│   ├── logger.h                (LOG_I/W/E/D Makros)
-│   └── taskLED.h               (setLedState() Deklaration)
-└── src/
-    ├── main.cpp                (Setup, Task-Start)
-    ├── appConfig.cpp           (Config laden/speichern)
-    ├── dataStore.cpp           (DataStore Implementation)
-    ├── logger.cpp
-    ├── taskWiFi.cpp            (WiFi + NTP als eigener Task)
-    ├── taskDTU.cpp             (TCP + manuelles Protobuf, kein Nanopb)
-    ├── taskMQTT.cpp            (esp-mqtt, non-blocking, ESP-IDF 4.x flat API)
-    ├── taskWebServer.cpp       (ESPAsyncWebServer)
-    ├── taskGPIO.cpp            (Relay + IO1-3)
-    ├── taskNeoPixel.cpp        (WS2812B GPIO38, Zustands-Auto-Derivierung)
-    ├── taskSerial.cpp          (Konsole)
-    └── taskSysMonitor.cpp      (Heap, Uptime)
-```
 
 ---
 

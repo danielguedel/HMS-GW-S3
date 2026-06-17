@@ -415,7 +415,7 @@ void taskDTU(void* pvParameters) {
                 dsClearDtuCommand();
             } else if (cmd.rebootDtu && _connected) {
                 LOG_W(MOD_DTU, "DTU reboot requested  -  closing connection");
-                if (_client) _client->close(true);
+                if (_client) _client->close();
                 dsClearDtuCommand();
             } else if (cmd.rebootInverter || cmd.setInverterOn) {
                 LOG_W(MOD_DTU, "Inverter command not yet implemented");
@@ -460,7 +460,7 @@ void taskDTU(void* pvParameters) {
             // alive (setRxTimeout=60s), then we idle until the poll interval.
             if (!waitFor(_appReady, 8000)) {
                 LOG_W(MOD_DTU, "AppInfo timeout  -  reconnecting");
-                if (_client) _client->close(true);
+                if (_client) _client->close();
                 _connected = false;
                 failCount++;
                 setDtuOnline(false, failCount);
@@ -488,7 +488,7 @@ void taskDTU(void* pvParameters) {
             LOG_W(MOD_DTU, "RealDataNew timeout (%d/%d)", failCount, appConfig.dtuRebootAfterFails);
             setDtuOnline(false, failCount);
             if (failCount >= appConfig.dtuRebootAfterFails) {
-                if (_client) _client->close(true);
+                if (_client) _client->close();
                 _connected = false; failCount = 0;
             }
             continue;
