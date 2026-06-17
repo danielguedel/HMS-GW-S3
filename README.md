@@ -19,12 +19,13 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | ⚡ Solar data | PV1/PV2 power, voltage, current · Grid feed-in · Daily & total energy · Temperature |
 | 🌐 Web dashboard | Live data, GPIO controls, config tabs — responsive Dark Mode SPA at `http://<ip>` |
 | 📡 MQTT | Full publish/subscribe · Home Assistant auto-discovery · OpenDTU-compatible mode |
-| 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/config` |
+| 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/dtu`, `/api/config`, `/api/ota/*` |
 | 🌈 NeoPixel LED | Onboard WS2812B (GPIO38) — 11 states via colour & animation |
 | 🔀 Relay + 3 IO | Switchable via Web GUI, REST API and MQTT · IO1/IO2 (GPIO2/3) suited for future I2C per datasheet |
 | 🔧 Web config | All settings in browser — WiFi, DTU, MQTT, GPIO, System |
-| 🔄 OTA updates | Firmware and filesystem update via web file upload or HTTP URL |
-| 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 18 commands at 115200 baud |
+| 🔄 OTA updates | Firmware/filesystem via web file upload, or by URL (downloads + flashes directly from the gateway) |
+| 🆕 Internet update check | Polls a JSON manifest (e.g. GitHub Releases) for newer versions — one-click install from the web GUI, plus a GitHub Actions workflow to publish releases |
+| 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 19 commands at 115200 baud |
 | 🧵 FreeRTOS | 8 independent tasks on Core 1 — Core 0 reserved for WiFi stack |
 | 🗄️ DataStore | Central in-memory data store — no direct task-to-task dependencies |
 
@@ -46,9 +47,7 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | 4 | IO3 — generic, suited for ADC1_CH3 per datasheet | Output (default) | ✅ |
 | 43/44 | Serial TX/RX | Console 115200 baud | — |
 
-> All GPIO assignments (except Serial TX/RX and BOOT) are configurable via the web GUI and saved to `config.json`. IO1–IO3 are generic — the "suited for" hint is informational (`altFunction` field) and does not restrict usage.
-
-> GPIO2 and GPIO3 are reserved for future I2C sensor support (temperature, humidity etc.) and initialised as high-impedance inputs.
+> All GPIO assignments (except Serial TX/RX and BOOT) are configurable via the web GUI and saved to `config.json`. IO1–IO3 are generic, fully reconfigurable GPIOs that default to `OUTPUT` — the "suited for" hint is purely informational (`altFunction` field) and does not restrict usage. GPIO2/GPIO3 are earmarked for future I2C sensor support (temperature, humidity etc.), but until that's implemented they behave like any other IO.
 
 ---
 
@@ -105,8 +104,11 @@ esptool.py --chip esp32s3 --baud 921600 \
 | `http://<ip>/api/data.json` | Live inverter data (JSON) |
 | `http://<ip>/api/info.json` | System info (JSON) |
 | `http://<ip>/api/gpio` | GPIO state (GET/POST JSON) |
+| `http://<ip>/api/dtu` | DTU status / control commands (GET/POST JSON) |
 | `http://<ip>/update` | OTA firmware upload |
 | `http://<ip>/updatefs` | OTA filesystem upload |
+| `http://<ip>/api/ota/check` | Internet update check status (GET) / trigger manual check (POST) |
+| `http://<ip>/api/ota/url` | Internet update: flash firmware/filesystem from a URL (POST) |
 
 ---
 
@@ -158,6 +160,9 @@ esptool.py --chip esp32s3 --baud 921600 \
 | `io2 on\|off` | Set IO2 |
 | `io3 on\|off` | Set IO3 |
 | `loglevel error\|warn\|info\|debug` | Set log level |
+| `tasks` | FreeRTOS task list |
+| `heap` | Heap usage |
+| `uptime` | Uptime (seconds + d/h/m/s) |
 | `ledtest` | Cycle through all LED states |
 | `restart` | Reboot gateway |
 | `reset` | Factory reset (clears config.json) |
@@ -201,6 +206,32 @@ Enable `mqttHaDiscovery` in config. Entities are published automatically 5 secon
 ### Power Limit Timeout
 
 If `powerLimitTimeout > 0` (seconds), any power limit set via MQTT or web GUI will automatically reset to `powerLimitDefault` (100%) after the timeout — protecting against permanent throttling if the controller loses connection.
+
+---
+
+## Internet Update Check (Manifest-Based OTA)
+
+Configure a manifest URL (`otaManifestUrl` in System config — defaults to this repo's `release/manifest.json` on GitHub) and the gateway will:
+
+- Check it automatically once after each WiFi connect, and on demand via `POST /api/ota/check`
+- Compare the manifest's build number against the running firmware
+- Show the result in the web GUI's "Internet Update" tile, with a one-click **Install** button
+- Download and flash firmware and/or filesystem directly from the URLs in the manifest (`POST /api/ota/url`) — no local file needed
+
+```
+release/manifest.json
+{
+  "version": "0.2.0",
+  "buildNumber": 202,
+  "url":    "https://github.com/<owner>/<repo>/releases/download/<tag>/firmware.bin",
+  "fs_url": "https://github.com/<owner>/<repo>/releases/download/<tag>/littlefs.bin",
+  "notes": "..."
+}
+```
+
+> Note: the external manifest uses `fs_url` (snake_case); the internal `/api/ota/check` and `/api/ota/url` endpoints use `fsUrl` (camelCase) — two distinct JSON schemas for two different purposes.
+
+`.github/workflows/release.yml` (manually triggered, `version` + `notes` inputs) builds firmware and filesystem, publishes a GitHub Release, and updates `release/manifest.json` — so tagging a release is enough to make it discoverable by every deployed gateway.
 
 ---
 
@@ -278,7 +309,12 @@ HMS-GW-S3/
 ├── data/www/
 │   └── index.html            # Web dashboard SPA (LittleFS)
 ├── docs/
-│   └── HMS-GW-S3_Spezifikation_v2.md  # Full architecture specification
+│   ├── HMS-GW-S3_Spezifikation_v2.md  # Full architecture specification
+│   └── code_review.md        # Latest code review findings
+├── release/
+│   └── manifest.json         # Version manifest polled by the Internet update check
+├── .github/workflows/
+│   └── release.yml           # Manual release workflow: build, publish, update manifest
 ├── platformio.ini
 ├── custom_partitions.csv
 └── version_inc.py
