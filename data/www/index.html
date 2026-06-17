@@ -599,7 +599,18 @@ async function saveConfig() {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify(cfg) });
     const d = await r.json();
-    toast(d.ok ? 'Gespeichert' : 'Fehler beim Speichern', !!d.ok);
+    if (d.ok) {
+      toast('Gespeichert — Gateway startet neu…');
+      setTimeout(async () => {
+        try {
+          await fetch('/api/dtu', { method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ rebootGateway: 1 }) });
+        } catch(e) {}
+      }, 500);
+    } else {
+      toast('Fehler beim Speichern', false);
+    }
   } catch (e) { toast('Fehler', false); }
 }
 
