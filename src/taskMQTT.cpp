@@ -258,7 +258,7 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
             if (appConfig.mqttHaDiscovery) {
                 _haIdx    = 0;
                 _haNextMs = millis() + 5000;
-                LOG_I(MOD_MQTT, "HA discovery scheduled in 5s (%d entities)", 16);
+                LOG_I(MOD_MQTT, "HA discovery scheduled in 5s (%d entities)", 15);
             }
             break;
         }

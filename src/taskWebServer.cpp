@@ -119,12 +119,13 @@ static void handleApiDtuPost(AsyncWebServerRequest* req, uint8_t* data,
     }
     if (doc["rebootGateway"].as<int>() == 1) {
         req->send(200, "application/json", "{\"ok\":true}");
-        vTaskDelay(pdMS_TO_TICKS(500)); ESP.restart(); return;
+        xEventGroupSetBits(systemStateEvents, EVT_REBOOT);
+        return;
     }
     if (doc["factoryReset"].as<int>() == 1) {
         req->send(200, "application/json", "{\"ok\":true}");
-        xEventGroupSetBits(systemStateEvents, EVT_FACTORY_RESET);
-        vTaskDelay(pdMS_TO_TICKS(3500)); ESP.restart(); return;
+        xEventGroupSetBits(systemStateEvents, EVT_FACTORY_RESET | EVT_REBOOT);
+        return;
     }
     DataStore::DtuCommand cmd = {};
     if (!doc["powerLimit"].isNull()) {
@@ -182,9 +183,20 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
 
 // ─── POST /api/config ─────────────────────────────────────────────────────────
 static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
-                                 size_t len, size_t /*index*/, size_t /*total*/) {
+                                 size_t len, size_t index, size_t total) {
+    // Accumulate body chunks — ESPAsyncWebServer calls this once per TCP segment
+    static uint8_t bodyBuf[2048];
+    if (index + len > sizeof(bodyBuf)) {
+        if (index + len >= total)
+            req->send(413, "application/json", "{\"error\":\"body too large\"}");
+        return;
+    }
+    memcpy(bodyBuf + index, data, len);
+    if (index + len < total) return;  // wait for remaining chunks
+    size_t bodyLen = index + len;
+
     JsonDocument doc;
-    if (deserializeJson(doc, (char*)data) != DeserializationError::Ok) {
+    if (deserializeJson(doc, bodyBuf, bodyLen) != DeserializationError::Ok) {
         req->send(400, "application/json", "{\"error\":\"invalid json\"}"); return;
     }
 
@@ -266,7 +278,10 @@ static void handleOtaUpload(AsyncWebServerRequest* /*req*/, String filename,
 
 static void handleOtaDone(AsyncWebServerRequest* req) {
     if (Update.hasError()) req->send(500, "text/plain", String("OTA Error: ") + Update.errorString());
-    else { req->send(200, "text/plain", "OTA OK — rebooting..."); vTaskDelay(pdMS_TO_TICKS(500)); ESP.restart(); }
+    else {
+        req->send(200, "text/plain", "OTA OK — rebooting...");
+        xEventGroupSetBits(systemStateEvents, EVT_REBOOT);
+    }
 }
 
 // ─── OTA filesystem upload ────────────────────────────────────────────────────
@@ -337,6 +352,15 @@ void taskWebServer(void* pvParameters) {
     setupRoutes();
 
     for (;;) {
+        // Deferred reboot/factory-reset (set by API callbacks to avoid vTaskDelay on lwIP thread)
+        EventBits_t evBits = xEventGroupGetBits(systemStateEvents);
+        if (evBits & EVT_REBOOT) {
+            uint32_t delayMs = (evBits & EVT_FACTORY_RESET) ? 3500 : 500;
+            if (evBits & EVT_FACTORY_RESET) LittleFS.remove(CONFIG_FILE);
+            vTaskDelay(pdMS_TO_TICKS(delayMs));
+            ESP.restart();
+        }
+
         // Start DNS captive portal on first AP mode detection
         if (!_dnsStarted && (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE)) {
             dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));

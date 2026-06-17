@@ -10,6 +10,7 @@
 #define EVT_DATA_RECEIVED     BIT4
 #define EVT_OTA_RUNNING       BIT5
 #define EVT_FACTORY_RESET     BIT6
+#define EVT_REBOOT            BIT7
 
 extern EventGroupHandle_t systemStateEvents;
 

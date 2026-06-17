@@ -245,15 +245,18 @@ static volatile bool   _connected = false;
 static volatile bool   _dataReady = false;  // RealDataNew response received
 static volatile bool   _cfgReady  = false;  // GetConfig response received
 static volatile bool   _appReady  = false;  // AppInfo response received
-static uint8_t         _rxBuf[2048];
-static volatile size_t _rxLen     = 0;
-static volatile int    _lastError = 0;
+static uint8_t            _rxBuf[2048];
+static volatile size_t    _rxLen     = 0;
+static volatile int       _lastError = 0;
+static SemaphoreHandle_t  _rxMutex   = nullptr;
 static volatile uint32_t _cloudPauseAt = 0;  // millis() of last ERR_RST -14
 
 static void onData(void*, AsyncClient*, void* data, size_t len) {
     size_t copy = len < sizeof(_rxBuf) ? len : sizeof(_rxBuf);
+    xSemaphoreTake(_rxMutex, portMAX_DELAY);
     memcpy(_rxBuf, data, copy);
     _rxLen = copy;
+    xSemaphoreGive(_rxMutex);
     const uint8_t* d = (const uint8_t*)data;
     if (len >= 4) LOG_I(MOD_DTU, "RX %zu bytes: cmd=%02X%02X  %02X %02X ...", len, d[2],d[3],d[0],d[1]);
     // Signal based on what's pending
@@ -363,6 +366,7 @@ static void setDtuCloudBusy(bool busy) {
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
 void taskDTU(void* pvParameters) {
+    _rxMutex = xSemaphoreCreateMutex();
     LOG_I(MOD_DTU, "Task started — target: %s:%d  interval: %ds",
           appConfig.dtuHost, appConfig.dtuPort, appConfig.dtuInterval);
 
@@ -492,8 +496,10 @@ void taskDTU(void* pvParameters) {
             }
             continue;
         }
+        xSemaphoreTake(_rxMutex, portMAX_DELAY);
         localLen = _rxLen;
         memcpy(localBuf, (const uint8_t*)_rxBuf, localLen);
+        xSemaphoreGive(_rxMutex);
 
         DataStore::PvData newPv = dsGetPv();  // keep existing powerLimit / wifiRssi
         if (!parseRealDataNew(localBuf, localLen, newPv)) {
@@ -507,8 +513,10 @@ void taskDTU(void* pvParameters) {
             sendGetConfig(ntpTime);
             if (waitFor(_cfgReady, 3000)) {
                 _cfgReady = false;
+                xSemaphoreTake(_rxMutex, portMAX_DELAY);
                 localLen = _rxLen;
                 memcpy(localBuf, (const uint8_t*)_rxBuf, localLen);
+                xSemaphoreGive(_rxMutex);
                 parseGetConfig(localBuf, localLen, newPv);
             } else {
                 LOG_D(MOD_DTU, "GetConfig timeout (non-fatal)");

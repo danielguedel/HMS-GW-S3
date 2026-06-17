@@ -75,9 +75,14 @@ void configSetDefaults() {
 
 void configLoad() {
     if (!LittleFS.exists(CONFIG_FILE)) {
-        LOG_W(MOD_CFG, "No %s — using defaults", CONFIG_FILE);
-        configSetDefaults();
-        return;
+        if (LittleFS.exists("/config.tmp")) {
+            LOG_W(MOD_CFG, "Recovering config from /config.tmp");
+            LittleFS.rename("/config.tmp", CONFIG_FILE);
+        } else {
+            LOG_W(MOD_CFG, "No %s — using defaults", CONFIG_FILE);
+            configSetDefaults();
+            return;
+        }
     }
     File f = LittleFS.open(CONFIG_FILE, "r");
     if (!f) {
@@ -210,9 +215,13 @@ void configSave() {
     doc["ntpServer"] = appConfig.ntpServer;
     doc["logLevel"]  = appConfig.logLevel;
 
-    File f = LittleFS.open(CONFIG_FILE, "w");
-    if (!f) { LOG_E(MOD_CFG, "Cannot write %s", CONFIG_FILE); return; }
+    // Write to temp file first, then rename — protects against config corruption on reset
+    static const char* TMP_FILE = "/config.tmp";
+    File f = LittleFS.open(TMP_FILE, "w");
+    if (!f) { LOG_E(MOD_CFG, "Cannot write %s", TMP_FILE); return; }
     serializeJson(doc, f);
     f.close();
+    LittleFS.remove(CONFIG_FILE);
+    LittleFS.rename(TMP_FILE, CONFIG_FILE);
     LOG_I(MOD_CFG, "Config saved");
 }
