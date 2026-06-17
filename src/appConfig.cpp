@@ -71,6 +71,7 @@ void configSetDefaults() {
     appConfig.tzOffset  = 3600;                 // UTC+1
     strlcpy(appConfig.ntpServer, "pool.ntp.org", sizeof(appConfig.ntpServer));
     appConfig.logLevel  = LOG_LEVEL_INFO;
+    appConfig.otaManifestUrl[0] = '\0';
 }
 
 void configLoad() {
@@ -168,6 +169,8 @@ void configLoad() {
     if (doc["ntpServer"].is<const char*>())
         strlcpy(appConfig.ntpServer, doc["ntpServer"].as<const char*>(), sizeof(appConfig.ntpServer));
     if (!doc["logLevel"].isNull()) appConfig.logLevel = doc["logLevel"].as<int>();
+    if (doc["otaManifestUrl"].is<const char*>())
+        strlcpy(appConfig.otaManifestUrl, doc["otaManifestUrl"].as<const char*>(), sizeof(appConfig.otaManifestUrl));
 
     LOG_I(MOD_CFG, "Config loaded: ssid=%s  dtu=%s:%d  mqtt=%s:%d",
           appConfig.wifiSsid, appConfig.dtuHost, appConfig.dtuPort,
@@ -216,7 +219,8 @@ void configSave() {
 
     doc["tzOffset"]  = appConfig.tzOffset;
     doc["ntpServer"] = appConfig.ntpServer;
-    doc["logLevel"]  = appConfig.logLevel;
+    doc["logLevel"]       = appConfig.logLevel;
+    doc["otaManifestUrl"] = appConfig.otaManifestUrl;
 
     // Write to temp file first, then rename  -  protects against config corruption on reset
     static const char* TMP_FILE = "/config.tmp";

@@ -137,6 +137,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 .ota-progress { margin-top: 12px; display: none; }
 .ota-status   { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
+/* ── Internet Update card ────────────────────────────────────────────────── */
+.ota-avail { border-color: var(--orange) !important; }
+.ota-info  { font-size: 12px; color: var(--muted); margin-bottom: 12px; min-height: 18px; }
+
 /* ── Toast ───────────────────────────────────────────────────────────────── */
 #toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 18px;
          border-radius: 8px; font-size: 13px; background: var(--surface);
@@ -325,6 +329,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
         </select>
       </label>
     </div>
+    <label>Manifest URL (leer = deaktiviert)
+      <input type="text" id="c-manifest-url" placeholder="https://raw.githubusercontent.com/…/manifest.json">
+    </label>
   </div>
   <div class="btn-row">
     <button class="btn btn-muted" onclick="loadConfig()">Zurücksetzen</button>
@@ -361,6 +368,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     <div class="ota-progress" id="fs-prog">
       <div class="bar-wrap"><div class="bar" id="fs-bar" style="width:0"></div></div>
       <div class="ota-status" id="fs-status">Hochladen…</div>
+    </div>
+  </div>
+
+  <div class="cfg-box" id="ota-check-box">
+    <h3>Internet Update</h3>
+    <div class="ota-info" id="ota-check-info">–</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-muted" id="btn-ota-check" onclick="checkUpdate()">Prüfen</button>
+      <button class="btn btn-ok"    id="btn-ota-install" style="display:none" onclick="installUpdate()">Jetzt installieren</button>
     </div>
   </div>
 
@@ -422,7 +438,7 @@ function showTab(name, btn) {
   $('tab-' + name).classList.add('active');
   btn.classList.add('active');
   if (name === 'config') loadConfig();
-  if (name === 'system') loadSysInfo();
+  if (name === 'system') { loadSysInfo(); loadOtaStatus(); }
 }
 
 // ─── Status dots ──────────────────────────────────────────────────────────
@@ -545,6 +561,7 @@ async function loadConfig() {
     $('c-tz').value          = d.tzOffset           || 3600;
     $('c-led').value         = d.ledBrightness      || 80;
     $('c-loglevel').value    = d.logLevel           || 2;
+    $('c-manifest-url').value = d.otaManifestUrl   || '';
   } catch (e) { toast('Config laden fehlgeschlagen', false); }
 }
 
@@ -570,6 +587,7 @@ async function saveConfig() {
     tzOffset:           +$('c-tz').value,
     ledBrightness:      +$('c-led').value,
     logLevel:           +$('c-loglevel').value,
+    otaManifestUrl:      $('c-manifest-url').value,
   };
   const pass = $('c-pass').value;
   if (pass) cfg.wifiPass = pass;
@@ -630,6 +648,93 @@ function doOta(label, fileId, endpoint) {
   const fd = new FormData();
   fd.append(label, file, file.name);
   xhr.send(fd);
+}
+
+// ─── Internet Update ──────────────────────────────────────────────────────
+async function loadOtaStatus() {
+  try {
+    const d = await fetch('/api/ota/check').then(r => r.json());
+    updateOtaCard(d);
+  } catch(e) {}
+}
+
+function updateOtaCard(d) {
+  const box  = $('ota-check-box');
+  const btn  = $('btn-ota-install');
+  if (d.checking) {
+    txt('ota-check-info', 'Prüfe Manifest…');
+    btn.style.display = 'none';
+    box.classList.remove('ota-avail');
+    return;
+  }
+  if (!d.manifestUrl) {
+    txt('ota-check-info', 'Kein Manifest konfiguriert (Config-Tab)');
+    btn.style.display = 'none';
+    box.classList.remove('ota-avail');
+    return;
+  }
+  if (!d.lastCheckMs) {
+    txt('ota-check-info', 'Noch kein Check durchgeführt');
+    btn.style.display = 'none';
+    box.classList.remove('ota-avail');
+    return;
+  }
+  if (d.available) {
+    const notes = d.notes ? ' — ' + d.notes : '';
+    txt('ota-check-info', 'Update verfügbar: v' + d.version + ' (Build ' + d.buildNumber + ')' + notes);
+    btn.style.display = '';
+    btn.dataset.url   = d.url;
+    box.classList.add('ota-avail');
+  } else {
+    txt('ota-check-info', 'Aktuell — v' + d.currentVersion + ' (Build ' + d.currentBuild + ')');
+    btn.style.display = 'none';
+    box.classList.remove('ota-avail');
+  }
+}
+
+async function checkUpdate() {
+  const btn = $('btn-ota-check');
+  btn.disabled = true;
+  txt('ota-check-info', 'Prüfe…');
+  try {
+    const r = await fetch('/api/ota/check', { method: 'POST' });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      txt('ota-check-info', d.error || 'Fehler (kein Manifest konfiguriert?)');
+      btn.disabled = false;
+      return;
+    }
+    pollOtaCheck();
+  } catch(e) {
+    txt('ota-check-info', 'Verbindungsfehler');
+    btn.disabled = false;
+  }
+}
+
+let _otaPollTimer;
+function pollOtaCheck() {
+  clearTimeout(_otaPollTimer);
+  _otaPollTimer = setTimeout(async () => {
+    try {
+      const d = await fetch('/api/ota/check').then(r => r.json());
+      updateOtaCard(d);
+      if (d.checking) pollOtaCheck();
+      else $('btn-ota-check').disabled = false;
+    } catch(e) { $('btn-ota-check').disabled = false; }
+  }, 1000);
+}
+
+async function installUpdate() {
+  const url = $('btn-ota-install').dataset.url;
+  if (!url) { toast('Keine URL verfügbar', false); return; }
+  if (!confirm('Firmware jetzt installieren?\n' + url)) return;
+  try {
+    await fetch('/api/ota/url', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }) });
+    toast('Update gestartet — Gateway startet nach dem Flash neu');
+    $('btn-ota-install').disabled = true;
+  } catch(e) { toast('Fehler', false); }
 }
 
 // ─── Reboot / Factory Reset ───────────────────────────────────────────────

@@ -59,6 +59,9 @@ struct AppConfig {
     int  tzOffset;              // Zeitzone-Offset [s], default: 3600 (UTC+1)
     char ntpServer[65];         // default: "pool.ntp.org"
     int  logLevel;              // 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
+
+    // Internet OTA
+    char otaManifestUrl[256];   // URL zum Versions-Manifest (leer = deaktiviert)
 };
 
 extern AppConfig appConfig;

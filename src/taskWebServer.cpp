@@ -23,7 +23,9 @@ static bool           _dnsStarted  = false;
 static bool           _otaFwError  = false;
 static bool           _otaFsError  = false;
 static char           _otaUrl[512] = "";
-static volatile bool  _otaUrlPending = false;
+static volatile bool  _otaUrlPending   = false;
+static volatile bool  _otaCheckPending = false;
+static bool           _bootCheckDone   = false;
 
 // --- GET /api/data.json  (Spec §6.2) -----------------------------------------
 static void handleApiData(AsyncWebServerRequest* req) {
@@ -179,9 +181,10 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
     }
     doc["ledPin"]        = appConfig.ledPin;
     doc["ledBrightness"] = appConfig.ledBrightness;
-    doc["tzOffset"]      = appConfig.tzOffset;
-    doc["ntpServer"]     = appConfig.ntpServer;
-    doc["logLevel"]      = appConfig.logLevel;
+    doc["tzOffset"]        = appConfig.tzOffset;
+    doc["ntpServer"]       = appConfig.ntpServer;
+    doc["logLevel"]        = appConfig.logLevel;
+    doc["otaManifestUrl"]  = appConfig.otaManifestUrl;
     String out; serializeJson(doc, out);
     req->send(200, "application/json", out);
 }
@@ -258,6 +261,8 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     if (doc["ntpServer"].is<const char*>())
         strlcpy(appConfig.ntpServer, doc["ntpServer"].as<const char*>(), sizeof(appConfig.ntpServer));
     if (!doc["logLevel"].isNull()) appConfig.logLevel = doc["logLevel"].as<int>();
+    if (doc["otaManifestUrl"].is<const char*>())
+        strlcpy(appConfig.otaManifestUrl, doc["otaManifestUrl"].as<const char*>(), sizeof(appConfig.otaManifestUrl));
 
     configSave();
     LOG_I(MOD_WEB, "Config saved via API");
@@ -316,6 +321,82 @@ static void handleFsUpload(AsyncWebServerRequest* /*req*/, String filename,
         else                  LOG_E(MOD_OTA, "FS OTA error: %s", Update.errorString());
         xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
     }
+}
+
+// --- Internet OTA: Manifest-Check -------------------------------------------
+static void doOtaCheck() {
+    if (!strlen(appConfig.otaManifestUrl)) return;
+
+    DataStore::OtaInfo info = {};
+    info.checking = true;
+    dsSetOtaInfo(info);
+    LOG_I(MOD_OTA, "OTA check: %s", appConfig.otaManifestUrl);
+
+    HTTPClient http;
+    http.setTimeout(10000);
+    if (!http.begin(appConfig.otaManifestUrl)) {
+        LOG_E(MOD_OTA, "OTA check: http.begin failed");
+        info.checking = false; dsSetOtaInfo(info); return;
+    }
+    int code = http.GET();
+    if (code != HTTP_CODE_OK) {
+        LOG_E(MOD_OTA, "OTA check: HTTP %d", code);
+        http.end(); info.checking = false; dsSetOtaInfo(info); return;
+    }
+    String body = http.getString();
+    http.end();
+
+    JsonDocument doc;
+    if (deserializeJson(doc, body) != DeserializationError::Ok) {
+        LOG_E(MOD_OTA, "OTA check: JSON parse error");
+        info.checking = false; dsSetOtaInfo(info); return;
+    }
+
+    info.checking     = false;
+    info.lastCheckMs  = millis();
+    info.buildNumber  = doc["buildNumber"].as<int>();
+    info.available    = (info.buildNumber > BUILD_NUMBER);
+    const char* ver   = doc["version"].as<const char*>();
+    const char* url   = doc["url"].as<const char*>();
+    const char* notes = doc["notes"].as<const char*>();
+    strlcpy(info.version, ver   ? ver   : "", sizeof(info.version));
+    strlcpy(info.url,     url   ? url   : "", sizeof(info.url));
+    strlcpy(info.notes,   notes ? notes : "", sizeof(info.notes));
+    dsSetOtaInfo(info);
+
+    if (info.available)
+        LOG_I(MOD_OTA, "Update available: v%s (build %d), current build %d",
+              info.version, info.buildNumber, BUILD_NUMBER);
+    else
+        LOG_I(MOD_OTA, "Firmware up to date (build %d)", BUILD_NUMBER);
+}
+
+// --- GET /api/ota/check -------------------------------------------------------
+static void handleApiOtaCheckGet(AsyncWebServerRequest* req) {
+    DataStore::OtaInfo info = dsGetOtaInfo();
+    JsonDocument doc;
+    doc["checking"]       = info.checking;
+    doc["available"]      = info.available;
+    doc["version"]        = info.version;
+    doc["buildNumber"]    = info.buildNumber;
+    doc["url"]            = info.url;
+    doc["notes"]          = info.notes;
+    doc["lastCheckMs"]    = info.lastCheckMs;
+    doc["currentVersion"] = FW_VERSION;
+    doc["currentBuild"]   = BUILD_NUMBER;
+    doc["manifestUrl"]    = appConfig.otaManifestUrl;
+    String out; serializeJson(doc, out);
+    req->send(200, "application/json", out);
+}
+
+// --- POST /api/ota/check (trigger manual check) ------------------------------
+static void handleApiOtaCheckPost(AsyncWebServerRequest* req) {
+    if (!strlen(appConfig.otaManifestUrl)) {
+        req->send(400, "application/json", "{\"error\":\"no manifest url configured\"}");
+        return;
+    }
+    _otaCheckPending = true;
+    req->send(200, "application/json", "{\"ok\":true}");
 }
 
 // --- POST /api/ota/url  (Internet OTA  -  Spec §10.2) ------------------------
@@ -448,6 +529,9 @@ static void setupRoutes() {
     server.on("/api/ota/url", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
         [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiOtaUrl(r,d,l,i,t); });
 
+    server.on("/api/ota/check", HTTP_GET,  handleApiOtaCheckGet);
+    server.on("/api/ota/check", HTTP_POST, handleApiOtaCheckPost);
+
     // Static files  -  registered LAST so API routes take priority
     server.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
 
@@ -480,6 +564,19 @@ void taskWebServer(void* pvParameters) {
             if (evBits & EVT_FACTORY_RESET) LittleFS.remove(CONFIG_FILE);
             vTaskDelay(pdMS_TO_TICKS(delayMs));
             ESP.restart();
+        }
+
+        // Boot-time manifest check (once, after WiFi is connected)
+        if (!_bootCheckDone && strlen(appConfig.otaManifestUrl) &&
+            (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_CONNECTED)) {
+            _bootCheckDone = true;
+            doOtaCheck();
+        }
+
+        // Manual manifest check triggered via POST /api/ota/check
+        if (_otaCheckPending) {
+            _otaCheckPending = false;
+            doOtaCheck();
         }
 
         // URL-OTA: download and flash in task context (not in lwIP callback)

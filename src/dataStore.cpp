@@ -41,6 +41,9 @@ void dsInit() {
 
     // DtuCommand  -  kein Befehl ausstehend
     memset(&ds.dtuCmd, 0, sizeof(ds.dtuCmd));
+
+    // OtaInfo  -  kein Check durchgeführt
+    memset(&ds.otaInfo, 0, sizeof(ds.otaInfo));
 }
 
 // --- Lesen --------------------------------------------------------------------
@@ -118,6 +121,19 @@ void dsSetDtuCommand(const DataStore::DtuCommand& cmd) {
 void dsClearDtuCommand() {
     xSemaphoreTake(ds.mutex, portMAX_DELAY);
     memset(&ds.dtuCmd, 0, sizeof(ds.dtuCmd));
+    xSemaphoreGive(ds.mutex);
+}
+
+DataStore::OtaInfo dsGetOtaInfo() {
+    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    DataStore::OtaInfo copy = ds.otaInfo;
+    xSemaphoreGive(ds.mutex);
+    return copy;
+}
+
+void dsSetOtaInfo(const DataStore::OtaInfo& info) {
+    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    ds.otaInfo = info;
     xSemaphoreGive(ds.mutex);
 }
 

@@ -77,6 +77,17 @@ struct DataStore {
         bool    inverterOnValue;
     } dtuCmd;
 
+    // -- Internet-OTA-Status (written by taskWebServer) ------------------------
+    struct OtaInfo {
+        bool     available;          // neuere Version gefunden
+        bool     checking;           // Manifest-Check läuft gerade
+        char     version[32];        // Version aus Manifest
+        int      buildNumber;        // Build-Nummer aus Manifest
+        char     url[256];           // Firmware-Download-URL
+        char     notes[128];         // Release-Notes
+        uint32_t lastCheckMs;        // millis() des letzten Checks (0 = noch nie)
+    } otaInfo;
+
     // -- Mutex ------------------------------------------------------------------
     SemaphoreHandle_t mutex;
 };
@@ -94,6 +105,7 @@ DataStore::SystemStatus dsGetSystem();
 DataStore::GpioState    dsGetGpio();
 DataStore::GpioCommand  dsGetGpioCommand();  // atomic read + clears pending
 DataStore::DtuCommand   dsGetDtuCommand();
+DataStore::OtaInfo      dsGetOtaInfo();
 
 // Schreiben (atomisch mit Mutex)
 void dsSetPv(const DataStore::PvData& data);
@@ -102,6 +114,7 @@ void dsSetGpio(const DataStore::GpioState& state);
 void dsSetGpioCommand(int target, bool state);
 void dsSetDtuCommand(const DataStore::DtuCommand& cmd);
 void dsClearDtuCommand();
+void dsSetOtaInfo(const DataStore::OtaInfo& info);
 
 // Convenience
 bool dsIsDtuOnline();
