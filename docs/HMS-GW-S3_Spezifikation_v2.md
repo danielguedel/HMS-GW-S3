@@ -634,6 +634,7 @@ Im Web-GUI unter System → OTA:
 - Firmware- und Filesystem-Update laufen sequenziell — beide Flags werden vor jedem `LOG_I` gesetzt, um eine Race Condition mit dem Reboot zu vermeiden (Fix in Commit `07ffd0d`)
 - Kein WebSocket/Live-Fortschritt im Browser — Status wird über `GET /api/ota/check` gepollt
 - Keine Signatur-/Hash-Prüfung implementiert
+- **Config-Erhalt bei Filesystem-Update:** Ein Filesystem-OTA (`U_SPIFFS`) überschreibt die komplette LittleFS-Partition mit dem CI-Build-Image (nur `data/www/*`, kein `/config.json`). Seit dem Fix vom 2026-06-17 (Produktionsvorfall, siehe `docs/code_review.md` §0) wird `/config.json` vor dem Schreiben in den RAM gesichert und danach zurückgeschrieben (`backupConfigBeforeFsOta()`/`restoreConfigAfterFsOta()` in `taskWebServer.cpp`) — sowohl beim lokalen Upload (`/updatefs`) als auch beim Internet-URL-OTA.
 
 ### 10.3 Internet-OTA-Versionscheck (Manifest)
 

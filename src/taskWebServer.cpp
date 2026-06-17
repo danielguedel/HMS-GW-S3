@@ -29,6 +29,34 @@ static volatile bool  _otaUrlPending   = false;
 static volatile bool  _otaFsUrlPending = false;
 static volatile bool  _otaCheckPending = false;
 static bool           _bootCheckDone   = false;
+static String         _fsOtaConfigBackup;  // /config.json content, preserved across a U_SPIFFS OTA write
+
+// A Filesystem-OTA (Update.begin(..., U_SPIFFS)) overwrites the entire LittleFS
+// partition with the CI-built image, which only contains data/www/* -  the
+// runtime-persisted /config.json lives on the same partition and would
+// otherwise be wiped, resetting WiFi/DTU/MQTT/GPIO config to factory defaults.
+static void backupConfigBeforeFsOta() {
+    File f = LittleFS.open(CONFIG_FILE, "r");
+    if (!f) { _fsOtaConfigBackup = ""; return; }
+    _fsOtaConfigBackup = f.readString();
+    f.close();
+    LOG_I(MOD_OTA, "Backed up %s (%u B) before filesystem OTA", CONFIG_FILE, (unsigned)_fsOtaConfigBackup.length());
+}
+
+static void restoreConfigAfterFsOta() {
+    if (_fsOtaConfigBackup.length() == 0) return;
+    LittleFS.end();
+    if (!LittleFS.begin()) {
+        LOG_E(MOD_OTA, "LittleFS remount failed after filesystem OTA  -  cannot restore %s", CONFIG_FILE);
+        return;
+    }
+    File f = LittleFS.open(CONFIG_FILE, "w");
+    if (!f) { LOG_E(MOD_OTA, "Cannot reopen %s to restore config after filesystem OTA", CONFIG_FILE); return; }
+    f.print(_fsOtaConfigBackup);
+    f.close();
+    _fsOtaConfigBackup = "";
+    LOG_I(MOD_OTA, "Restored %s after filesystem OTA", CONFIG_FILE);
+}
 
 // --- GET /api/data.json  (Spec §6.2) -----------------------------------------
 static void handleApiData(AsyncWebServerRequest* req) {
@@ -311,6 +339,7 @@ static void handleFsUpload(AsyncWebServerRequest* /*req*/, String filename,
         LOG_I(MOD_OTA, "FS OTA start: %s", filename.c_str());
         xEventGroupSetBits(systemStateEvents, EVT_OTA_RUNNING);
         setLedState(LED_OTA);
+        backupConfigBeforeFsOta();
         if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
             LOG_E(MOD_OTA, "FS Update.begin failed");
             _otaFsError = true;
@@ -320,8 +349,13 @@ static void handleFsUpload(AsyncWebServerRequest* /*req*/, String filename,
     if (_otaFsError) return;
     if (Update.write(data, len) != len) LOG_E(MOD_OTA, "FS write error at %zu", index);
     if (final) {
-        if (Update.end(true)) LOG_I(MOD_OTA, "FS OTA OK: %zu B", index + len);
-        else                  LOG_E(MOD_OTA, "FS OTA error: %s", Update.errorString());
+        if (Update.end(true)) {
+            LOG_I(MOD_OTA, "FS OTA OK: %zu B", index + len);
+            restoreConfigAfterFsOta();
+        } else {
+            LOG_E(MOD_OTA, "FS OTA error: %s", Update.errorString());
+            restoreConfigAfterFsOta();  // partition left in an unknown state -  best effort
+        }
         xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
     }
 }
@@ -466,6 +500,8 @@ static bool doUrlOtaPartition(const char* url, int partition) {
     int contentLen = http.getSize();
     LOG_I(MOD_OTA, "URL-OTA %s size: %d B", tag, contentLen);
 
+    if (partition == U_SPIFFS) backupConfigBeforeFsOta();
+
     if (!Update.begin(contentLen > 0 ? (size_t)contentLen : UPDATE_SIZE_UNKNOWN, partition)) {
         LOG_E(MOD_OTA, "URL-OTA %s Update.begin failed: %s", tag, Update.errorString());
         http.end();
@@ -504,13 +540,19 @@ static bool doUrlOtaPartition(const char* url, int partition) {
     }
 
     http.end();
-    if (writeErr) { Update.abort(); return false; }
+    if (writeErr) {
+        Update.abort();
+        if (partition == U_SPIFFS) restoreConfigAfterFsOta();  // partition left in an unknown state -  best effort
+        return false;
+    }
 
     if (Update.end(true)) {
         LOG_I(MOD_OTA, "URL-OTA %s complete: %zu B", tag, written);
+        if (partition == U_SPIFFS) restoreConfigAfterFsOta();
         return true;
     }
     LOG_E(MOD_OTA, "URL-OTA %s end failed: %s", tag, Update.errorString());
+    if (partition == U_SPIFFS) restoreConfigAfterFsOta();
     return false;
 }
 

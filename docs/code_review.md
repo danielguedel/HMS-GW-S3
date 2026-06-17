@@ -12,6 +12,26 @@ Das vorherige Review (Basis: Commit `4c4983d`/`4bc063a`, 2026-06-15/16) ist inzw
 
 ---
 
+## 0. Update 2026-06-17 (Produktionsvorfall) — Config-Verlust bei Filesystem-OTA
+
+Nach diesem Review trat auf einem produktiven Gateway ein realer Vorfall auf: ein Internet-OTA (Firmware + Filesystem) führte dazu, dass nach dem Reboot WiFi/DTU/MQTT/GPIO-Konfiguration komplett auf Werkseinstellungen zurückgesetzt waren. Per Serial-Log eindeutig belegt:
+
+```
+[INF] [OTA ] URL-OTA FS complete: 524288 B
+... (Reboot) ...
+[E] open(): /littlefs/config.json does not exist, no permits for creation
+[E] open(): /littlefs/config.tmp does not exist, no permits for creation
+[E][WiFiSTA.cpp:232] begin(): SSID too long or missing!
+```
+
+**Root Cause:** `Update.begin(..., U_SPIFFS)` (sowohl in `handleFsUpload()` als auch in `doUrlOtaPartition()`) überschreibt die komplette LittleFS-Partition mit dem von CI gebauten `littlefs.bin`, das nur `data/www/*` enthält — `/config.json` ist bewusst gitignored und nie Teil des Build-Images. Jedes Filesystem-OTA (egal ob lokaler Upload oder Internet-URL) hat daher bisher zwangsläufig die laufzeit-persistierte Config gelöscht.
+
+**Fix:** `backupConfigBeforeFsOta()`/`restoreConfigAfterFsOta()` in `taskWebServer.cpp` — sichert `/config.json` vor dem `Update.begin(..., U_SPIFFS)`-Aufruf in den RAM, remounted LittleFS nach `Update.end()` und schreibt die Config zurück. In beiden FS-OTA-Pfaden (Upload + URL) sowie deren Fehlerpfaden (best effort) verdrahtet.
+
+Dieser Befund hätte bei der vorherigen Review-Runde auffallen können/sollen — die Internet-OTA-Implementierung wurde zwar gegen die Spec abgeglichen, aber nicht gegen den Effekt eines `U_SPIFFS`-Updates auf bereits vorhandene Laufzeitdateien auf derselben Partition geprüft.
+
+---
+
 ## 1. Spezifikations-Konformität
 
 Die Spezifikation wurde vor diesem Review gegen den Code abgeglichen und aktualisiert (DataStore-API, EventGroup-Bits, Web-API-Endpunkte, AppConfig-Felder, Internet-OTA-Ablauf, Logger-Farben, Konsolen-Kommandos, Web-Dashboard-Tabs). Es bestehen daher **keine offenen Abweichungen** zwischen Code und Spec — mit zwei Ausnahmen, die in der Spec selbst explizit als "geplant, noch nicht implementiert" markiert sind:
