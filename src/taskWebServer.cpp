@@ -426,16 +426,18 @@ static void handleApiOtaUrl(AsyncWebServerRequest* req, uint8_t* data,
     if ((!url || strlen(url) == 0) && (!fsUrl || strlen(fsUrl) == 0)) {
         req->send(400, "application/json", "{\"error\":\"url missing\"}"); return;
     }
+    // Set both flags before any LOG_I to avoid race with task loop on Core 1
+    // (LOG_I blocks ~8ms at 115200 baud, enough for Core 1 to see a partial state)
     if (url && strlen(url)) {
         strlcpy(_otaUrl, url, sizeof(_otaUrl));
         _otaUrlPending = true;
-        LOG_I(MOD_OTA, "FW-URL queued: %s", _otaUrl);
     }
     if (fsUrl && strlen(fsUrl)) {
         strlcpy(_otaFsUrl, fsUrl, sizeof(_otaFsUrl));
         _otaFsUrlPending = true;
-        LOG_I(MOD_OTA, "FS-URL queued: %s", _otaFsUrl);
     }
+    if (_otaUrlPending)   LOG_I(MOD_OTA, "FW-URL queued: %s", _otaUrl);
+    if (_otaFsUrlPending) LOG_I(MOD_OTA, "FS-URL queued: %s", _otaFsUrl);
     req->send(200, "application/json", "{\"ok\":true}");
 }
 
