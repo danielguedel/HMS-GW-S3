@@ -16,6 +16,7 @@
 #include <Update.h>
 #include <DNSServer.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
 static AsyncWebServer server(WEB_DEFAULT_PORT);
 static DNSServer      dnsServer;
@@ -431,9 +432,12 @@ static void doUrlOta() {
     setLedState(LED_OTA);
     xEventGroupSetBits(systemStateEvents, EVT_OTA_RUNNING);
 
+    WiFiClientSecure client;
+    client.setInsecure();  // GitHub uses HTTPS; skip cert verification
     HTTPClient http;
-    http.setTimeout(15000);
-    if (!http.begin(_otaUrl)) {
+    http.setTimeout(30000);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);  // GitHub releases redirect to CDN
+    if (!http.begin(client, _otaUrl)) {
         LOG_E(MOD_OTA, "URL-OTA http.begin failed");
         xEventGroupClearBits(systemStateEvents, EVT_OTA_RUNNING);
         return;

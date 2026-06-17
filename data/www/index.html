@@ -684,6 +684,8 @@ function updateOtaCard(d) {
     txt('ota-check-info', 'Update verfügbar: v' + d.version + ' (Build ' + d.buildNumber + ')' + notes);
     btn.style.display = '';
     btn.dataset.url   = d.url;
+    btn.disabled      = false;
+    btn.textContent   = 'Jetzt installieren';
     box.classList.add('ota-avail');
   } else {
     txt('ota-check-info', 'Aktuell — v' + d.currentVersion + ' (Build ' + d.currentBuild + ')');
@@ -733,6 +735,7 @@ async function installUpdate() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }) });
     toast('Update gestartet — Gateway startet nach dem Flash neu');
+    txt('btn-ota-install', 'Lädt…');
     $('btn-ota-install').disabled = true;
   } catch(e) { toast('Fehler', false); }
 }
