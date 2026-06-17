@@ -2,17 +2,20 @@
 #include <Arduino.h>
 #include "appConfig.h"
 
+// Module name column width (change here to realign all log output)
+#define LOG_MOD_WIDTH 4
+
 // Modules
-#define MOD_SYS    "SYS   "
-#define MOD_DTU    "DTU   "
-#define MOD_MQTT   "MQTT  "
-#define MOD_WEB    "WEB   "
-#define MOD_GPIO   "GPIO  "
-#define MOD_LED    "LED   "
-#define MOD_CFG    "CFG   "
-#define MOD_OTA    "OTA   "
-#define MOD_DATA   "DATA  "
-#define MOD_WIFI   "WIFI  "
+#define MOD_SYS    "SYS"
+#define MOD_DTU    "DTU"
+#define MOD_MQTT   "MQTT"
+#define MOD_WEB    "WEB"
+#define MOD_GPIO   "GPIO"
+#define MOD_LED    "LED"
+#define MOD_CFG    "CFG"
+#define MOD_OTA    "OTA"
+#define MOD_DATA   "DATA"
+#define MOD_WIFI   "WIFI"
 
 void logInit();
 void logMsg(uint8_t level, const char* module, const char* fmt, ...);
