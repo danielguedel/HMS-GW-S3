@@ -37,6 +37,8 @@ header h1 { font-size: 17px; font-weight: 700; color: var(--accent);
 .hdr-info  { display: flex; align-items: center; gap: 8px; font-size: 12px;
              color: var(--muted); flex-wrap: wrap; }
 .hdr-sep   { color: var(--accent); }
+.hdr-sep.warn  { color: var(--orange); }
+.hdr-sep.muted { color: var(--muted); }
 .hdr-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .dot-wrap   { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
@@ -647,6 +649,7 @@ function updateStatusBadge() {
   else if (_invActive === false) { cls = 'muted'; key = 'statStandby'; }
   else                            { cls = 'muted'; key = 'statNoData'; }
   $('s-active').innerHTML = '<span class="status-text ' + cls + '">' + tr(key) + '</span>';
+  document.querySelectorAll('.hdr-sep').forEach(el => el.className = 'hdr-sep ' + cls);
 }
 
 async function refreshData() {
