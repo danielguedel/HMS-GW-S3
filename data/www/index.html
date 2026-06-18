@@ -650,7 +650,7 @@ function updateStatusBadge() {
   else                            { cls = 'muted'; key = 'statNoData'; }
   $('s-active').innerHTML = '<span class="status-text ' + cls + '">' + tr(key) + '</span>';
   document.querySelectorAll('.hdr-sep').forEach(el => el.className = 'hdr-sep ' + cls);
-  ['grid-p', 'pv0-p', 'pv1-p'].forEach(id => $(id).className = 'card-val ' + cls);
+  ['grid-p', 'pv0-p', 'pv1-p', 's-temp', 's-limit', 's-de', 's-te'].forEach(id => $(id).className = 'card-val ' + cls);
   ['bar-grid', 'bar-pv0', 'bar-pv1'].forEach(id => $(id).className = 'bar ' + cls);
 }
 
