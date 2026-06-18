@@ -157,8 +157,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 .status-card { background: var(--surface); border: 1px solid var(--border);
                border-radius: 10px; padding: 12px 16px; margin-bottom: 18px;
                display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
-.status-item { font-size: 12px; color: var(--muted); }
-.status-item strong { color: var(--text); }
+.status-item { font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 5px; }
+.status-item strong { color: var(--text); font-weight: 700; }
+.stat-label  { font-size: 11px; font-weight: 600; color: var(--blue);
+               text-transform: uppercase; letter-spacing: .5px; }
 </style>
 </head>
 <body>
@@ -196,10 +198,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 
   <!-- Status bar -->
   <div class="status-card" id="status-bar" style="display:none">
-    <div class="status-item"><span data-i18n="statTemp">Temp</span> <strong id="s-temp">–</strong> °C</div>
-    <div class="status-item"><span data-i18n="statLimit">Limit</span> <strong id="s-limit">–</strong> %</div>
-    <div class="status-item"><span data-i18n="statYieldToday">Yield today</span> <strong id="s-de">–</strong> kWh</div>
-    <div class="status-item"><span data-i18n="statTotal">Total</span> <strong id="s-te">–</strong> kWh</div>
+    <div class="status-item"><span class="stat-label" data-i18n="statTemp">Temp</span><strong id="s-temp">–</strong> °C</div>
+    <div class="status-item"><span class="stat-label" data-i18n="statLimit">Limit</span><strong id="s-limit">–</strong> %</div>
+    <div class="status-item"><span class="stat-label" data-i18n="statYieldToday">Yield today</span><strong id="s-de">–</strong> kWh</div>
+    <div class="status-item"><span class="stat-label" data-i18n="statTotal">Total</span><strong id="s-te">–</strong> kWh</div>
     <div class="status-item" id="s-active"></div>
   </div>
 
