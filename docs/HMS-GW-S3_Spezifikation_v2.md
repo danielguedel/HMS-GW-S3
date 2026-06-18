@@ -590,46 +590,67 @@ Gespeichert als JSON in LittleFS (`/config.json`).
 
 Anlehnung an **Shelly Web-UI**: modern, aufgeräumt, professionell.
 
-- **Dark Mode** als Standard (umschaltbar, Präferenz wird lokal gespeichert)
-- Farbpalette: Dunkelgrau `#1a1a2e` / `#16213e` Hintergrund, Akzentfarbe Grün `#00b894` für Produktionsdaten
+- **Dark Mode** als Standard (umschaltbar via Icon-Button, Präferenz wird in `localStorage` gespeichert)
+- **Zweisprachig** (Englisch Default, Deutsch umschaltbar via Flaggen-Icon-Button links vom Dark/Light-Toggle, Präferenz in `localStorage`) — `I18N`-Objekt (`en`/`de`) + `data-i18n`/`data-i18n-ph`-Attribute + `tr(key, ...args)`-Lookup, analog zum Theme-Toggle-Muster
+- Farbpalette: Dunkelgrau `#1a1a2e` / `#16213e` Hintergrund, Akzentfarbe Grün `#00b894` für Produktionsdaten/aktiven Status, Orange für Warnungen/Offline-Zustände, Grau für neutrale/Standby-Zustände
 - Typografie: System-Font-Stack (`-apple-system, BlinkMacSystemFont, "Segoe UI"`)
+- Titel/Sektionsüberschriften einheitlich in Blau, Großschreibung (`.card-title`, `.sec`, `.cfg-box h3`, `.gpio-name`)
 - Karten-Layout (Cards) für Dashboard-Elemente
 - Responsive: Mobile-first, funktioniert auf Smartphone ohne Zoomen
 - Keine externen Abhängigkeiten — alles in `index.html` (inline CSS + JS)
-- Auto-Refresh alle 10 Sekunden via Fetch API
+- Auto-Refresh: PV-Daten alle 10s (`refreshData()`), Verbindungsstatus/Header-Info alle 15s (`refreshInfo()`), Uhrzeit/Datum im Header jede Sekunde (`tickClock()`)
+
+**Header:** Links Titel "⚡ HMS-GW-S3" plus Info-Leiste (MAC-Adresse | Firmware+Build | Datum | Uhrzeit, getrennt durch `.hdr-sep`-Striche). Rechts Sprach-Toggle und Dark/Light-Toggle. Datum/Uhrzeit-Format ist fix `TT.MM.JJJJ` / `HH:MM:SS` (`fmtDate()`/`fmtTime()`), unabhängig von der UI-Sprache — identisch zum Format im System-Tab (`loadSysInfo()`).
 
 ### 9.2 Dashboard-Tab — PV-Output-Anzeige
 
 ```
-┌─────────────────────────────────────────────┐
-│  HMS-GW-S3          🌙  ⚙️  ℹ️              │  ← Header + Dark/Light Toggle
-├─────────────────────────────────────────────┤
-│  Temp 45.2°C  Limit 100%  Ertrag heute 3.04  │  ← Status-Bar (Temp/Limit/
-│  Gesamt 241.4 kWh   ● Aktiv                  │     Tagesertrag/Gesamt/Active)
-├─────────────────────────────────────────────┤
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │  Grid    │  │  PV1     │  │  PV2     │  │  ← Power-Karten: Leistung [W]
-│  │ 610 W    │  │ 353 W    │  │ 296 W    │  │     + Balkenanzeige (% von
-│  │ ▓▓▓▓░░░  │  │ ▓▓▓░░░░  │  │ ▓▓░░░░░  │  │     einem Max-Wert) + Sub-
-│  │241.9V/2.5A│  │ 26.6V/1.3A│ │ 27.7V/1.1A│ │     Zeile Spannung/Strom
-│  └──────────┘  └──────────┘  └──────────┘  │
-│  Leistungsbegrenzung                         │
-│  [════════●══] 100%          [ Setzen ]     │  ← Slider 2–100% + Button
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  ⚡ HMS-GW-S3  MAC|FW+Build|Datum|Uhrzeit   🇬🇧 🌙   │  ← Header
+├───────────────────────┬───────────────────────────────┤
+│  Status               │  Power Limit                   │
+│  ACTIVE                │  [════════●══] 100%  [ Set ]  │  ← Status-Card +
+├──────┬──────┬─────────┼─────────────────────────────┤     Power-Limit-Card
+│ Temp │Limit │Yield tdy│ Total                          │  ← Temp/Limit/Yield/
+│45.2°C│ 100% │ 3.04 kWh│ 241.4 kWh                      │     Total-Karten
+├──────┴──────┴─────────┴─────────────────────────────┤
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  Grid    │  │  PV1     │  │  PV2     │            │  ← Power-Karten: Leistung [W]
+│  │ 610 W    │  │ 353 W    │  │ 296 W    │            │     + Balkenanzeige (% von
+│  │ ▓▓▓▓░░░  │  │ ▓▓▓░░░░  │  │ ▓▓░░░░░  │            │     einem Max-Wert) + Sub-
+│  │241.9V/2.5A│  │ 26.6V/1.3A│ │ 27.7V/1.1A│           │     Zeile Spannung/Strom
+│  └──────────┘  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────────────────┘
 ```
 
-Die Karten werden alle 10s per `GET /api/data.json` aktualisiert (`pv0`/`pv1`/`grid` → Leistung, Balkenbreite, Spannung/Strom-Subzeile; `inverter` → Status-Bar Temp/Limit/Active). Tagesertrag/Gesamtertrag in der Status-Bar stammen aus `pv0.dE+pv1.dE+grid.dE` bzw. den `tE`-Feldern.
+Die Karten werden alle 10s per `GET /api/data.json` aktualisiert (`pv0`/`pv1`/`grid` → Leistung, Balkenbreite, Spannung/Strom-Subzeile; `inverter` → Temp/Limit-Karten). Tagesertrag/Gesamtertrag-Karten stammen aus `pv0.dE+pv1.dE+grid.dE` bzw. den `tE`-Feldern. Alle vier Karten (Temp/Limit/Yield/Total) sind immer sichtbar und zeigen `–` als Platzhalter, solange keine gültigen Daten vorliegen — sie werden NICHT mehr ausgeblendet (anders als in einer früheren Version).
 
-**Browser-Tab-Titel:** Bei jedem Refresh wird `document.title` auf die aktuelle Netzleistung gesetzt, z.B. `"610 W — HMS-GW-S3"` (`index.html:455`) — ermöglicht das Ablesen des aktuellen Ertrags auch bei minimiertem/inaktivem Browser-Tab (z.B. mehrere Tabs im Überblick).
+**Status-Anzeige (zentral über `updateStatusBadge()`):** Die Status-Card kombiniert zwei unabhängige Datenquellen zu einem von vier Zuständen:
+- `dtuOnline` aus `GET /api/info.json` (`dtu`-Feld) — DTU-Verbindung
+- `inverter.active` aus `GET /api/data.json` — Einspeisung läuft
+
+| Zustand | Bedingung | Farbe |
+|---|---|---|
+| **Offline** | `dtuOnline === false` | Orange (`var(--orange)`) |
+| **Active** | DTU online + `inverter.active === true` | Grün (`var(--accent)`) |
+| **Standby** | DTU online + `inverter.active === false` | Grau (`var(--muted)`) |
+| **No data** (Übergang) | DTU online, aber noch keine PV-Daten empfangen | Grau (`var(--muted)`) |
+
+Die Status-Card stellt den Zustand als farbigen Text im selben Schriftstil wie der Header-Titel "HMS-GW-S3" dar (`status-text`, 17px/700/.5px Letter-Spacing) — keine Pillen-Badge, kein Punkt-Indikator. Dieselbe Farbklasse (leer/`warn`/`muted`) wird zusätzlich synchron auf folgende Elemente angewendet, sodass das gesamte Dashboard den Verbindungs-/Betriebszustand widerspiegelt:
+- Header-Trennstriche (`.hdr-sep`)
+- Grid/PV1/PV2-Werte und Fortschrittsbalken (`.card-val`/`.bar`) — PV1/PV2 haben dadurch bewusst **keine** eigene Kennfarbe (vorher Blau/Orange) mehr, eine farbliche Unterscheidung der Quellen wurde als nicht nötig erachtet
+- Temp/Limit/Yield-heute/Total-Werte (`s-temp`/`s-limit`/`s-de`/`s-te`)
+
+**Browser-Tab-Titel:** Bei jedem Refresh mit gültigen Daten wird `document.title` auf die aktuelle Netzleistung gesetzt, z.B. `"610 W — HMS-GW-S3"` — ermöglicht das Ablesen des aktuellen Ertrags auch bei minimiertem/inaktivem Browser-Tab (z.B. mehrere Tabs im Überblick).
 
 ### 9.3 Seiten (Tabs)
 
 Vier Tabs in der Hauptnavigation (`nav button`, `showTab()`):
 
-- **Dashboard** — PV-Output (Grid/PV1/PV2-Karten), Status-Bar, Leistungsbegrenzungs-Slider (Abschnitt 9.2)
-- **GPIO / Relay** — eigener Tab (nicht Teil des Dashboards) mit Toggle-Switches für Relay, IO1–IO3 inkl. Status-Badge
-- **Config** — WiFi, DTU, MQTT, GPIO-Pinbelegung, System (innerhalb des Tabs gegliedert)
-- **System** — Firmware-OTA (File Upload), Filesystem-OTA (File Upload), Internet-Update (Manifest-Check + Install), Geräteinformationen, Danger Zone (Reboot, Factory Reset)
+- **Dashboard** — Status-Card, Power-Limit-Card, Temp/Limit/Yield/Total-Karten, PV-Output (Grid/PV1/PV2-Karten) (Abschnitt 9.2)
+- **Relay / IO** — eigener Tab (nicht Teil des Dashboards) mit Toggle-Switches für Relay, IO1–IO3 inkl. Status-Badge (bis 2026-06-18 "GPIO / Relay" genannt)
+- **Config** — WiFi (inkl. statische IP/Subnetz/Gateway), DTU, MQTT, GPIO-Pinbelegung, Web-Server (Port, Zugriffsschutz), System (innerhalb des Tabs gegliedert)
+- **System** — Firmware-OTA (File Upload), Filesystem-OTA (File Upload), Internet-Update (Manifest-Check + Install), Config-Backup/Restore (Download/Upload `config.json`), Geräteinformationen, Danger Zone (Reboot, Factory Reset)
 
 ---
 
