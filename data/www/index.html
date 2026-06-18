@@ -405,6 +405,18 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
   </div>
 
   <div class="cfg-box">
+    <h3>Konfiguration sichern</h3>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px">
+      Backup enthält alle Einstellungen inkl. WLAN-/MQTT-/Web-Passwörter im Klartext — Datei sicher aufbewahren.</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <a class="btn btn-muted" href="/api/config/backup" download>Backup herunterladen</a>
+      <input type="file" accept=".json" id="restore-file"
+             style="background:none;border:none;color:var(--text);padding:0;flex:1">
+      <button class="btn btn-ok" onclick="doRestore()">Wiederherstellen</button>
+    </div>
+  </div>
+
+  <div class="cfg-box">
     <h3>Geräteinformationen</h3>
     <div id="sysinfo"></div>
   </div>
@@ -698,6 +710,23 @@ function doOta(label, fileId, endpoint) {
   xhr.onerror = () => { txt(statId, 'Fehler'); toast('OTA Fehler', false); };
   const fd = new FormData();
   fd.append(label, file, file.name);
+  xhr.send(fd);
+}
+
+// ─── Config Backup/Restore ────────────────────────────────────────────────
+function doRestore() {
+  const file = $('restore-file').files[0];
+  if (!file) { toast('Bitte zuerst eine Backup-Datei wählen', false); return; }
+  if (!confirm('Aktuelle Konfiguration mit der Backup-Datei überschreiben und neu starten?')) return;
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/config/restore');
+  xhr.onload = () => {
+    if (xhr.status === 200) toast('Wiederhergestellt — Gateway startet neu…');
+    else toast('Ungültige Backup-Datei', false);
+  };
+  xhr.onerror = () => toast('Fehler beim Wiederherstellen', false);
+  const fd = new FormData();
+  fd.append('config', file, file.name);
   xhr.send(fd);
 }
 

@@ -100,32 +100,11 @@ void configSetDefaults() {
     appConfig.webPort = WEB_DEFAULT_PORT;
 }
 
-void configLoad() {
-    if (!LittleFS.exists(CONFIG_FILE)) {
-        if (LittleFS.exists("/config.tmp")) {
-            LOG_W(MOD_CFG, "Recovering config from /config.tmp");
-            LittleFS.rename("/config.tmp", CONFIG_FILE);
-        } else {
-            LOG_W(MOD_CFG, "No %s  -  using defaults", CONFIG_FILE);
-            configSetDefaults();
-            return;
-        }
-    }
-    File f = LittleFS.open(CONFIG_FILE, "r");
-    if (!f) {
-        LOG_W(MOD_CFG, "Cannot open %s  -  using defaults", CONFIG_FILE);
-        configSetDefaults();
-        return;
-    }
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, f);
-    f.close();
-    if (err) {
-        LOG_E(MOD_CFG, "JSON parse error: %s  -  using defaults", err.c_str());
-        configSetDefaults();
-        return;
-    }
-
+// Applies a parsed config JsonDocument onto appConfig, with the same
+// validation/clamping as configLoad(). Shared by configLoad() (reading
+// /config.json) and configRestoreFromJson() (a config backup uploaded via
+// the web GUI), so both go through identical validation.
+static void applyConfigJson(JsonDocument& doc) {
     // Start from defaults so missing keys fall back gracefully
     configSetDefaults();
 
@@ -242,10 +221,58 @@ void configLoad() {
         LOG_W(MOD_CFG, "webAuthEnabled but no password set -  disabling auth");
         appConfig.webAuthEnabled = false;
     }
+}
+
+void configLoad() {
+    if (!LittleFS.exists(CONFIG_FILE)) {
+        if (LittleFS.exists("/config.tmp")) {
+            LOG_W(MOD_CFG, "Recovering config from /config.tmp");
+            LittleFS.rename("/config.tmp", CONFIG_FILE);
+        } else {
+            LOG_W(MOD_CFG, "No %s  -  using defaults", CONFIG_FILE);
+            configSetDefaults();
+            return;
+        }
+    }
+    File f = LittleFS.open(CONFIG_FILE, "r");
+    if (!f) {
+        LOG_W(MOD_CFG, "Cannot open %s  -  using defaults", CONFIG_FILE);
+        configSetDefaults();
+        return;
+    }
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    if (err) {
+        LOG_E(MOD_CFG, "JSON parse error: %s  -  using defaults", err.c_str());
+        configSetDefaults();
+        return;
+    }
+
+    applyConfigJson(doc);
 
     LOG_I(MOD_CFG, "Config loaded: ssid=%s  dtu=%s:%d  mqtt=%s:%d",
           appConfig.wifiSsid, appConfig.dtuHost, appConfig.dtuPort,
           appConfig.mqttHost, appConfig.mqttPort);
+}
+
+bool configRestoreFromJson(const char* json, size_t len) {
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, json, len);
+    if (err) {
+        LOG_E(MOD_CFG, "Restore: JSON parse error: %s", err.c_str());
+        return false;
+    }
+    // Sanity check  -  reject anything that doesn't even look like a config
+    // backup (e.g. a random JSON file) instead of silently resetting to defaults.
+    if (!doc["wifiSsid"].is<const char*>() && !doc["dtuHost"].is<const char*>()) {
+        LOG_E(MOD_CFG, "Restore: does not look like a config backup");
+        return false;
+    }
+    applyConfigJson(doc);
+    configSave();
+    LOG_I(MOD_CFG, "Config restored from upload");
+    return true;
 }
 
 void configSave() {

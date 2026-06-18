@@ -407,8 +407,10 @@ Discovery-Nachrichten werden 5 Sekunden nach MQTT-Connect gesendet, eine pro 500
 |---|---|---|
 | GET | `/api/data.json` | PV-Echtzeit-Daten |
 | GET | `/api/info.json` | System-Info, Verbindungsstatus |
-| GET | `/api/config` | Aktuelle Konfiguration |
+| GET | `/api/config` | Aktuelle Konfiguration (ohne Passwörter) |
 | POST | `/api/config` | Konfiguration speichern |
+| GET | `/api/config/backup` | Vollständiges `config.json` als Download (inkl. Passwörter im Klartext) |
+| POST | `/api/config/restore` | `config.json`-Backup hochladen, validieren, übernehmen + Neustart |
 | GET | `/api/gpio` | GPIO-Zustand |
 | POST | `/api/gpio` | GPIO setzen |
 | GET | `/api/dtu` | DTU-Status (PowerLimit, Inverter aktiv) |
@@ -455,6 +457,12 @@ Discovery-Nachrichten werden 5 Sekunden nach MQTT-Connect gesendet, eine pro 500
 - **Benutzername/Passwort-Schutz:** Optionaler HTTP-Basic-Auth-Schutz für die gesamte Web-GUI, konfigurierbar im Config-Tab (`webAuthEnabled`, `webUser`, `webPass` in `AppConfig`, §8). Default: deaktiviert. Umsetzung über die in ESPAsyncWebServer 3.x eingebaute `AsyncAuthenticationMiddleware`, global via `server->addMiddleware(&authMiddleware)` angehängt (`taskWebServer.cpp`, `setupRoutes()`) — deckt dadurch automatisch **alle** Routen ab (`/api/*`, `/update`, `/updatefs`, statische Dateien, Captive Portal), nicht nur einzeln gepflegte Handler. Sicherheits-Guard: Speichern von `webAuthEnabled=true` ohne Passwort wird abgelehnt (Aussperr-Schutz), sowohl beim Config-Laden als auch bei `POST /api/config`.
 - **Konfigurierbarer Port:** `appConfig.webPort` (default: 80). `server` ist dafür von einem globalen statischen `AsyncWebServer`-Objekt auf einen Zeiger umgestellt worden, der erst in `setupRoutes()` (nach `configLoad()`) mit `new AsyncWebServer(appConfig.webPort)` allokiert wird.
 - Beide Einstellungen werden erst nach dem automatischen Neustart aktiv (wie alle Config-Änderungen). Bei aktivem Port-Wechsel muss die Web-GUI danach unter der neuen Port-Nummer aufgerufen werden; bei aktivem Auth-Schutz fragt der Browser beim nächsten Zugriff automatisch nach den Zugangsdaten (natives Basic-Auth-Popup).
+
+### 6.5 Konfigurations-Backup/Restore (implementiert 2026-06-18)
+
+- **Backup:** `GET /api/config/backup` liefert das vollständige, rohe `config.json` als Datei-Download (`Content-Disposition: attachment`) — **inklusive** WLAN-/MQTT-/Web-Auth-Passwörter im Klartext, bewusst so entschieden, damit ein Restore wirklich alles wiederherstellt, ohne dass Passwörter neu eingegeben werden müssen. Liest direkt von LittleFS (`req->send(LittleFS, CONFIG_FILE, "application/json", true)`), kein Umweg über `appConfig`.
+- **Restore:** `POST /api/config/restore` (Datei-Upload, wie `/update`/`/updatefs`) validiert die hochgeladene Datei (muss als JSON parsen UND mindestens `wifiSsid` oder `dtuHost` enthalten, um zufällige Fremd-Dateien abzulehnen), wendet sie über `applyConfigJson()` an — dieselbe Validierungs-/Clamping-Logik wie `configLoad()` — und speichert via `configSave()`. Bei ungültigem Inhalt: `400`, Config bleibt unverändert.
+- **Wichtige Implementierungsfalle:** ESPAsyncWebServers einfache String-Routen sind "backward compatible" — eine Route `/api/config` matched per Präfix auch `/api/config/backup` und `/api/config/restore` (`path.startsWith(_value + "/")`). Die spezifischeren Routen **müssen vor** `/api/config` registriert werden (`setupRoutes()`), sonst fängt der breitere `/api/config`-Handler die Anfrage ab — genau das ist beim Implementieren passiert (Backup lieferte stillschweigend die passwortlose `GET /api/config`-Antwort statt der echten Datei) und wurde erst durch Vergleich der In-Memory- mit der tatsächlich ausgelieferten Antwort entdeckt.
 
 ---
 

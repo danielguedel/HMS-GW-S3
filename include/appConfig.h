@@ -81,3 +81,9 @@ extern AppConfig appConfig;
 void configLoad();
 void configSave();
 void configSetDefaults();
+
+// Restores config from an uploaded backup JSON (web GUI). Validates,
+// applies (same rules as configLoad()) and persists via configSave().
+// Returns false without changing anything if the JSON is invalid or
+// doesn't look like a config backup.
+bool configRestoreFromJson(const char* json, size_t len);

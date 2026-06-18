@@ -365,6 +365,41 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     req->send(200, "application/json", "{\"ok\":true,\"reboot\":true}");
 }
 
+// --- GET /api/config/backup  -  full config.json download (incl. passwords) --
+static void handleApiConfigBackup(AsyncWebServerRequest* req) {
+    if (!LittleFS.exists(CONFIG_FILE)) {
+        req->send(404, "application/json", "{\"error\":\"no config saved yet\"}");
+        return;
+    }
+    req->send(LittleFS, CONFIG_FILE, "application/json", true);
+}
+
+// --- POST /api/config/restore  -  upload a previously downloaded backup -----
+static bool _restoreError = false;
+static void handleApiConfigRestore(AsyncWebServerRequest* /*req*/, String /*filename*/,
+                                    size_t index, uint8_t* data, size_t len, bool final) {
+    static uint8_t bodyBuf[4096];
+    if (index == 0) _restoreError = false;
+    if (_restoreError) return;
+    if (index + len > sizeof(bodyBuf)) {
+        LOG_E(MOD_WEB, "Config restore: file too large");
+        _restoreError = true;
+        return;
+    }
+    memcpy(bodyBuf + index, data, len);
+    if (!final) return;
+    if (!configRestoreFromJson((const char*)bodyBuf, index + len)) _restoreError = true;
+}
+
+static void handleApiConfigRestoreDone(AsyncWebServerRequest* req) {
+    if (_restoreError) {
+        req->send(400, "application/json", "{\"error\":\"invalid config backup\"}");
+        return;
+    }
+    req->send(200, "application/json", "{\"ok\":true,\"reboot\":true}");
+    xEventGroupSetBits(systemStateEvents, EVT_REBOOT);
+}
+
 // --- OTA firmware upload ------------------------------------------------------
 static void handleOtaUpload(AsyncWebServerRequest* /*req*/, String filename,
                              size_t index, uint8_t* data, size_t len, bool final) {
@@ -667,7 +702,15 @@ static void setupRoutes() {
         server->addMiddleware(&authMiddleware);
     }
 
-    // API routes MUST be registered before serveStatic  -  match order is FIFO
+    // API routes MUST be registered before serveStatic  -  match order is FIFO.
+    // ESPAsyncWebServer's plain-string URI matching is "backward compatible":
+    // a route "/api/config" also matches any "/api/config/..." sub-path (prefix
+    // match with trailing slash), so more specific sub-paths like
+    // /api/config/backup MUST be registered before the shorter /api/config,
+    // or the broader handler intercepts them first.
+    server->on("/api/config/backup",  HTTP_GET,  handleApiConfigBackup);
+    server->on("/api/config/restore", HTTP_POST, handleApiConfigRestoreDone, handleApiConfigRestore);
+
     server->on("/api/data.json", HTTP_GET, handleApiData);
     server->on("/api/info.json", HTTP_GET, handleApiInfo);
     server->on("/api/gpio",      HTTP_GET, handleApiGpioGet);
