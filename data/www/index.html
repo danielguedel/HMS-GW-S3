@@ -192,7 +192,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 <div id="tab-dashboard" class="tab active">
 
   <!-- Status bar -->
-  <div class="grid" id="status-bar" style="display:none">
+  <div class="grid" id="status-bar">
     <div class="card">
       <div class="card-title" data-i18n="statTemp">Temp</div>
       <div><span class="card-val" id="s-temp">–</span><span class="card-unit">°C</span></div>
@@ -677,7 +677,6 @@ async function refreshData() {
     txt('s-te',    d.grid.tE.toFixed(1));
     _invActive = d.inverter.active;
     updateStatusBadge();
-    $('status-bar').style.display = '';
 
     const lr = $('limit-range');
     if (document.activeElement !== lr) {
