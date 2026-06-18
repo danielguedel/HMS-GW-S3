@@ -69,6 +69,10 @@ nav button:hover  { color: var(--text); }
 .card-val   { font-size: 30px; font-weight: 700; color: var(--accent); line-height: 1; }
 .card-val.blue   { color: var(--blue); }
 .card-val.orange { color: var(--orange); }
+.status-val { font-size: 22px; font-weight: 700; line-height: 1; text-transform: uppercase;
+              letter-spacing: .5px; color: var(--accent); }
+.status-val.red   { color: var(--red); }
+.status-val.muted { color: var(--muted); }
 .card-unit  { font-size: 13px; color: var(--muted); margin-left: 3px; }
 .card-sub   { font-size: 12px; color: var(--muted); margin-top: 5px; }
 .bar-wrap   { background: var(--surface2); border-radius: 4px; height: 6px;
@@ -98,7 +102,6 @@ input:checked + .slider               { background: var(--accent); }
 input:checked + .slider::before       { transform: translateX(21px); }
 input:disabled + .slider              { opacity: .4; cursor: default; }
 .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-.badge-lg { padding: 6px 16px; font-size: 14px; }
 .b-ok   { background: var(--ok-bg);   color: var(--accent); }
 .b-off  { background: var(--surface2); color: var(--muted); }
 .b-err  { background: var(--err-bg);  color: var(--red); }
@@ -235,7 +238,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
   <div class="row2">
   <div class="card">
     <div class="sec" data-i18n="secStatus">Status</div>
-    <div id="s-active"><span class="badge b-off">–</span></div>
+    <div id="s-active"><span class="status-val muted">–</span></div>
   </div>
   <div class="card">
     <div class="sec" data-i18n="secPowerLimit">Power Limit</div>
@@ -640,11 +643,11 @@ function setDot(id, ok) {
 let _dtuOnline = null, _invActive = null;
 function updateStatusBadge() {
   let cls, key;
-  if (_dtuOnline === false)      { cls = 'b-err'; key = 'statOffline'; }
-  else if (_invActive === true)  { cls = 'b-ok';  key = 'statActive'; }
-  else if (_invActive === false) { cls = 'b-off'; key = 'statStandby'; }
-  else                            { cls = 'b-off'; key = 'statNoData'; }
-  $('s-active').innerHTML = '<span class="badge badge-lg ' + cls + '">' + tr(key) + '</span>';
+  if (_dtuOnline === false)      { cls = 'red';   key = 'statOffline'; }
+  else if (_invActive === true)  { cls = '';      key = 'statActive'; }
+  else if (_invActive === false) { cls = 'muted'; key = 'statStandby'; }
+  else                            { cls = 'muted'; key = 'statNoData'; }
+  $('s-active').innerHTML = '<span class="status-val ' + cls + '">' + tr(key) + '</span>';
 }
 
 async function refreshData() {
