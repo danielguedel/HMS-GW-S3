@@ -471,7 +471,7 @@ const I18N = {
   en: {
     navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Yield today', statTotal: 'Total',
-    statActive: 'Active', statStandby: 'Standby', statNoData: 'No data',
+    statActive: 'Active', statStandby: 'Standby', statNoData: 'No data', statOffline: 'Offline',
     secPowerLimit: 'Power Limit', secStatus: 'Status', btnSet: 'Set',
     hNetwork: 'Network', hPowerControl: 'Power Control', hNtpTime: 'NTP & Time', hWebServer: 'Web Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
@@ -519,7 +519,7 @@ const I18N = {
   de: {
     navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
-    statActive: 'Aktiv', statStandby: 'Standby', statNoData: 'Keine Daten',
+    statActive: 'Aktiv', statStandby: 'Standby', statNoData: 'Keine Daten', statOffline: 'Offline',
     secPowerLimit: 'Leistungsbegrenzung', secStatus: 'Status', btnSet: 'Setzen',
     hNetwork: 'Netzwerk', hPowerControl: 'Leistungsregelung', hNtpTime: 'NTP & Zeit', hWebServer: 'Web-Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
@@ -636,11 +636,23 @@ function setDot(id, ok) {
 }
 
 // ─── Dashboard data ───────────────────────────────────────────────────────
+// ─── Combined status badge (DTU online/offline + inverter active/standby) ──
+let _dtuOnline = null, _invActive = null;
+function updateStatusBadge() {
+  let cls, key;
+  if (_dtuOnline === false)      { cls = 'b-err'; key = 'statOffline'; }
+  else if (_invActive === true)  { cls = 'b-ok';  key = 'statActive'; }
+  else if (_invActive === false) { cls = 'b-off'; key = 'statStandby'; }
+  else                            { cls = 'b-off'; key = 'statNoData'; }
+  $('s-active').innerHTML = '<span class="badge badge-lg ' + cls + '">' + tr(key) + '</span>';
+}
+
 async function refreshData() {
   try {
     const d = await fetch('/api/data.json').then(r => r.json());
     if (!d.valid) {
-      $('s-active').innerHTML = '<span class="badge b-off">' + tr('statNoData') + '</span>';
+      _invActive = null;
+      updateStatusBadge();
       return;
     }
     document.title = `${d.grid.p.toFixed(0)} W — HMS-GW-S3`;
@@ -661,9 +673,8 @@ async function refreshData() {
     txt('s-limit', d.inverter.powerLimit);
     txt('s-de',    d.grid.dE.toFixed(3));
     txt('s-te',    d.grid.tE.toFixed(1));
-    $('s-active').innerHTML =
-      '<span class="badge badge-lg ' + (d.inverter.active ? 'b-ok' : 'b-off') + '">' +
-      (d.inverter.active ? tr('statActive') : tr('statStandby')) + '</span>';
+    _invActive = d.inverter.active;
+    updateStatusBadge();
     $('status-bar').style.display = '';
 
     const lr = $('limit-range');
@@ -683,8 +694,12 @@ async function refreshInfo() {
     setDot('d-mqtt', d.mqtt);
     txt('hi-mac', d.mac);
     txt('hi-fw',  tr('fmtFirmware', d.fw, d.build));
+    _dtuOnline = d.dtu;
+    updateStatusBadge();
   } catch (e) {
     setDot('d-wifi', false); setDot('d-dtu', false); setDot('d-mqtt', false);
+    _dtuOnline = false;
+    updateStatusBadge();
   }
 }
 
