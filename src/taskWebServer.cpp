@@ -19,7 +19,11 @@
 #include <WiFiClientSecure.h>
 #include <esp_ota_ops.h>
 
-static AsyncWebServer server(WEB_DEFAULT_PORT);
+// Allocated in taskWebServer() after configLoad() so the configured webPort
+// can be used  -  a global static AsyncWebServer would have to be constructed
+// with WEB_DEFAULT_PORT before config is even loaded.
+static AsyncWebServer*              server = nullptr;
+static AsyncAuthenticationMiddleware authMiddleware;
 static DNSServer      dnsServer;
 static bool           _dnsStarted  = false;
 static bool           _otaFwError  = false;
@@ -208,6 +212,10 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
     doc["wifiSsid"]        = appConfig.wifiSsid;
     doc["wifiApFallback"]  = appConfig.wifiApFallback;
     // passwords never sent back
+    doc["useStaticIp"] = appConfig.useStaticIp;
+    doc["staticIp"]    = appConfig.staticIp;
+    doc["subnet"]      = appConfig.subnet;
+    doc["gateway"]     = appConfig.gateway;
     doc["dtuHost"]             = appConfig.dtuHost;
     doc["dtuPort"]             = appConfig.dtuPort;
     doc["dtuInterval"]         = appConfig.dtuInterval;
@@ -238,6 +246,10 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
     doc["ntpServer"]       = appConfig.ntpServer;
     doc["logLevel"]        = appConfig.logLevel;
     doc["otaManifestUrl"]  = appConfig.otaManifestUrl;
+    doc["webAuthEnabled"] = appConfig.webAuthEnabled;
+    doc["webUser"]        = appConfig.webUser;
+    // webPass never sent back
+    doc["webPort"]        = appConfig.webPort;
     String out; serializeJson(doc, out);
     req->send(200, "application/json", out);
 }
@@ -267,6 +279,23 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     if (doc["wifiPass"].is<const char*>())
         strlcpy(appConfig.wifiPass, doc["wifiPass"].as<const char*>(), sizeof(appConfig.wifiPass));
     if (!doc["wifiApFallback"].isNull()) appConfig.wifiApFallback = doc["wifiApFallback"].as<bool>();
+
+    if (!doc["useStaticIp"].isNull()) {
+        const char* ip = doc["staticIp"].is<const char*>() ? doc["staticIp"].as<const char*>() : "";
+        const char* sn = doc["subnet"].is<const char*>()   ? doc["subnet"].as<const char*>()   : "";
+        const char* gw = doc["gateway"].is<const char*>()  ? doc["gateway"].as<const char*>()  : "";
+        IPAddress tmp;
+        bool valid = *ip && tmp.fromString(ip) && *sn && tmp.fromString(sn) && *gw && tmp.fromString(gw);
+        appConfig.useStaticIp = doc["useStaticIp"].as<bool>() && valid;
+        if (valid) {
+            strlcpy(appConfig.staticIp, ip, sizeof(appConfig.staticIp));
+            strlcpy(appConfig.subnet,   sn, sizeof(appConfig.subnet));
+            strlcpy(appConfig.gateway,  gw, sizeof(appConfig.gateway));
+        } else if (doc["useStaticIp"].as<bool>()) {
+            req->send(400, "application/json", "{\"error\":\"invalid static IP/subnet/gateway\"}");
+            return;
+        }
+    }
 
     if (doc["dtuHost"].is<const char*>())
         strlcpy(appConfig.dtuHost, doc["dtuHost"].as<const char*>(), sizeof(appConfig.dtuHost));
@@ -316,6 +345,20 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     if (!doc["logLevel"].isNull()) appConfig.logLevel = doc["logLevel"].as<int>();
     if (doc["otaManifestUrl"].is<const char*>())
         strlcpy(appConfig.otaManifestUrl, doc["otaManifestUrl"].as<const char*>(), sizeof(appConfig.otaManifestUrl));
+
+    if (!doc["webAuthEnabled"].isNull()) appConfig.webAuthEnabled = doc["webAuthEnabled"].as<bool>();
+    if (doc["webUser"].is<const char*>())
+        strlcpy(appConfig.webUser, doc["webUser"].as<const char*>(), sizeof(appConfig.webUser));
+    if (doc["webPass"].is<const char*>())
+        strlcpy(appConfig.webPass, doc["webPass"].as<const char*>(), sizeof(appConfig.webPass));
+    if (!doc["webPort"].isNull()) {
+        int wp = doc["webPort"].as<int>();
+        if (wp >= 1 && wp <= 65535) appConfig.webPort = (uint16_t)wp;
+    }
+    if (appConfig.webAuthEnabled && strlen(appConfig.webPass) == 0) {
+        req->send(400, "application/json", "{\"error\":\"auth enabled but no password set\"}");
+        return;
+    }
 
     configSave();
     LOG_I(MOD_WEB, "Config saved via API");
@@ -611,49 +654,63 @@ static void handleCaptive(AsyncWebServerRequest* req) {
 
 // --- Route registration -------------------------------------------------------
 static void setupRoutes() {
-    // API routes MUST be registered before serveStatic  -  match order is FIFO
-    server.on("/api/data.json", HTTP_GET, handleApiData);
-    server.on("/api/info.json", HTTP_GET, handleApiInfo);
-    server.on("/api/gpio",      HTTP_GET, handleApiGpioGet);
-    server.on("/api/dtu",       HTTP_GET, handleApiDtuGet);
-    server.on("/api/config",    HTTP_GET, handleApiConfigGet);
+    server = new AsyncWebServer(appConfig.webPort);
 
-    server.on("/api/gpio", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
+    if (appConfig.webAuthEnabled && strlen(appConfig.webPass)) {
+        authMiddleware.setUsername(appConfig.webUser);
+        authMiddleware.setPassword(appConfig.webPass);
+        authMiddleware.setAuthType(AsyncAuthType::AUTH_BASIC);
+        authMiddleware.setRealm("HMS-GW-S3");
+        // Global middleware  -  covers every route incl. /api/*, /update, static
+        // files and the captive portal, not just whichever handlers we remember
+        // to guard individually.
+        server->addMiddleware(&authMiddleware);
+    }
+
+    // API routes MUST be registered before serveStatic  -  match order is FIFO
+    server->on("/api/data.json", HTTP_GET, handleApiData);
+    server->on("/api/info.json", HTTP_GET, handleApiInfo);
+    server->on("/api/gpio",      HTTP_GET, handleApiGpioGet);
+    server->on("/api/dtu",       HTTP_GET, handleApiDtuGet);
+    server->on("/api/config",    HTTP_GET, handleApiConfigGet);
+
+    server->on("/api/gpio", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
         [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiGpioPost(r,d,l,i,t); });
 
-    server.on("/api/dtu", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
+    server->on("/api/dtu", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
         [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiDtuPost(r,d,l,i,t); });
 
-    server.on("/api/config", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
+    server->on("/api/config", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
         [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiConfigPost(r,d,l,i,t); });
 
-    server.on("/update",   HTTP_POST, handleOtaDone, handleOtaUpload);
-    server.on("/updatefs", HTTP_POST, handleOtaDone, handleFsUpload);
+    server->on("/update",   HTTP_POST, handleOtaDone, handleOtaUpload);
+    server->on("/updatefs", HTTP_POST, handleOtaDone, handleFsUpload);
 
-    server.on("/api/ota/url", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
+    server->on("/api/ota/url", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
         [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiOtaUrl(r,d,l,i,t); });
 
-    server.on("/api/ota/check", HTTP_GET,  handleApiOtaCheckGet);
-    server.on("/api/ota/check", HTTP_POST, handleApiOtaCheckPost);
+    server->on("/api/ota/check", HTTP_GET,  handleApiOtaCheckGet);
+    server->on("/api/ota/check", HTTP_POST, handleApiOtaCheckPost);
 
     // Static files  -  registered LAST so API routes take priority
     // no-cache: forces revalidation so a Filesystem-OTA update is visible without
     // a hard browser refresh (Ctrl+Shift+R), while still allowing conditional caching
-    server.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html").setCacheControl("no-cache");
+    server->serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html").setCacheControl("no-cache");
 
     // Captive portal well-known URIs
     const char* captiveUris[] = {"/generate_204", "/hotspot-detect.html",
                                   "/connecttest.txt", "/ncsi.txt", "/wpad.dat"};
-    for (auto u : captiveUris) server.on(u, HTTP_GET, handleCaptive);
+    for (auto u : captiveUris) server->on(u, HTTP_GET, handleCaptive);
 
-    server.onNotFound([](AsyncWebServerRequest* req) {
+    server->onNotFound([](AsyncWebServerRequest* req) {
         if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE) handleCaptive(req);
         else req->redirect("/");
     });
 
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
-    server.begin();
-    LOG_I(MOD_WEB, "Web server started on port %d", WEB_DEFAULT_PORT);
+    server->begin();
+    LOG_I(MOD_WEB, "Web server started on port %d%s", appConfig.webPort,
+          appConfig.webAuthEnabled ? " (auth enabled)" : "");
 }
 
 // --- Task ---------------------------------------------------------------------

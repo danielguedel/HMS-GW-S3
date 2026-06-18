@@ -274,6 +274,17 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     </div>
   </div>
   <div class="cfg-box">
+    <h3>Netzwerk</h3>
+    <div class="chk-row">
+      <label><input type="checkbox" id="c-static-ip"> Feste IP-Adresse (statt DHCP)</label>
+    </div>
+    <div class="row2">
+      <label>IP-Adresse<input type="text" id="c-ip" placeholder="192.168.1.50"></label>
+      <label>Subnetzmaske<input type="text" id="c-subnet" placeholder="255.255.255.0"></label>
+    </div>
+    <label>Gateway (wird auch als DNS verwendet)<input type="text" id="c-gateway" placeholder="192.168.1.1"></label>
+  </div>
+  <div class="cfg-box">
     <h3>DTU (Hoymiles)</h3>
     <div class="row2">
       <label>Host / IP<input type="text" id="c-dtu-host"></label>
@@ -315,6 +326,19 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
       <label>NTP Server<input type="text" id="c-ntp"></label>
       <label>Timezone Offset (s)<input type="number" id="c-tz"></label>
     </div>
+  </div>
+  <div class="cfg-box">
+    <h3>Web-Server</h3>
+    <label>Port<input type="number" id="c-web-port" min="1" max="65535" placeholder="80"></label>
+    <div class="chk-row">
+      <label><input type="checkbox" id="c-web-auth"> Benutzername/Passwort-Schutz</label>
+    </div>
+    <div class="row2">
+      <label>Benutzername<input type="text" id="c-web-user" placeholder="admin"></label>
+      <label>Passwort<input type="password" id="c-web-pass" placeholder="(unverändert lassen)"></label>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:4px">
+      Port- und Auth-Änderungen werden erst nach dem automatischen Neustart aktiv. Bei aktivem Schutz fragt der Browser beim nächsten Zugriff nach den Zugangsdaten.</p>
   </div>
   <div class="cfg-box">
     <h3>System</h3>
@@ -543,6 +567,13 @@ async function loadConfig() {
     const d = await fetch('/api/config').then(r => r.json());
     $('c-ssid').value        = d.wifiSsid        || '';
     $('c-apfb').checked      = !!d.wifiApFallback;
+    $('c-static-ip').checked = !!d.useStaticIp;
+    $('c-ip').value          = d.staticIp         || '';
+    $('c-subnet').value      = d.subnet           || '';
+    $('c-gateway').value     = d.gateway          || '';
+    $('c-web-port').value    = d.webPort          || 80;
+    $('c-web-auth').checked  = !!d.webAuthEnabled;
+    $('c-web-user').value    = d.webUser          || '';
     $('c-dtu-host').value    = d.dtuHost          || '';
     $('c-dtu-port').value    = d.dtuPort          || 10081;
     $('c-dtu-iv').value      = d.dtuInterval      || 31;
@@ -569,6 +600,13 @@ async function saveConfig() {
   const cfg = {
     wifiSsid:           $('c-ssid').value,
     wifiApFallback:     $('c-apfb').checked,
+    useStaticIp:        $('c-static-ip').checked,
+    staticIp:           $('c-ip').value,
+    subnet:             $('c-subnet').value,
+    gateway:            $('c-gateway').value,
+    webPort:            +$('c-web-port').value,
+    webAuthEnabled:     $('c-web-auth').checked,
+    webUser:            $('c-web-user').value,
     dtuHost:            $('c-dtu-host').value,
     dtuPort:            +$('c-dtu-port').value,
     dtuInterval:        +$('c-dtu-iv').value,
@@ -593,6 +631,8 @@ async function saveConfig() {
   if (pass) cfg.wifiPass = pass;
   const mqttPass = $('c-mqtt-pass').value;
   if (mqttPass) cfg.mqttPass = mqttPass;
+  const webPass = $('c-web-pass').value;
+  if (webPass) cfg.webPass = webPass;
 
   try {
     const r = await fetch('/api/config', { method: 'POST',

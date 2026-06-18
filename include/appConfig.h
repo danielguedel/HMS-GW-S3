@@ -16,6 +16,12 @@ struct AppConfig {
     char wifiPass[65];
     bool wifiApFallback;        // AP-Modus wenn WiFi nicht erreichbar
 
+    // WiFi  -  Static IP (useStaticIp=false -> DHCP, default)
+    bool useStaticIp;
+    char staticIp[16];          // z.B. "192.168.1.50"
+    char subnet[16];            // default: "255.255.255.0"
+    char gateway[16];           // z.B. "192.168.1.1"  -  wird auch als DNS-Server verwendet
+
     // DTU
     char     dtuHost[40];
     uint16_t dtuPort;           // default: 10081
@@ -62,6 +68,12 @@ struct AppConfig {
 
     // Internet OTA
     char otaManifestUrl[256];   // URL zum Versions-Manifest (leer = deaktiviert)
+
+    // Web-Server
+    bool     webAuthEnabled;    // Benutzername/Passwort-Schutz für die Web-GUI, default: false
+    char     webUser[33];       // Benutzername, default: "admin"
+    char     webPass[65];       // Passwort
+    uint16_t webPort;           // Web-GUI Port, default: 80
 };
 
 extern AppConfig appConfig;

@@ -22,7 +22,8 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/dtu`, `/api/config`, `/api/ota/*` |
 | 🌈 NeoPixel LED | Onboard WS2812B (GPIO38) — 11 states via colour & animation |
 | 🔀 Relay + 3 IO | Switchable via Web GUI, REST API and MQTT · IO1/IO2 (GPIO2/3) suited for future I2C per datasheet |
-| 🔧 Web config | All settings in browser — WiFi, DTU, MQTT, GPIO, System |
+| 🔧 Web config | All settings in browser — WiFi (DHCP or static IP), DTU, MQTT, GPIO, System |
+| 🔒 Web GUI protection | Optional username/password (HTTP Basic Auth, covers every route) and a configurable port (default 80) |
 | 🔄 OTA updates | Firmware/filesystem via web file upload, or by URL (downloads + flashes directly from the gateway) |
 | 🆕 Internet update check | Polls a JSON manifest (e.g. GitHub Releases) for newer versions — one-click install from the web GUI, plus a GitHub Actions workflow to publish releases |
 | 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 19 commands at 115200 baud |
@@ -76,6 +77,8 @@ pio run -e esp32-s3-devkitc-1 -t upload
 pio device monitor
 ```
 
+> ⚠️ **`uploadfs` over USB erases `/config.json`.** It writes the LittleFS partition directly via esptool, bypassing the app's own backup/restore logic that protects `config.json` during a Filesystem-OTA (`/updatefs` or the Internet Update flow) — those go through the running firmware and back the file up first. A local `uploadfs` does not. After flashing the filesystem locally on an already-configured device, you'll need to re-enter WiFi/DTU/MQTT settings via the captive portal.
+
 ### 3. First-time factory flash
 
 > ⚠️ **ESP32-S3: Bootloader is at address `0x0` — not `0x1000` like classic ESP32.**
@@ -109,6 +112,8 @@ esptool.py --chip esp32s3 --baud 921600 \
 | `http://<ip>/updatefs` | OTA filesystem upload |
 | `http://<ip>/api/ota/check` | Internet update check status (GET) / trigger manual check (POST) |
 | `http://<ip>/api/ota/url` | Internet update: flash firmware/filesystem from a URL (POST) |
+
+> Port defaults to 80 and can be changed in the Config tab (`webPort`) — if changed, every URL above moves to `http://<ip>:<port>`. If username/password protection is enabled (`webAuthEnabled`), the browser will prompt for credentials on the next request.
 
 ---
 

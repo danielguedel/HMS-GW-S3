@@ -76,6 +76,19 @@ void taskWiFi(void* pvParameters) {
 
         // -- STA-Verbindungsversuch ---------------------------------------------
         WiFi.mode(WIFI_STA);
+        if (appConfig.useStaticIp) {
+            IPAddress ip, gw, sn;
+            if (ip.fromString(appConfig.staticIp) && gw.fromString(appConfig.gateway) &&
+                sn.fromString(appConfig.subnet)) {
+                // Gateway doubles as DNS server  -  works for the common case (most
+                // home/office routers proxy DNS) and avoids a separate config field.
+                WiFi.config(ip, gw, sn, gw);
+                LOG_I(MOD_WIFI, "Static IP: %s  gw=%s  subnet=%s",
+                      appConfig.staticIp, appConfig.gateway, appConfig.subnet);
+            } else {
+                LOG_W(MOD_WIFI, "Invalid static IP config  -  falling back to DHCP");
+            }
+        }
         WiFi.begin(appConfig.wifiSsid, appConfig.wifiPass);
         LOG_I(MOD_WIFI, "Connecting to '%s'...", appConfig.wifiSsid);
 

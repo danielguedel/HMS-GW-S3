@@ -17,6 +17,11 @@ static uint8_t clampPin(int v, uint8_t def) {
     return (v >= 0 && v <= 48) ? (uint8_t)v : def;
 }
 
+static bool isValidIp(const char* s) {
+    IPAddress tmp;
+    return s && *s && tmp.fromString(s);
+}
+
 void configSetDefaults() {
     memset(&appConfig, 0, sizeof(AppConfig));
 
@@ -24,6 +29,12 @@ void configSetDefaults() {
     strlcpy(appConfig.wifiSsid,  "", sizeof(appConfig.wifiSsid));
     strlcpy(appConfig.wifiPass,  "", sizeof(appConfig.wifiPass));
     appConfig.wifiApFallback = true;
+
+    // WiFi  -  Static IP (default: DHCP)
+    appConfig.useStaticIp = false;
+    strlcpy(appConfig.staticIp, "", sizeof(appConfig.staticIp));
+    strlcpy(appConfig.subnet,   "255.255.255.0", sizeof(appConfig.subnet));
+    strlcpy(appConfig.gateway,  "", sizeof(appConfig.gateway));
 
     // DTU
     strlcpy(appConfig.dtuHost, "192.168.1.100", sizeof(appConfig.dtuHost));
@@ -81,6 +92,12 @@ void configSetDefaults() {
     strlcpy(appConfig.otaManifestUrl,
             "https://raw.githubusercontent.com/danielguedel/HMS-GW-S3/main/release/manifest.json",
             sizeof(appConfig.otaManifestUrl));
+
+    // Web-Server
+    appConfig.webAuthEnabled = false;
+    strlcpy(appConfig.webUser, "admin", sizeof(appConfig.webUser));
+    strlcpy(appConfig.webPass, "",      sizeof(appConfig.webPass));
+    appConfig.webPort = WEB_DEFAULT_PORT;
 }
 
 void configLoad() {
@@ -119,6 +136,20 @@ void configLoad() {
         strlcpy(appConfig.wifiPass, doc["wifiPass"].as<const char*>(), sizeof(appConfig.wifiPass));
     if (!doc["wifiApFallback"].isNull())
         appConfig.wifiApFallback = doc["wifiApFallback"].as<bool>();
+
+    // WiFi  -  Static IP (nur uebernehmen wenn alle drei Felder gueltige IPs sind)
+    if (!doc["useStaticIp"].isNull()) {
+        const char* ip = doc["staticIp"].is<const char*>() ? doc["staticIp"].as<const char*>() : "";
+        const char* sn = doc["subnet"].is<const char*>()   ? doc["subnet"].as<const char*>()   : "";
+        const char* gw = doc["gateway"].is<const char*>()  ? doc["gateway"].as<const char*>()  : "";
+        bool valid = isValidIp(ip) && isValidIp(sn) && isValidIp(gw);
+        appConfig.useStaticIp = doc["useStaticIp"].as<bool>() && valid;
+        if (valid) {
+            strlcpy(appConfig.staticIp, ip, sizeof(appConfig.staticIp));
+            strlcpy(appConfig.subnet,   sn, sizeof(appConfig.subnet));
+            strlcpy(appConfig.gateway,  gw, sizeof(appConfig.gateway));
+        }
+    }
 
     // DTU
     if (doc["dtuHost"].is<const char*>())
@@ -194,6 +225,24 @@ void configLoad() {
     if (doc["otaManifestUrl"].is<const char*>())
         strlcpy(appConfig.otaManifestUrl, doc["otaManifestUrl"].as<const char*>(), sizeof(appConfig.otaManifestUrl));
 
+    // Web-Server
+    if (!doc["webAuthEnabled"].isNull()) appConfig.webAuthEnabled = doc["webAuthEnabled"].as<bool>();
+    if (doc["webUser"].is<const char*>())
+        strlcpy(appConfig.webUser, doc["webUser"].as<const char*>(), sizeof(appConfig.webUser));
+    if (doc["webPass"].is<const char*>())
+        strlcpy(appConfig.webPass, doc["webPass"].as<const char*>(), sizeof(appConfig.webPass));
+    if (!doc["webPort"].isNull()) {
+        int wp = doc["webPort"].as<int>();
+        appConfig.webPort = (wp >= 1 && wp <= 65535) ? (uint16_t)wp : WEB_DEFAULT_PORT;
+    }
+    // Safety: never persist auth-enabled with an empty password -  would lock out
+    // every request (browser keeps sending no/empty creds) with no way to recover
+    // other than a factory reset.
+    if (appConfig.webAuthEnabled && strlen(appConfig.webPass) == 0) {
+        LOG_W(MOD_CFG, "webAuthEnabled but no password set -  disabling auth");
+        appConfig.webAuthEnabled = false;
+    }
+
     LOG_I(MOD_CFG, "Config loaded: ssid=%s  dtu=%s:%d  mqtt=%s:%d",
           appConfig.wifiSsid, appConfig.dtuHost, appConfig.dtuPort,
           appConfig.mqttHost, appConfig.mqttPort);
@@ -205,6 +254,11 @@ void configSave() {
     doc["wifiSsid"]        = appConfig.wifiSsid;
     doc["wifiPass"]        = appConfig.wifiPass;
     doc["wifiApFallback"]  = appConfig.wifiApFallback;
+
+    doc["useStaticIp"] = appConfig.useStaticIp;
+    doc["staticIp"]    = appConfig.staticIp;
+    doc["subnet"]      = appConfig.subnet;
+    doc["gateway"]     = appConfig.gateway;
 
     doc["dtuHost"]             = appConfig.dtuHost;
     doc["dtuPort"]             = appConfig.dtuPort;
@@ -243,6 +297,11 @@ void configSave() {
     doc["ntpServer"] = appConfig.ntpServer;
     doc["logLevel"]       = appConfig.logLevel;
     doc["otaManifestUrl"] = appConfig.otaManifestUrl;
+
+    doc["webAuthEnabled"] = appConfig.webAuthEnabled;
+    doc["webUser"]        = appConfig.webUser;
+    doc["webPass"]        = appConfig.webPass;
+    doc["webPort"]        = appConfig.webPort;
 
     // Write to temp file first, then rename  -  protects against config corruption on reset
     static const char* TMP_FILE = "/config.tmp";

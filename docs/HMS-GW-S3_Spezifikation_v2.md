@@ -4,7 +4,7 @@
 **Hardware:** ESP32-S3-DevKitC-1-N8R8 (8MB Flash, 8MB PSRAM)  
 **Framework:** Arduino / FreeRTOS (PlatformIO)  
 **Repository:** https://github.com/danielguedel/HMS-GW-S3  
-**Datum:** 2026-06-17 (synchronisiert mit Commit `07ffd0d`)  
+**Datum:** 2026-06-18 (Web-Auth, Web-Port, Static-IP ergänzt)  
 **Status:** Implementiert und produktiv (v0.2.0, Buildnummer wird bei jedem Build automatisch inkrementiert — siehe `include/buildnumber.txt`)
 
 ---
@@ -450,11 +450,11 @@ Discovery-Nachrichten werden 5 Sekunden nach MQTT-Connect gesendet, eine pro 500
 }
 ```
 
-### 6.4 Zugriffsschutz und Port (geplant, noch nicht implementiert)
+### 6.4 Zugriffsschutz und Port (implementiert 2026-06-18)
 
-- **Benutzername/Passwort-Schutz:** Optionaler HTTP-Basic-Auth-Schutz für die gesamte Web-GUI, konfigurierbar im Config- oder System-Tab (`webAuthEnabled`, `webUser`, `webPass` in `AppConfig`, §8). Default: deaktiviert. Umsetzung via `AsyncWebServerRequest::authenticate()`/`requestAuthentication()` in `taskWebServer.cpp` — am einfachsten als globaler Check zu Beginn jedes Handlers oder als `server.addHandler()`-Filter, damit auch `/api/*` und `/update` geschützt sind, nicht nur die statischen Dateien.
-- **Konfigurierbarer Port:** `appConfig.webPort` (default: 80, ersetzt die fixe Konstante `WEB_DEFAULT_PORT` in `config.h:62`).
-- **Technische Einschränkung:** `AsyncWebServer` erhält den Port nur im Konstruktor; das aktuelle `server`-Objekt ist als globales statisches Objekt vor `configLoad()` angelegt (`taskWebServer.cpp:21`). Eine Portänderung kann daher nicht zur Laufzeit erfolgen — wie bei anderen Config-Änderungen löst das Speichern einen automatischen Neustart aus (siehe `abf7864`). Für die Umsetzung muss `server` entweder dynamisch (`AsyncWebServer* server`) nach `configLoad()` allokiert werden, oder der Port muss vor dem regulären `configLoad()`-Aufruf verfügbar sein (z. B. separat aus NVS/Preferences gelesen).
+- **Benutzername/Passwort-Schutz:** Optionaler HTTP-Basic-Auth-Schutz für die gesamte Web-GUI, konfigurierbar im Config-Tab (`webAuthEnabled`, `webUser`, `webPass` in `AppConfig`, §8). Default: deaktiviert. Umsetzung über die in ESPAsyncWebServer 3.x eingebaute `AsyncAuthenticationMiddleware`, global via `server->addMiddleware(&authMiddleware)` angehängt (`taskWebServer.cpp`, `setupRoutes()`) — deckt dadurch automatisch **alle** Routen ab (`/api/*`, `/update`, `/updatefs`, statische Dateien, Captive Portal), nicht nur einzeln gepflegte Handler. Sicherheits-Guard: Speichern von `webAuthEnabled=true` ohne Passwort wird abgelehnt (Aussperr-Schutz), sowohl beim Config-Laden als auch bei `POST /api/config`.
+- **Konfigurierbarer Port:** `appConfig.webPort` (default: 80). `server` ist dafür von einem globalen statischen `AsyncWebServer`-Objekt auf einen Zeiger umgestellt worden, der erst in `setupRoutes()` (nach `configLoad()`) mit `new AsyncWebServer(appConfig.webPort)` allokiert wird.
+- Beide Einstellungen werden erst nach dem automatischen Neustart aktiv (wie alle Config-Änderungen). Bei aktivem Port-Wechsel muss die Web-GUI danach unter der neuen Port-Nummer aufgerufen werden; bei aktivem Auth-Schutz fragt der Browser beim nächsten Zugriff automatisch nach den Zugangsdaten (natives Basic-Auth-Popup).
 
 ---
 
@@ -486,6 +486,12 @@ struct AppConfig {
     char wifiSsid[33];
     char wifiPass[65];
     bool wifiApFallback;        // AP-Modus wenn WiFi nicht verfügbar
+
+    // WiFi — Static IP (useStaticIp=false -> DHCP, default)
+    bool useStaticIp;
+    char staticIp[16];          // z.B. "192.168.1.50"
+    char subnet[16];            // default: "255.255.255.0"
+    char gateway[16];           // z.B. "192.168.1.1" — wird auch als DNS-Server verwendet
 
     // DTU
     char dtuHost[40];
@@ -535,13 +541,17 @@ struct AppConfig {
     // Internet-OTA
     char otaManifestUrl[256];   // URL zum Versions-Manifest (leer = deaktiviert)
 
-    // Web-Server (geplant — siehe §6.4, noch nicht implementiert)
+    // Web-Server (siehe §6.4)
     bool     webAuthEnabled;    // Benutzername/Passwort-Schutz aktivieren, default: false
     char     webUser[33];       // Benutzername, default: "admin"
     char     webPass[65];       // Passwort
     uint16_t webPort;           // Web-GUI Port, default: 80
 };
 ```
+
+### 8.0 Static IP (implementiert 2026-06-18)
+
+`useStaticIp`/`staticIp`/`subnet`/`gateway` im Config-Tab (WiFi-Block). Default: DHCP (`useStaticIp=false`). Wenn aktiviert, ruft `taskWiFi.cpp` vor `WiFi.begin()` `WiFi.config(ip, gateway, subnet, gateway)` auf — die Gateway-Adresse wird auch als DNS-Server verwendet (kein eigenes DNS-Feld, deckt den Standardfall ab, da die meisten Router selbst als DNS-Proxy laufen; nötig für NTP-Auflösung). Validierung (`IPAddress::fromString()`) erfolgt sowohl in `appConfig.cpp` (`configLoad()`) als auch in `taskWebServer.cpp` (`POST /api/config`) — bei ungültigen Werten bleibt `useStaticIp` deaktiviert (Fallback auf DHCP) bzw. wird die Anfrage mit 400 abgelehnt.
 
 ### 8.1 GPIO Default-Pinbelegung
 
