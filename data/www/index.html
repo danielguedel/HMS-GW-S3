@@ -165,8 +165,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     <div class="hdr-info" id="hdr-info">
       <span id="hi-mac">–</span><span class="hdr-sep">|</span>
       <span id="hi-fw">–</span><span class="hdr-sep">|</span>
-      <span id="hi-time">–</span><span class="hdr-sep">|</span>
-      <span id="hi-date">–</span>
+      <span id="hi-date">–</span><span class="hdr-sep">|</span>
+      <span id="hi-time">–</span>
     </div>
   </div>
   <div class="hdr-right">
@@ -235,7 +235,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
   <div class="row2">
   <div class="card">
     <div class="sec" data-i18n="secStatus">Status</div>
-    <div id="s-active"></div>
+    <div id="s-active"><span class="badge b-off">–</span></div>
   </div>
   <div class="card">
     <div class="sec" data-i18n="secPowerLimit">Power Limit</div>
@@ -471,7 +471,7 @@ const I18N = {
   en: {
     navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Yield today', statTotal: 'Total',
-    statActive: 'Active', statStandby: 'Standby',
+    statActive: 'Active', statStandby: 'Standby', statNoData: 'No data',
     secPowerLimit: 'Power Limit', secStatus: 'Status', btnSet: 'Set',
     hNetwork: 'Network', hPowerControl: 'Power Control', hNtpTime: 'NTP & Time', hWebServer: 'Web Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
@@ -519,7 +519,7 @@ const I18N = {
   de: {
     navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
-    statActive: 'Aktiv', statStandby: 'Standby',
+    statActive: 'Aktiv', statStandby: 'Standby', statNoData: 'Keine Daten',
     secPowerLimit: 'Leistungsbegrenzung', secStatus: 'Status', btnSet: 'Setzen',
     hNetwork: 'Netzwerk', hPowerControl: 'Leistungsregelung', hNtpTime: 'NTP & Zeit', hWebServer: 'Web-Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
@@ -639,7 +639,10 @@ function setDot(id, ok) {
 async function refreshData() {
   try {
     const d = await fetch('/api/data.json').then(r => r.json());
-    if (!d.valid) return;
+    if (!d.valid) {
+      $('s-active').innerHTML = '<span class="badge b-off">' + tr('statNoData') + '</span>';
+      return;
+    }
     document.title = `${d.grid.p.toFixed(0)} W — HMS-GW-S3`;
 
     txt('grid-p',  d.grid.p.toFixed(0));
