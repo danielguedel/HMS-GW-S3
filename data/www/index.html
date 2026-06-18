@@ -69,8 +69,8 @@ nav button:hover  { color: var(--text); }
 .card-title { font-size: 12px; font-weight: 600; color: var(--blue);
               text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
 .card-val   { font-size: 30px; font-weight: 700; color: var(--accent); line-height: 1; }
-.card-val.blue   { color: var(--blue); }
-.card-val.orange { color: var(--orange); }
+.card-val.warn  { color: var(--orange); }
+.card-val.muted { color: var(--muted); }
 .status-text { font-size: 17px; font-weight: 700; letter-spacing: .5px; color: var(--accent); }
 .status-text.warn  { color: var(--orange); }
 .status-text.muted { color: var(--muted); }
@@ -79,8 +79,8 @@ nav button:hover  { color: var(--text); }
 .bar-wrap   { background: var(--surface2); border-radius: 4px; height: 6px;
               margin-top: 8px; overflow: hidden; }
 .bar { height: 100%; border-radius: 4px; background: var(--accent); transition: width .5s; min-width: 0; }
-.bar.blue   { background: var(--blue); }
-.bar.orange { background: var(--orange); }
+.bar.warn  { background: var(--orange); }
+.bar.muted { background: var(--muted); }
 
 /* ── Section title ───────────────────────────────────────────────────────── */
 .sec { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
@@ -223,14 +223,14 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     </div>
     <div class="card">
       <div class="card-title">PV1</div>
-      <div><span class="card-val blue" id="pv0-p">–</span><span class="card-unit">W</span></div>
-      <div class="bar-wrap"><div class="bar blue" id="bar-pv0" style="width:0"></div></div>
+      <div><span class="card-val" id="pv0-p">–</span><span class="card-unit">W</span></div>
+      <div class="bar-wrap"><div class="bar" id="bar-pv0" style="width:0"></div></div>
       <div class="card-sub" id="pv0-ui">– V / – A</div>
     </div>
     <div class="card">
       <div class="card-title">PV2</div>
-      <div><span class="card-val orange" id="pv1-p">–</span><span class="card-unit">W</span></div>
-      <div class="bar-wrap"><div class="bar orange" id="bar-pv1" style="width:0"></div></div>
+      <div><span class="card-val" id="pv1-p">–</span><span class="card-unit">W</span></div>
+      <div class="bar-wrap"><div class="bar" id="bar-pv1" style="width:0"></div></div>
       <div class="card-sub" id="pv1-ui">– V / – A</div>
     </div>
   </div>
@@ -650,6 +650,8 @@ function updateStatusBadge() {
   else                            { cls = 'muted'; key = 'statNoData'; }
   $('s-active').innerHTML = '<span class="status-text ' + cls + '">' + tr(key) + '</span>';
   document.querySelectorAll('.hdr-sep').forEach(el => el.className = 'hdr-sep ' + cls);
+  ['grid-p', 'pv0-p', 'pv1-p'].forEach(id => $(id).className = 'card-val ' + cls);
+  ['bar-grid', 'bar-pv0', 'bar-pv1'].forEach(id => $(id).className = 'bar ' + cls);
 }
 
 async function refreshData() {
