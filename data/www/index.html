@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de" data-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -33,13 +33,16 @@ header { background: var(--surface); border-bottom: 1px solid var(--border);
          justify-content: space-between; gap: 12px; position: sticky; top: 0; z-index: 10; }
 header h1 { font-size: 17px; font-weight: 700; color: var(--accent);
             letter-spacing: .5px; white-space: nowrap; }
+.hdr-left  { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hdr-info  { display: flex; align-items: center; gap: 8px; font-size: 12px;
+             color: var(--muted); flex-wrap: wrap; }
+.hdr-sep   { color: var(--muted); }
 .hdr-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .dot-wrap   { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
 .dot.ok   { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
 .dot.warn { background: var(--orange); }
 .dot.err  { background: var(--red); }
-#last-upd { font-size: 11px; color: var(--muted); }
 .icon-btn { background: none; border: none; cursor: pointer; font-size: 16px;
             color: var(--muted); padding: 4px 6px; border-radius: 6px; }
 .icon-btn:hover { background: var(--surface2); }
@@ -82,7 +85,8 @@ nav button:hover  { color: var(--text); }
 .gpio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
 .gpio-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
              padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.gpio-name { font-size: 12px; color: var(--muted); text-align: center; }
+.gpio-name { font-size: 12px; font-weight: 600; color: var(--blue);
+             text-transform: uppercase; letter-spacing: .5px; text-align: center; }
 .toggle { position: relative; width: 46px; height: 25px; }
 .toggle input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; inset: 0; background: var(--surface2); border-radius: 25px;
@@ -160,22 +164,30 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 
 <!-- ════ HEADER ═══════════════════════════════════════════════════════════ -->
 <header>
-  <h1>⚡ HMS-GW-S3</h1>
+  <div class="hdr-left">
+    <h1>⚡ HMS-GW-S3</h1>
+    <div class="hdr-info" id="hdr-info">
+      <span id="hi-mac">–</span><span class="hdr-sep">|</span>
+      <span id="hi-fw">–</span><span class="hdr-sep">|</span>
+      <span id="hi-time">–</span><span class="hdr-sep">|</span>
+      <span id="hi-date">–</span>
+    </div>
+  </div>
   <div class="hdr-right">
     <div class="dot-wrap"><div class="dot" id="d-wifi"></div>WiFi</div>
     <div class="dot-wrap"><div class="dot" id="d-dtu"></div>DTU</div>
     <div class="dot-wrap"><div class="dot" id="d-mqtt"></div>MQTT</div>
-    <span id="last-upd">–</span>
+    <button class="icon-btn" id="lang-btn" onclick="toggleLang()" title="Language">🇩🇪</button>
     <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Dark/Light">🌙</button>
   </div>
 </header>
 
 <!-- ════ NAV ══════════════════════════════════════════════════════════════ -->
 <nav>
-  <button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
-  <button onclick="showTab('gpio',this)">GPIO / Relay</button>
-  <button onclick="showTab('config',this)">Config</button>
-  <button onclick="showTab('system',this)">System</button>
+  <button class="active" onclick="showTab('dashboard',this)" data-i18n="navDashboard">Dashboard</button>
+  <button onclick="showTab('gpio',this)" data-i18n="navRelayIo">Relay / IO</button>
+  <button onclick="showTab('config',this)" data-i18n="navConfig">Config</button>
+  <button onclick="showTab('system',this)" data-i18n="navSystem">System</button>
 </nav>
 
 <!-- ════ DASHBOARD ════════════════════════════════════════════════════════ -->
@@ -183,10 +195,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 
   <!-- Status bar -->
   <div class="status-card" id="status-bar" style="display:none">
-    <div class="status-item">Temp <strong id="s-temp">–</strong> °C</div>
-    <div class="status-item">Limit <strong id="s-limit">–</strong> %</div>
-    <div class="status-item">Ertrag heute <strong id="s-de">–</strong> kWh</div>
-    <div class="status-item">Gesamt <strong id="s-te">–</strong> kWh</div>
+    <div class="status-item"><span data-i18n="statTemp">Temp</span> <strong id="s-temp">–</strong> °C</div>
+    <div class="status-item"><span data-i18n="statLimit">Limit</span> <strong id="s-limit">–</strong> %</div>
+    <div class="status-item"><span data-i18n="statYieldToday">Yield today</span> <strong id="s-de">–</strong> kWh</div>
+    <div class="status-item"><span data-i18n="statTotal">Total</span> <strong id="s-te">–</strong> kWh</div>
     <div class="status-item" id="s-active"></div>
   </div>
 
@@ -213,20 +225,19 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
   </div>
 
   <!-- Power limit -->
-  <div class="sec">Leistungsbegrenzung</div>
+  <div class="sec" data-i18n="secPowerLimit">Power Limit</div>
   <div class="card">
     <input type="range" min="2" max="100" value="100" id="limit-range"
            oninput="document.getElementById('range-val').textContent=this.value+'%'">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <span id="range-val" style="color:var(--accent);font-weight:700">100%</span>
-      <button class="btn btn-ok" onclick="setLimit()">Setzen</button>
+      <button class="btn btn-ok" onclick="setLimit()" data-i18n="btnSet">Set</button>
     </div>
   </div>
 </div>
 
 <!-- ════ GPIO / RELAY ═════════════════════════════════════════════════════ -->
 <div id="tab-gpio" class="tab">
-  <div class="sec">Relay &amp; GPIO</div>
   <div class="gpio-grid">
     <div class="gpio-card">
       <div class="gpio-name">Relay</div>
@@ -267,84 +278,84 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 <div id="tab-config" class="tab">
   <div class="cfg-box">
     <h3>WiFi</h3>
-    <label>SSID<input type="text" id="c-ssid"></label>
-    <label>Password<input type="password" id="c-pass" placeholder="(unverändert lassen)"></label>
+    <label><span data-i18n="lblSsid">SSID</span><input type="text" id="c-ssid"></label>
+    <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
     <div class="chk-row">
-      <label><input type="checkbox" id="c-apfb"> AP-Fallback wenn kein STA</label>
+      <label><input type="checkbox" id="c-apfb"> <span data-i18n="lblApFallback">AP fallback if no STA</span></label>
     </div>
   </div>
   <div class="cfg-box">
-    <h3>Netzwerk</h3>
+    <h3 data-i18n="hNetwork">Network</h3>
     <div class="chk-row">
-      <label><input type="checkbox" id="c-static-ip"> Feste IP-Adresse (statt DHCP)</label>
+      <label><input type="checkbox" id="c-static-ip"> <span data-i18n="lblStaticIp">Static IP address (instead of DHCP)</span></label>
     </div>
     <div class="row2">
-      <label>IP-Adresse<input type="text" id="c-ip" placeholder="192.168.1.50"></label>
-      <label>Subnetzmaske<input type="text" id="c-subnet" placeholder="255.255.255.0"></label>
+      <label><span data-i18n="lblIpAddress">IP Address</span><input type="text" id="c-ip" placeholder="192.168.1.50"></label>
+      <label><span data-i18n="lblSubnet">Subnet Mask</span><input type="text" id="c-subnet" placeholder="255.255.255.0"></label>
     </div>
-    <label>Gateway (wird auch als DNS verwendet)<input type="text" id="c-gateway" placeholder="192.168.1.1"></label>
+    <label><span data-i18n="lblGateway">Gateway (also used as DNS)</span><input type="text" id="c-gateway" placeholder="192.168.1.1"></label>
   </div>
   <div class="cfg-box">
     <h3>DTU (Hoymiles)</h3>
     <div class="row2">
-      <label>Host / IP<input type="text" id="c-dtu-host"></label>
-      <label>Port<input type="number" id="c-dtu-port"></label>
+      <label><span data-i18n="lblHostIp">Host / IP</span><input type="text" id="c-dtu-host"></label>
+      <label><span data-i18n="lblPort">Port</span><input type="number" id="c-dtu-port"></label>
     </div>
     <div class="row2">
-      <label>Poll-Intervall (s, min 31)<input type="number" id="c-dtu-iv" min="31"></label>
-      <label>Cloud-Pause (s)<input type="number" id="c-dtu-cp" min="0"></label>
+      <label><span data-i18n="lblPollInterval">Poll interval (s, min 31)</span><input type="number" id="c-dtu-iv" min="31"></label>
+      <label><span data-i18n="lblCloudPause">Cloud pause (s)</span><input type="number" id="c-dtu-cp" min="0"></label>
     </div>
-    <label>Reboot nach Fails<input type="number" id="c-dtu-rf" min="0"></label>
+    <label><span data-i18n="lblRebootAfterFails">Reboot after fails</span><input type="number" id="c-dtu-rf" min="0"></label>
   </div>
   <div class="cfg-box">
     <h3>MQTT</h3>
     <div class="row2">
-      <label>Broker Host<input type="text" id="c-mqtt-host"></label>
-      <label>Port<input type="number" id="c-mqtt-port"></label>
+      <label><span data-i18n="lblBrokerHost">Broker Host</span><input type="text" id="c-mqtt-host"></label>
+      <label><span data-i18n="lblPort">Port</span><input type="number" id="c-mqtt-port"></label>
     </div>
     <div class="row2">
-      <label>Username<input type="text" id="c-mqtt-user"></label>
-      <label>Password<input type="password" id="c-mqtt-pass" placeholder="(unverändert)"></label>
+      <label><span data-i18n="lblUsername">Username</span><input type="text" id="c-mqtt-user"></label>
+      <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-mqtt-pass" data-i18n-ph="phUnchangedShort" placeholder="(unchanged)"></label>
     </div>
-    <label>Topic<input type="text" id="c-mqtt-topic"></label>
+    <label><span data-i18n="lblTopic">Topic</span><input type="text" id="c-mqtt-topic"></label>
     <div class="chk-row">
-      <label><input type="checkbox" id="c-mqtt-ha"> HA Auto-Discovery</label>
-      <label><input type="checkbox" id="c-mqtt-opendtu"> OpenDTU-Modus</label>
-      <label><input type="checkbox" id="c-mqtt-retain"> Retain</label>
+      <label><input type="checkbox" id="c-mqtt-ha"> <span data-i18n="lblHaDiscovery">HA Auto-Discovery</span></label>
+      <label><input type="checkbox" id="c-mqtt-opendtu"> <span data-i18n="lblOpenDtu">OpenDTU mode</span></label>
+      <label><input type="checkbox" id="c-mqtt-retain"> <span data-i18n="lblRetain">Retain</span></label>
     </div>
   </div>
   <div class="cfg-box">
-    <h3>Leistungsregelung</h3>
+    <h3 data-i18n="hPowerControl">Power Control</h3>
     <div class="row2">
-      <label>Standard-Limit (%)<input type="number" id="c-plim" min="2" max="100"></label>
-      <label>Timeout (s, 0=deaktiviert)<input type="number" id="c-ptmo" min="0"></label>
+      <label><span data-i18n="lblDefaultLimit">Default limit (%)</span><input type="number" id="c-plim" min="2" max="100"></label>
+      <label><span data-i18n="lblPlimTimeout">Timeout (s, 0=disabled)</span><input type="number" id="c-ptmo" min="0"></label>
     </div>
   </div>
   <div class="cfg-box">
-    <h3>NTP &amp; Zeit</h3>
+    <h3 data-i18n="hNtpTime">NTP &amp; Time</h3>
     <div class="row2">
-      <label>NTP Server<input type="text" id="c-ntp"></label>
-      <label>Timezone Offset (s)<input type="number" id="c-tz"></label>
+      <label><span data-i18n="lblNtpServer">NTP Server</span><input type="text" id="c-ntp"></label>
+      <label><span data-i18n="lblTzOffset">Timezone Offset (s)</span><input type="number" id="c-tz"></label>
     </div>
   </div>
   <div class="cfg-box">
-    <h3>Web-Server</h3>
-    <label>Port<input type="number" id="c-web-port" min="1" max="65535" placeholder="80"></label>
+    <h3 data-i18n="hWebServer">Web Server</h3>
+    <label><span data-i18n="lblPort">Port</span><input type="number" id="c-web-port" min="1" max="65535" placeholder="80"></label>
     <div class="chk-row">
-      <label><input type="checkbox" id="c-web-auth"> Benutzername/Passwort-Schutz</label>
+      <label><input type="checkbox" id="c-web-auth"> <span data-i18n="lblWebAuth">Username/password protection</span></label>
     </div>
     <div class="row2">
-      <label>Benutzername<input type="text" id="c-web-user" placeholder="admin"></label>
-      <label>Passwort<input type="password" id="c-web-pass" placeholder="(unverändert lassen)"></label>
+      <label><span data-i18n="lblUsername">Username</span><input type="text" id="c-web-user" placeholder="admin"></label>
+      <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-web-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
     </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:4px">
-      Port- und Auth-Änderungen werden erst nach dem automatischen Neustart aktiv. Bei aktivem Schutz fragt der Browser beim nächsten Zugriff nach den Zugangsdaten.</p>
+    <p style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="pWebServerHint">
+      Port and auth changes only take effect after the automatic restart. With protection enabled, the browser will prompt for credentials on the next request.</p>
   </div>
   <div class="cfg-box">
     <h3>System</h3>
     <div class="row2">
-      <label>LED Helligkeit (0–255)<input type="number" id="c-led" min="0" max="255"></label>
-      <label>Log-Level
+      <label><span data-i18n="lblLedBrightness">LED Brightness (0–255)</span><input type="number" id="c-led" min="0" max="255"></label>
+      <label><span data-i18n="lblLogLevel">Log Level</span>
         <select id="c-loglevel">
           <option value="0">0 — Error</option>
           <option value="1">1 — Warning</option>
@@ -353,82 +364,82 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
         </select>
       </label>
     </div>
-    <label>Manifest URL (leer = deaktiviert)
+    <label><span data-i18n="lblManifestUrl">Manifest URL (empty = disabled)</span>
       <input type="text" id="c-manifest-url" placeholder="https://raw.githubusercontent.com/…/manifest.json">
     </label>
   </div>
   <div class="btn-row">
-    <button class="btn btn-muted" onclick="loadConfig()">Zurücksetzen</button>
-    <button class="btn btn-ok"    onclick="saveConfig()">Speichern</button>
+    <button class="btn btn-muted" onclick="loadConfig()" data-i18n="btnReset">Reset</button>
+    <button class="btn btn-ok"    onclick="saveConfig()" data-i18n="btnSave">Save</button>
   </div>
 </div>
 
 <!-- ════ SYSTEM ═══════════════════════════════════════════════════════════ -->
 <div id="tab-system" class="tab">
   <div class="cfg-box">
-    <h3>Firmware OTA</h3>
-    <p style="color:var(--muted);font-size:12px;margin-bottom:12px">
-      Kompilierte .bin-Datei hochladen. Gateway startet nach erfolgreichem Update neu.</p>
+    <h3 data-i18n="hFirmwareOta">Firmware OTA</h3>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:12px" data-i18n="pFirmwareOta">
+      Upload a compiled .bin file. Gateway restarts after a successful update.</p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <input type="file" accept=".bin" id="fw-file"
              style="background:none;border:none;color:var(--text);padding:0;flex:1">
-      <button class="btn btn-ok" onclick="doOta('firmware','fw-file','/update')">Flash</button>
+      <button class="btn btn-ok" onclick="doOta('firmware','fw-file','/update')" data-i18n="btnFlash">Flash</button>
     </div>
     <div class="ota-progress" id="fw-prog">
       <div class="bar-wrap"><div class="bar" id="fw-bar" style="width:0"></div></div>
-      <div class="ota-status" id="fw-status">Hochladen…</div>
+      <div class="ota-status" id="fw-status" data-i18n="otaUploading">Uploading…</div>
     </div>
   </div>
 
   <div class="cfg-box">
-    <h3>Filesystem OTA</h3>
-    <p style="color:var(--muted);font-size:12px;margin-bottom:12px">
-      LittleFS .bin (data/www) hochladen.</p>
+    <h3 data-i18n="hFilesystemOta">Filesystem OTA</h3>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:12px" data-i18n="pFilesystemOta">
+      Upload a LittleFS .bin (data/www).</p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <input type="file" accept=".bin" id="fs-file"
              style="background:none;border:none;color:var(--text);padding:0;flex:1">
-      <button class="btn btn-ok" onclick="doOta('filesystem','fs-file','/updatefs')">Flash</button>
+      <button class="btn btn-ok" onclick="doOta('filesystem','fs-file','/updatefs')" data-i18n="btnFlash">Flash</button>
     </div>
     <div class="ota-progress" id="fs-prog">
       <div class="bar-wrap"><div class="bar" id="fs-bar" style="width:0"></div></div>
-      <div class="ota-status" id="fs-status">Hochladen…</div>
+      <div class="ota-status" id="fs-status" data-i18n="otaUploading">Uploading…</div>
     </div>
   </div>
 
   <div class="cfg-box" id="ota-check-box">
-    <h3>Internet Update</h3>
+    <h3 data-i18n="hInternetUpdate">Internet Update</h3>
     <div class="ota-info" id="ota-check-info">–</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-muted" id="btn-ota-check" onclick="checkUpdate()">Prüfen</button>
-      <button class="btn btn-ok"    id="btn-ota-install" style="display:none" onclick="installUpdate()">Jetzt installieren</button>
+      <button class="btn btn-muted" id="btn-ota-check" onclick="checkUpdate()" data-i18n="btnCheck">Check</button>
+      <button class="btn btn-ok"    id="btn-ota-install" style="display:none" onclick="installUpdate()" data-i18n="btnInstallNow">Install now</button>
     </div>
   </div>
 
   <div class="cfg-box">
-    <h3>Konfiguration sichern</h3>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px">
-      Backup enthält alle Einstellungen inkl. WLAN-/MQTT-/Web-Passwörter im Klartext — Datei sicher aufbewahren.</p>
+    <h3 data-i18n="hBackupConfig">Backup Configuration</h3>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px" data-i18n="pBackupHint">
+      Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.</p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <a class="btn btn-muted" href="/api/config/backup" download>Backup herunterladen</a>
+      <a class="btn btn-muted" href="/api/config/backup" download data-i18n="btnDownloadBackup">Download Backup</a>
       <input type="file" accept=".json" id="restore-file"
              style="background:none;border:none;color:var(--text);padding:0;flex:1">
-      <button class="btn btn-ok" onclick="doRestore()">Wiederherstellen</button>
+      <button class="btn btn-ok" onclick="doRestore()" data-i18n="btnRestore">Restore</button>
     </div>
   </div>
 
   <div class="cfg-box">
-    <h3>Geräteinformationen</h3>
+    <h3 data-i18n="hDeviceInfo">Device Information</h3>
     <div id="sysinfo"></div>
   </div>
 
   <div class="cfg-box" style="border-color:var(--red)">
     <h3 style="color:var(--red)">Danger Zone</h3>
     <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
-      <button class="btn btn-muted"   onclick="doReboot()">Gateway Neustart</button>
-      <button class="btn btn-danger"  onclick="doFactory()">Factory Reset</button>
+      <button class="btn btn-muted"   onclick="doReboot()"  data-i18n="btnRebootGw">Reboot Gateway</button>
+      <button class="btn btn-danger"  onclick="doFactory()" data-i18n="btnFactoryReset">Factory Reset</button>
     </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:8px">
-      Factory Reset löscht config.json und startet neu.</p>
+    <p style="font-size:11px;color:var(--muted);margin-top:8px" data-i18n="pFactoryResetHint">
+      Factory Reset erases config.json and restarts.</p>
   </div>
 </div>
 
@@ -441,6 +452,134 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 const $ = id => document.getElementById(id);
 const txt = (id, v) => { const e = $(id); if (e) e.textContent = v; };
 const pct = (v, max) => Math.min(100, Math.max(0, v / max * 100)).toFixed(1) + '%';
+
+// ─── i18n ─────────────────────────────────────────────────────────────────
+const I18N = {
+  en: {
+    navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
+    statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Yield today', statTotal: 'Total',
+    statActive: 'Active', statStandby: 'Standby',
+    secPowerLimit: 'Power Limit', btnSet: 'Set',
+    hNetwork: 'Network', hPowerControl: 'Power Control', hNtpTime: 'NTP & Time', hWebServer: 'Web Server',
+    hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
+    hBackupConfig: 'Backup Configuration', hDeviceInfo: 'Device Information',
+    lblSsid: 'SSID', lblPassword: 'Password', lblApFallback: 'AP fallback if no STA',
+    lblStaticIp: 'Static IP address (instead of DHCP)', lblIpAddress: 'IP Address', lblSubnet: 'Subnet Mask',
+    lblGateway: 'Gateway (also used as DNS)', lblHostIp: 'Host / IP', lblPort: 'Port',
+    lblPollInterval: 'Poll interval (s, min 31)', lblCloudPause: 'Cloud pause (s)',
+    lblRebootAfterFails: 'Reboot after fails', lblBrokerHost: 'Broker Host', lblUsername: 'Username',
+    lblTopic: 'Topic', lblHaDiscovery: 'HA Auto-Discovery', lblOpenDtu: 'OpenDTU mode', lblRetain: 'Retain',
+    lblDefaultLimit: 'Default limit (%)', lblPlimTimeout: 'Timeout (s, 0=disabled)',
+    lblNtpServer: 'NTP Server', lblTzOffset: 'Timezone Offset (s)', lblWebAuth: 'Username/password protection',
+    lblLedBrightness: 'LED Brightness (0–255)', lblLogLevel: 'Log Level',
+    lblManifestUrl: 'Manifest URL (empty = disabled)',
+    phUnchanged: '(leave unchanged)', phUnchangedShort: '(unchanged)',
+    pWebServerHint: 'Port and auth changes only take effect after the automatic restart. With protection enabled, the browser will prompt for credentials on the next request.',
+    btnReset: 'Reset', btnSave: 'Save',
+    pFirmwareOta: 'Upload a compiled .bin file. Gateway restarts after a successful update.',
+    pFilesystemOta: 'Upload a LittleFS .bin (data/www).',
+    btnFlash: 'Flash', otaUploading: 'Uploading…',
+    btnCheck: 'Check', btnInstallNow: 'Install now',
+    pBackupHint: 'Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.',
+    btnDownloadBackup: 'Download Backup', btnRestore: 'Restore',
+    btnRebootGw: 'Reboot Gateway', btnFactoryReset: 'Factory Reset',
+    pFactoryResetHint: 'Factory Reset erases config.json and restarts.',
+    fmtFirmware: (fw, build) => `${fw} (Build ${build})`,
+    rowFirmware: 'Firmware', rowMac: 'MAC', rowIp: 'IP', rowRssi: 'WiFi RSSI', rowUptime: 'Uptime', rowHeap: 'Free Heap', rowNtpTime: 'NTP Time',
+    errGeneric: 'Error', errLoadConfig: 'Failed to load config', errSaveConfig: 'Error saving',
+    errSelectBin: 'Please select a .bin file first', errSelectBackup: 'Please select a backup file first',
+    errInvalidBackup: 'Invalid backup file', errRestore: 'Error restoring',
+    errNoManifest: 'Error (no manifest configured?)', errConnection: 'Connection error', errNoUrl: 'No URL available',
+    msgSaved: 'Saved — gateway restarting…', msgOtaDone: 'Done — gateway restarting…',
+    msgOtaComplete: 'OTA complete', msgOtaError: 'OTA error',
+    msgRestored: 'Restored — gateway restarting…',
+    msgCheckingManifest: 'Checking manifest…', msgNoManifestConfigured: 'No manifest configured (Config tab)',
+    msgNoCheckYet: 'No check performed yet', msgUpdateAvailable: (v,b,n) => `Update available: v${v} (Build ${b})${n}`,
+    msgUpToDate: (v,b) => `Up to date — v${v} (Build ${b})`,
+    btnInstallFwFs: 'Install firmware + FS', msgChecking: 'Checking…',
+    msgUpdateStarted: 'Update started — gateway restarts after flashing', msgLoading: 'Loading…',
+    confirmRestore: 'Overwrite current configuration with the backup file and restart?',
+    confirmInstallFwFs: 'Install firmware + filesystem?', confirmInstallFw: 'Install firmware?',
+    confirmReboot: 'Restart the gateway now?', msgRestarting: 'Restarting…',
+    confirmFactoryReset: 'Factory reset? All settings will be erased!', msgFactoryReset: 'Factory reset — gateway restarting…',
+  },
+  de: {
+    navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
+    statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
+    statActive: 'Aktiv', statStandby: 'Standby',
+    secPowerLimit: 'Leistungsbegrenzung', btnSet: 'Setzen',
+    hNetwork: 'Netzwerk', hPowerControl: 'Leistungsregelung', hNtpTime: 'NTP & Zeit', hWebServer: 'Web-Server',
+    hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
+    hBackupConfig: 'Konfiguration sichern', hDeviceInfo: 'Geräteinformationen',
+    lblSsid: 'SSID', lblPassword: 'Passwort', lblApFallback: 'AP-Fallback wenn kein STA',
+    lblStaticIp: 'Feste IP-Adresse (statt DHCP)', lblIpAddress: 'IP-Adresse', lblSubnet: 'Subnetzmaske',
+    lblGateway: 'Gateway (wird auch als DNS verwendet)', lblHostIp: 'Host / IP', lblPort: 'Port',
+    lblPollInterval: 'Poll-Intervall (s, min 31)', lblCloudPause: 'Cloud-Pause (s)',
+    lblRebootAfterFails: 'Reboot nach Fails', lblBrokerHost: 'Broker Host', lblUsername: 'Benutzername',
+    lblTopic: 'Topic', lblHaDiscovery: 'HA Auto-Discovery', lblOpenDtu: 'OpenDTU-Modus', lblRetain: 'Retain',
+    lblDefaultLimit: 'Standard-Limit (%)', lblPlimTimeout: 'Timeout (s, 0=deaktiviert)',
+    lblNtpServer: 'NTP Server', lblTzOffset: 'Zeitzone-Offset (s)', lblWebAuth: 'Benutzername/Passwort-Schutz',
+    lblLedBrightness: 'LED Helligkeit (0–255)', lblLogLevel: 'Log-Level',
+    lblManifestUrl: 'Manifest URL (leer = deaktiviert)',
+    phUnchanged: '(unverändert lassen)', phUnchangedShort: '(unverändert)',
+    pWebServerHint: 'Port- und Auth-Änderungen werden erst nach dem automatischen Neustart aktiv. Bei aktivem Schutz fragt der Browser beim nächsten Zugriff nach den Zugangsdaten.',
+    btnReset: 'Zurücksetzen', btnSave: 'Speichern',
+    pFirmwareOta: 'Kompilierte .bin-Datei hochladen. Gateway startet nach erfolgreichem Update neu.',
+    pFilesystemOta: 'LittleFS .bin (data/www) hochladen.',
+    btnFlash: 'Flash', otaUploading: 'Hochladen…',
+    btnCheck: 'Prüfen', btnInstallNow: 'Jetzt installieren',
+    pBackupHint: 'Backup enthält alle Einstellungen inkl. WLAN-/MQTT-/Web-Passwörter im Klartext — Datei sicher aufbewahren.',
+    btnDownloadBackup: 'Backup herunterladen', btnRestore: 'Wiederherstellen',
+    btnRebootGw: 'Gateway Neustart', btnFactoryReset: 'Factory Reset',
+    pFactoryResetHint: 'Factory Reset löscht config.json und startet neu.',
+    fmtFirmware: (fw, build) => `${fw} (Build ${build})`,
+    rowFirmware: 'Firmware', rowMac: 'MAC', rowIp: 'IP', rowRssi: 'WiFi RSSI', rowUptime: 'Laufzeit', rowHeap: 'Freier Heap', rowNtpTime: 'NTP Zeit',
+    errGeneric: 'Fehler', errLoadConfig: 'Config laden fehlgeschlagen', errSaveConfig: 'Fehler beim Speichern',
+    errSelectBin: 'Bitte zuerst eine .bin-Datei wählen', errSelectBackup: 'Bitte zuerst eine Backup-Datei wählen',
+    errInvalidBackup: 'Ungültige Backup-Datei', errRestore: 'Fehler beim Wiederherstellen',
+    errNoManifest: 'Fehler (kein Manifest konfiguriert?)', errConnection: 'Verbindungsfehler', errNoUrl: 'Keine URL verfügbar',
+    msgSaved: 'Gespeichert — Gateway startet neu…', msgOtaDone: 'Fertig — Gateway startet neu…',
+    msgOtaComplete: 'OTA abgeschlossen', msgOtaError: 'OTA Fehler',
+    msgRestored: 'Wiederhergestellt — Gateway startet neu…',
+    msgCheckingManifest: 'Prüfe Manifest…', msgNoManifestConfigured: 'Kein Manifest konfiguriert (Config-Tab)',
+    msgNoCheckYet: 'Noch kein Check durchgeführt', msgUpdateAvailable: (v,b,n) => `Update verfügbar: v${v} (Build ${b})${n}`,
+    msgUpToDate: (v,b) => `Aktuell — v${v} (Build ${b})`,
+    btnInstallFwFs: 'Firmware + FS installieren', msgChecking: 'Prüfe…',
+    msgUpdateStarted: 'Update gestartet — Gateway startet nach dem Flash neu', msgLoading: 'Lädt…',
+    confirmRestore: 'Aktuelle Konfiguration mit der Backup-Datei überschreiben und neu starten?',
+    confirmInstallFwFs: 'Firmware + Filesystem installieren?', confirmInstallFw: 'Firmware installieren?',
+    confirmReboot: 'Gateway jetzt neu starten?', msgRestarting: 'Neustart…',
+    confirmFactoryReset: 'Factory Reset? Alle Einstellungen werden gelöscht!', msgFactoryReset: 'Factory Reset — Gateway startet neu…',
+  },
+};
+
+function currentLang() { return localStorage.getItem('lang') || 'en'; }
+function tr(key, ...args) {
+  const dict = I18N[currentLang()] || I18N.en;
+  const v = dict[key] ?? I18N.en[key] ?? key;
+  return typeof v === 'function' ? v(...args) : v;
+}
+
+function applyI18n() {
+  document.documentElement.lang = currentLang();
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
+}
+
+function initLang() {
+  $('lang-btn').textContent = currentLang() === 'en' ? '🇩🇪' : '🇬🇧';
+  applyI18n();
+}
+
+function toggleLang() {
+  const next = currentLang() === 'en' ? 'de' : 'en';
+  localStorage.setItem('lang', next);
+  $('lang-btn').textContent = next === 'en' ? '🇩🇪' : '🇬🇧';
+  applyI18n();
+  // Re-render anything currently showing dynamically-built/translated text
+  refreshData();
+  if ($('tab-system').classList.contains('active')) { loadSysInfo(); loadOtaStatus(); }
+}
 
 // ─── Theme ────────────────────────────────────────────────────────────────
 (function initTheme() {
@@ -508,7 +647,7 @@ async function refreshData() {
     txt('s-te',    d.grid.tE.toFixed(1));
     $('s-active').innerHTML =
       '<span class="badge ' + (d.inverter.active ? 'b-ok' : 'b-off') + '">' +
-      (d.inverter.active ? 'Aktiv' : 'Standby') + '</span>';
+      (d.inverter.active ? tr('statActive') : tr('statStandby')) + '</span>';
     $('status-bar').style.display = '';
 
     const lr = $('limit-range');
@@ -516,20 +655,29 @@ async function refreshData() {
       lr.value = d.inverter.powerLimit;
       txt('range-val', d.inverter.powerLimit + '%');
     }
-    txt('last-upd', new Date(d.timestamp * 1000).toLocaleTimeString());
   } catch (e) { /* silent — shown by dot color */ }
 }
 
-// ─── Info (status dots) ───────────────────────────────────────────────────
+// ─── Info (status dots + header info bar) ─────────────────────────────────
 async function refreshInfo() {
   try {
     const d = await fetch('/api/info.json').then(r => r.json());
     setDot('d-wifi', d.wifi);
     setDot('d-dtu',  d.dtu);
     setDot('d-mqtt', d.mqtt);
+    txt('hi-mac', d.mac);
+    txt('hi-fw',  tr('fmtFirmware', d.fw, d.build));
   } catch (e) {
     setDot('d-wifi', false); setDot('d-dtu', false); setDot('d-mqtt', false);
   }
+}
+
+// ─── Header clock ──────────────────────────────────────────────────────────
+function tickClock() {
+  const now = new Date();
+  const locale = currentLang() === 'de' ? 'de-DE' : 'en-GB';
+  txt('hi-time', now.toLocaleTimeString(locale));
+  txt('hi-date', now.toLocaleDateString(locale));
 }
 
 // ─── GPIO ─────────────────────────────────────────────────────────────────
@@ -559,7 +707,7 @@ async function setGpio(key, state) {
                                body: JSON.stringify(body) });
     applyGpio(key, state);
     toast(key + ' → ' + (state ? 'ON' : 'OFF'));
-  } catch (e) { toast('Fehler', false); }
+  } catch (e) { toast(tr('errGeneric'), false); }
 }
 
 // ─── Power limit ──────────────────────────────────────────────────────────
@@ -570,7 +718,7 @@ async function setLimit() {
                               body: JSON.stringify({ powerLimit: val }) });
     txt('range-val', val + '%');
     toast('Limit → ' + val + '%');
-  } catch (e) { toast('Fehler', false); }
+  } catch (e) { toast(tr('errGeneric'), false); }
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────
@@ -605,7 +753,7 @@ async function loadConfig() {
     $('c-led').value         = d.ledBrightness      || 80;
     $('c-loglevel').value    = d.logLevel           || 2;
     $('c-manifest-url').value = d.otaManifestUrl   || '';
-  } catch (e) { toast('Config laden fehlgeschlagen', false); }
+  } catch (e) { toast(tr('errLoadConfig'), false); }
 }
 
 async function saveConfig() {
@@ -652,7 +800,7 @@ async function saveConfig() {
                           body: JSON.stringify(cfg) });
     const d = await r.json();
     if (d.ok) {
-      toast('Gespeichert — Gateway startet neu…');
+      toast(tr('msgSaved'));
       setTimeout(async () => {
         try {
           await fetch('/api/dtu', { method: 'POST',
@@ -661,9 +809,9 @@ async function saveConfig() {
         } catch(e) {}
       }, 500);
     } else {
-      toast('Fehler beim Speichern', false);
+      toast(tr('errSaveConfig'), false);
     }
-  } catch (e) { toast('Fehler', false); }
+  } catch (e) { toast(tr('errGeneric'), false); }
 }
 
 // ─── System info ──────────────────────────────────────────────────────────
@@ -676,13 +824,13 @@ async function loadSysInfo() {
   try {
     const d = await fetch('/api/info.json').then(r => r.json());
     const rows = [
-      ['Firmware',   d.fw + ' (Build ' + d.build + ')'],
-      ['MAC',        d.mac],
-      ['IP',         d.ip],
-      ['WiFi RSSI',  d.rssi + ' dBm'],
-      ['Uptime',     fmtUptime(d.uptime)],
-      ['Free Heap',  (d.heap / 1024).toFixed(1) + ' kB'],
-      ['NTP Zeit',   d.ntpTime ? new Date(d.ntpTime * 1000).toLocaleString() : '–'],
+      [tr('rowFirmware'), tr('fmtFirmware', d.fw, d.build)],
+      [tr('rowMac'),   d.mac],
+      [tr('rowIp'),    d.ip],
+      [tr('rowRssi'),  d.rssi + ' dBm'],
+      [tr('rowUptime'), fmtUptime(d.uptime)],
+      [tr('rowHeap'),  (d.heap / 1024).toFixed(1) + ' kB'],
+      [tr('rowNtpTime'), d.ntpTime ? new Date(d.ntpTime * 1000).toLocaleString() : '–'],
     ];
     $('sysinfo').innerHTML = rows.map(([k, v]) =>
       '<div class="stat-row"><span class="sk">' + k +
@@ -694,7 +842,7 @@ async function loadSysInfo() {
 // ─── OTA ──────────────────────────────────────────────────────────────────
 function doOta(label, fileId, endpoint) {
   const file = $(fileId).files[0];
-  if (!file) { toast('Bitte zuerst eine .bin-Datei wählen', false); return; }
+  if (!file) { toast(tr('errSelectBin'), false); return; }
   const progId = fileId === 'fw-file' ? 'fw-prog' : 'fs-prog';
   const barId  = fileId === 'fw-file' ? 'fw-bar'  : 'fs-bar';
   const statId = fileId === 'fw-file' ? 'fw-status' : 'fs-status';
@@ -704,10 +852,10 @@ function doOta(label, fileId, endpoint) {
   xhr.upload.onprogress = e => {
     const p = Math.round(e.loaded / e.total * 100);
     $(barId).style.width = p + '%';
-    txt(statId, 'Hochladen… ' + p + '%');
+    txt(statId, tr('otaUploading') + ' ' + p + '%');
   };
-  xhr.onload = () => { txt(statId, 'Fertig — Gateway startet neu…'); toast('OTA abgeschlossen'); };
-  xhr.onerror = () => { txt(statId, 'Fehler'); toast('OTA Fehler', false); };
+  xhr.onload = () => { txt(statId, tr('msgOtaDone')); toast(tr('msgOtaComplete')); };
+  xhr.onerror = () => { txt(statId, tr('errGeneric')); toast(tr('msgOtaError'), false); };
   const fd = new FormData();
   fd.append(label, file, file.name);
   xhr.send(fd);
@@ -716,15 +864,15 @@ function doOta(label, fileId, endpoint) {
 // ─── Config Backup/Restore ────────────────────────────────────────────────
 function doRestore() {
   const file = $('restore-file').files[0];
-  if (!file) { toast('Bitte zuerst eine Backup-Datei wählen', false); return; }
-  if (!confirm('Aktuelle Konfiguration mit der Backup-Datei überschreiben und neu starten?')) return;
+  if (!file) { toast(tr('errSelectBackup'), false); return; }
+  if (!confirm(tr('confirmRestore'))) return;
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/config/restore');
   xhr.onload = () => {
-    if (xhr.status === 200) toast('Wiederhergestellt — Gateway startet neu…');
-    else toast('Ungültige Backup-Datei', false);
+    if (xhr.status === 200) toast(tr('msgRestored'));
+    else toast(tr('errInvalidBackup'), false);
   };
-  xhr.onerror = () => toast('Fehler beim Wiederherstellen', false);
+  xhr.onerror = () => toast(tr('errRestore'), false);
   const fd = new FormData();
   fd.append('config', file, file.name);
   xhr.send(fd);
@@ -742,36 +890,36 @@ function updateOtaCard(d) {
   const box  = $('ota-check-box');
   const btn  = $('btn-ota-install');
   if (d.checking) {
-    txt('ota-check-info', 'Prüfe Manifest…');
+    txt('ota-check-info', tr('msgCheckingManifest'));
     btn.style.display = 'none';
     box.classList.remove('ota-avail');
     return;
   }
   if (!d.manifestUrl) {
-    txt('ota-check-info', 'Kein Manifest konfiguriert (Config-Tab)');
+    txt('ota-check-info', tr('msgNoManifestConfigured'));
     btn.style.display = 'none';
     box.classList.remove('ota-avail');
     return;
   }
   if (!d.lastCheckMs) {
-    txt('ota-check-info', 'Noch kein Check durchgeführt');
+    txt('ota-check-info', tr('msgNoCheckYet'));
     btn.style.display = 'none';
     box.classList.remove('ota-avail');
     return;
   }
   if (d.available) {
     const notes = d.notes ? ' — ' + d.notes : '';
-    txt('ota-check-info', 'Update verfügbar: v' + d.version + ' (Build ' + d.buildNumber + ')' + notes);
+    txt('ota-check-info', tr('msgUpdateAvailable', d.version, d.buildNumber, notes));
     btn.style.display  = '';
     btn.dataset.url    = d.url;
     btn.dataset.fsUrl  = d.fsUrl || '';
     btn.dataset.md5    = d.md5   || '';
     btn.dataset.fsMd5  = d.fsMd5 || '';
     btn.disabled       = false;
-    btn.textContent    = d.fsUrl ? 'Firmware + FS installieren' : 'Jetzt installieren';
+    btn.textContent    = d.fsUrl ? tr('btnInstallFwFs') : tr('btnInstallNow');
     box.classList.add('ota-avail');
   } else {
-    txt('ota-check-info', 'Aktuell — v' + d.currentVersion + ' (Build ' + d.currentBuild + ')');
+    txt('ota-check-info', tr('msgUpToDate', d.currentVersion, d.currentBuild));
     btn.style.display = 'none';
     box.classList.remove('ota-avail');
   }
@@ -780,18 +928,18 @@ function updateOtaCard(d) {
 async function checkUpdate() {
   const btn = $('btn-ota-check');
   btn.disabled = true;
-  txt('ota-check-info', 'Prüfe…');
+  txt('ota-check-info', tr('msgChecking'));
   try {
     const r = await fetch('/api/ota/check', { method: 'POST' });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      txt('ota-check-info', d.error || 'Fehler (kein Manifest konfiguriert?)');
+      txt('ota-check-info', d.error || tr('errNoManifest'));
       btn.disabled = false;
       return;
     }
     pollOtaCheck();
   } catch(e) {
-    txt('ota-check-info', 'Verbindungsfehler');
+    txt('ota-check-info', tr('errConnection'));
     btn.disabled = false;
   }
 }
@@ -814,8 +962,8 @@ async function installUpdate() {
   const fsUrl = $('btn-ota-install').dataset.fsUrl;
   const md5   = $('btn-ota-install').dataset.md5;
   const fsMd5 = $('btn-ota-install').dataset.fsMd5;
-  if (!url) { toast('Keine URL verfügbar', false); return; }
-  const label = fsUrl ? 'Firmware + Filesystem installieren?' : 'Firmware installieren?';
+  if (!url) { toast(tr('errNoUrl'), false); return; }
+  const label = fsUrl ? tr('confirmInstallFwFs') : tr('confirmInstallFw');
   if (!confirm(label + '\n' + url)) return;
   const body = { url };
   if (fsUrl) body.fsUrl = fsUrl;
@@ -825,35 +973,38 @@ async function installUpdate() {
     await fetch('/api/ota/url', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body) });
-    toast('Update gestartet — Gateway startet nach dem Flash neu');
-    txt('btn-ota-install', 'Lädt…');
+    toast(tr('msgUpdateStarted'));
+    txt('btn-ota-install', tr('msgLoading'));
     $('btn-ota-install').disabled = true;
-  } catch(e) { toast('Fehler', false); }
+  } catch(e) { toast(tr('errGeneric'), false); }
 }
 
 // ─── Reboot / Factory Reset ───────────────────────────────────────────────
 async function doReboot() {
-  if (!confirm('Gateway jetzt neu starten?')) return;
+  if (!confirm(tr('confirmReboot'))) return;
   try {
     await fetch('/api/dtu', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ rebootGateway: 1 }) });
-    toast('Neustart…');
+    toast(tr('msgRestarting'));
   } catch (e) {}
 }
 
 async function doFactory() {
-  if (!confirm('Factory Reset? Alle Einstellungen werden gelöscht!')) return;
+  if (!confirm(tr('confirmFactoryReset'))) return;
   try {
     await fetch('/api/dtu', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ factoryReset: 1 }) });
-    toast('Factory Reset — Gateway startet neu…');
+    toast(tr('msgFactoryReset'));
   } catch (e) {}
 }
 
-// ─── Polling ──────────────────────────────────────────────────────────────
+// ─── Init / Polling ────────────────────────────────────────────────────────
+initLang();
+tickClock();
 refreshData();
 refreshInfo();
 refreshGpio();
+setInterval(tickClock,    1000);
 setInterval(refreshData,  10000);
 setInterval(refreshInfo,  15000);
 setInterval(refreshGpio,   5000);

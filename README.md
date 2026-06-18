@@ -17,7 +17,7 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | Feature | Details |
 |---|---|
 | ⚡ Solar data | PV1/PV2 power, voltage, current · Grid feed-in · Daily & total energy · Temperature |
-| 🌐 Web dashboard | Live data, GPIO controls, config tabs — responsive Dark Mode SPA at `http://<ip>` |
+| 🌐 Web dashboard | Live data, GPIO controls, config tabs — responsive Dark Mode SPA at `http://<ip>`, English/German UI toggle |
 | 📡 MQTT | Full publish/subscribe · Home Assistant auto-discovery · OpenDTU-compatible mode |
 | 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/dtu`, `/api/config`, `/api/ota/*` |
 | 🌈 NeoPixel LED | Onboard WS2812B (GPIO38) — 11 states via colour & animation |
