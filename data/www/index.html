@@ -98,6 +98,7 @@ input:checked + .slider               { background: var(--accent); }
 input:checked + .slider::before       { transform: translateX(21px); }
 input:disabled + .slider              { opacity: .4; cursor: default; }
 .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge-lg { padding: 6px 16px; font-size: 14px; }
 .b-ok   { background: var(--ok-bg);   color: var(--accent); }
 .b-off  { background: var(--surface2); color: var(--muted); }
 .b-err  { background: var(--err-bg);  color: var(--red); }
@@ -193,7 +194,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     <div class="card">
       <div class="card-title" data-i18n="statTemp">Temp</div>
       <div><span class="card-val" id="s-temp">–</span><span class="card-unit">°C</span></div>
-      <div class="card-sub" id="s-active"></div>
     </div>
     <div class="card">
       <div class="card-title" data-i18n="statLimit">Limit</div>
@@ -231,7 +231,12 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     </div>
   </div>
 
-  <!-- Power limit -->
+  <!-- Status + Power limit -->
+  <div class="row2">
+  <div class="card">
+    <div class="sec" data-i18n="secStatus">Status</div>
+    <div id="s-active"></div>
+  </div>
   <div class="card">
     <div class="sec" data-i18n="secPowerLimit">Power Limit</div>
     <input type="range" min="2" max="100" value="100" id="limit-range"
@@ -240,6 +245,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
       <span id="range-val" style="color:var(--accent);font-weight:700">100%</span>
       <button class="btn btn-ok" onclick="setLimit()" data-i18n="btnSet">Set</button>
     </div>
+  </div>
   </div>
 </div>
 
@@ -466,7 +472,7 @@ const I18N = {
     navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Yield today', statTotal: 'Total',
     statActive: 'Active', statStandby: 'Standby',
-    secPowerLimit: 'Power Limit', btnSet: 'Set',
+    secPowerLimit: 'Power Limit', secStatus: 'Status', btnSet: 'Set',
     hNetwork: 'Network', hPowerControl: 'Power Control', hNtpTime: 'NTP & Time', hWebServer: 'Web Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
     hBackupConfig: 'Backup Configuration', hDeviceInfo: 'Device Information',
@@ -514,7 +520,7 @@ const I18N = {
     navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
     statActive: 'Aktiv', statStandby: 'Standby',
-    secPowerLimit: 'Leistungsbegrenzung', btnSet: 'Setzen',
+    secPowerLimit: 'Leistungsbegrenzung', secStatus: 'Status', btnSet: 'Setzen',
     hNetwork: 'Netzwerk', hPowerControl: 'Leistungsregelung', hNtpTime: 'NTP & Zeit', hWebServer: 'Web-Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
     hBackupConfig: 'Konfiguration sichern', hDeviceInfo: 'Geräteinformationen',
@@ -653,7 +659,7 @@ async function refreshData() {
     txt('s-de',    d.grid.dE.toFixed(3));
     txt('s-te',    d.grid.tE.toFixed(1));
     $('s-active').innerHTML =
-      '<span class="badge ' + (d.inverter.active ? 'b-ok' : 'b-off') + '">' +
+      '<span class="badge badge-lg ' + (d.inverter.active ? 'b-ok' : 'b-off') + '">' +
       (d.inverter.active ? tr('statActive') : tr('statStandby')) + '</span>';
     $('status-bar').style.display = '';
 
@@ -679,12 +685,16 @@ async function refreshInfo() {
   }
 }
 
+// ─── Date/time formatting (fixed format, independent of UI language) ──────
+const pad2 = n => String(n).padStart(2, '0');
+function fmtDate(d) { return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`; }
+function fmtTime(d) { return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; }
+
 // ─── Header clock ──────────────────────────────────────────────────────────
 function tickClock() {
   const now = new Date();
-  const locale = currentLang() === 'de' ? 'de-DE' : 'en-GB';
-  txt('hi-time', now.toLocaleTimeString(locale));
-  txt('hi-date', now.toLocaleDateString(locale));
+  txt('hi-time', fmtTime(now));
+  txt('hi-date', fmtDate(now));
 }
 
 // ─── GPIO ─────────────────────────────────────────────────────────────────
@@ -837,7 +847,7 @@ async function loadSysInfo() {
       [tr('rowRssi'),  d.rssi + ' dBm'],
       [tr('rowUptime'), fmtUptime(d.uptime)],
       [tr('rowHeap'),  (d.heap / 1024).toFixed(1) + ' kB'],
-      [tr('rowNtpTime'), d.ntpTime ? new Date(d.ntpTime * 1000).toLocaleString() : '–'],
+      [tr('rowNtpTime'), d.ntpTime ? (fmtDate(new Date(d.ntpTime * 1000)) + ' ' + fmtTime(new Date(d.ntpTime * 1000))) : '–'],
     ];
     $('sysinfo').innerHTML = rows.map(([k, v]) =>
       '<div class="stat-row"><span class="sk">' + k +
