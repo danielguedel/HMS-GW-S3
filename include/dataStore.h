@@ -90,9 +90,6 @@ struct DataStore {
         char     notes[128];         // Release-Notes
         uint32_t lastCheckMs;        // millis() des letzten Checks (0 = noch nie)
     } otaInfo;
-
-    // -- Mutex ------------------------------------------------------------------
-    SemaphoreHandle_t mutex;
 };
 
 extern DataStore ds;

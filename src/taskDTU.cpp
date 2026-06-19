@@ -254,7 +254,10 @@ static volatile uint32_t _cloudPauseAt = 0;  // millis() of last ERR_RST -14
 
 static void onData(void*, AsyncClient*, void* data, size_t len) {
     size_t copy = len < sizeof(_rxBuf) ? len : sizeof(_rxBuf);
-    xSemaphoreTake(_rxMutex, portMAX_DELAY);
+    if (xSemaphoreTake(_rxMutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+        LOG_W(MOD_DTU, "RX mutex busy, dropping %zu bytes", len);
+        return;
+    }
     memcpy(_rxBuf, data, copy);
     _rxLen = copy;
     xSemaphoreGive(_rxMutex);
@@ -381,7 +384,7 @@ void taskDTU(void* pvParameters) {
 
     uint32_t lastPollMs = 0;
     int      failCount  = 0;
-    static uint8_t  localBuf[2048];
+    static uint8_t  localBuf[2048];  // static: avoid 2KB on the 8192B taskDTU stack
     size_t   localLen;
 
     for (;;) {

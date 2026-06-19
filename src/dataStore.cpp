@@ -2,10 +2,11 @@
 #include "config.h"
 
 DataStore ds;
+static SemaphoreHandle_t _mutex = nullptr;  // private: never exposed via DataStore, only ds*() API may touch it
 
 void dsInit() {
-    ds.mutex = xSemaphoreCreateMutex();
-    configASSERT(ds.mutex);
+    _mutex = xSemaphoreCreateMutex();
+    configASSERT(_mutex);
 
     // PvData  -  Nullwerte / ungültig
     memset(&ds.pv, 0, sizeof(ds.pv));
@@ -49,113 +50,113 @@ void dsInit() {
 // --- Lesen --------------------------------------------------------------------
 
 DataStore::PvData dsGetPv() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     DataStore::PvData copy = ds.pv;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return copy;
 }
 
 DataStore::SystemStatus dsGetSystem() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     DataStore::SystemStatus copy = ds.system;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return copy;
 }
 
 DataStore::GpioState dsGetGpio() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     DataStore::GpioState copy = ds.gpio;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return copy;
 }
 
 DataStore::GpioCommand dsGetGpioCommand() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     DataStore::GpioCommand copy = ds.gpioCmd;
     if (copy.pending) ds.gpioCmd.pending = false;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return copy;
 }
 
 DataStore::DtuCommand dsGetDtuCommand() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     DataStore::DtuCommand copy = ds.dtuCmd;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return copy;
 }
 
 // --- Schreiben ----------------------------------------------------------------
 
 void dsSetPv(const DataStore::PvData& data) {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     ds.pv = data;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
 }
 
 void dsSetSystem(const DataStore::SystemStatus& status) {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     ds.system = status;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
 }
 
 void dsSetGpio(const DataStore::GpioState& state) {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     ds.gpio = state;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
 }
 
 void dsSetGpioCommand(int target, bool state) {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     ds.gpioCmd.pending = true;
     ds.gpioCmd.target  = target;
     ds.gpioCmd.state   = state;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
 }
 
 void dsSetDtuCommand(const DataStore::DtuCommand& cmd) {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     ds.dtuCmd = cmd;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
 }
 
 void dsClearDtuCommand() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     memset(&ds.dtuCmd, 0, sizeof(ds.dtuCmd));
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
 }
 
 DataStore::OtaInfo dsGetOtaInfo() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     DataStore::OtaInfo copy = ds.otaInfo;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return copy;
 }
 
 void dsSetOtaInfo(const DataStore::OtaInfo& info) {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     ds.otaInfo = info;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
 }
 
 // --- Convenience --------------------------------------------------------------
 
 bool dsIsDtuOnline() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     bool v = ds.system.dtuOnline;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return v;
 }
 
 bool dsIsWifiConnected() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     bool v = ds.system.wifiConnected;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return v;
 }
 
 bool dsPvValid() {
-    xSemaphoreTake(ds.mutex, portMAX_DELAY);
+    xSemaphoreTake(_mutex, portMAX_DELAY);
     bool v = ds.pv.valid;
-    xSemaphoreGive(ds.mutex);
+    xSemaphoreGive(_mutex);
     return v;
 }
