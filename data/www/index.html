@@ -23,6 +23,7 @@
 
 /* ── Reset & Base ─────────────────────────────────────────────────────────── */
 *  { box-sizing: border-box; margin: 0; padding: 0; }
+html { scrollbar-gutter: stable; }
 body { background: var(--bg); color: var(--text);
        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
        font-size: 14px; min-height: 100vh; }
@@ -45,16 +46,18 @@ header h1 { font-size: 17px; font-weight: 700; color: var(--accent);
 .dot.ok   { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
 .dot.warn { background: var(--orange); }
 .dot.err  { background: var(--red); }
-.icon-btn { background: none; border: none; cursor: pointer; font-size: 16px;
-            color: var(--muted); padding: 4px 6px; border-radius: 6px; }
+.icon-btn { background: none; border: none; cursor: pointer; font-size: 12px;
+            font-weight: 600; color: var(--muted); padding: 4px 6px; border-radius: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .icon-btn:hover { background: var(--surface2); }
 
 /* ── Nav ─────────────────────────────────────────────────────────────────── */
 nav { background: var(--surface); border-bottom: 1px solid var(--border);
       display: flex; gap: 2px; padding: 0 16px; overflow-x: auto; }
 nav button { background: none; border: none; color: var(--muted);
-             padding: 10px 14px; cursor: pointer; font-size: 13px; white-space: nowrap;
-             border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+             padding: 10px 14px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap;
+             border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
 nav button:hover  { color: var(--text); }
 
@@ -63,32 +66,28 @@ nav button:hover  { color: var(--text); }
 .tab.active { display: block; }
 
 /* ── Cards ───────────────────────────────────────────────────────────────── */
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .card { background: var(--surface); border: 1px solid var(--border);
         border-radius: 10px; padding: 14px; }
 .card-title { font-size: 12px; font-weight: 600; color: var(--blue);
-              text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+              text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
 .card-val   { font-size: 30px; font-weight: 700; color: var(--accent); line-height: 1; }
 .card-val.warn  { color: var(--orange); }
 .card-val.muted { color: var(--muted); }
-.status-text { font-size: 17px; font-weight: 700; letter-spacing: .5px; color: var(--accent); }
-.status-text.warn  { color: var(--orange); }
-.status-text.muted { color: var(--muted); }
 .card-unit  { font-size: 13px; color: var(--muted); margin-left: 3px; }
 .card-sub   { font-size: 12px; color: var(--muted); margin-top: 5px; }
 .bar-wrap   { background: var(--surface2); border-radius: 4px; height: 6px;
               margin-top: 8px; overflow: hidden; }
-.bar { height: 100%; border-radius: 4px; background: var(--accent); transition: width .5s; min-width: 0; }
+.bar { height: 100%; border-radius: 4px; background: var(--accent); transition: width .5s; width: 0; }
 .bar.warn  { background: var(--orange); }
 .bar.muted { background: var(--muted); }
 
 /* ── Section title ───────────────────────────────────────────────────────── */
 .sec { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
-       color: var(--blue); margin: 18px 0 10px; }
-.card > .sec:first-child { margin-top: 0; }
+       color: var(--blue); margin: 0 0 12px; }
 
 /* ── GPIO cards ──────────────────────────────────────────────────────────── */
-.gpio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+.gpio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .gpio-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
              padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .gpio-name { font-size: 12px; font-weight: 600; color: var(--blue);
@@ -103,6 +102,7 @@ input:checked + .slider               { background: var(--accent); }
 input:checked + .slider::before       { transform: translateX(21px); }
 input:disabled + .slider              { opacity: .4; cursor: default; }
 .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge-lg { padding: 6px 16px; font-size: 14px; }
 .b-ok   { background: var(--ok-bg);   color: var(--accent); }
 .b-off  { background: var(--surface2); color: var(--muted); }
 .b-err  { background: var(--err-bg);  color: var(--red); }
@@ -110,11 +110,12 @@ input:disabled + .slider              { opacity: .4; cursor: default; }
 
 /* ── Config form ─────────────────────────────────────────────────────────── */
 .cfg-box { background: var(--surface); border: 1px solid var(--border);
-           border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+           border-radius: 10px; padding: 14px; margin-bottom: 14px; }
 .cfg-box h3 { font-size: 12px; font-weight: 600; color: var(--blue);
               text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
 label { font-size: 12px; color: var(--muted); display: block; margin-top: 10px; }
 label:first-of-type { margin-top: 0; }
+label > span:first-child { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 input[type=text], input[type=number], input[type=password], select {
   background: var(--surface2); border: 1px solid var(--border); color: var(--text);
   border-radius: 6px; padding: 7px 10px; width: 100%; font-size: 13px; margin-top: 4px; }
@@ -123,15 +124,30 @@ input:focus, select:focus { outline: none; border-color: var(--blue); }
 .chk-row label { display: flex; align-items: center; gap: 6px; margin-top: 0; cursor: pointer; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.row2 > label, .row3 > label { margin-top: 0; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 .btn { padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer;
-       font-size: 13px; font-weight: 600; transition: opacity .15s; }
+       font-size: 12px; font-weight: 600; transition: opacity .15s;
+       display: inline-block; text-decoration: none;
+       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .btn:hover  { opacity: .85; }
-.btn-ok     { background: var(--accent); color: #000; }
-.btn-danger { background: var(--red);    color: #fff; }
 .btn-muted  { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-muted.text-ok     { color: var(--accent); }
+.btn-muted.text-danger { color: var(--red); }
+
+/* ── Danger zone (explanation above, button below-left) ────────────────── */
+.dz-row   { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.dz-row:last-of-type { padding-bottom: 0; margin-bottom: 0; border-bottom: none; }
+.dz-row p { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
 .btn-row    { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.flex-row    { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.range-val   { color: var(--accent); font-weight: 700; }
+.hint        { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.hint-trailing { margin-top: 4px; margin-bottom: 0; }
+.hidden-input { display: none; }
+.file-lbl    { color: var(--muted); font-size: 12px; flex: 1; }
 
 /* ── Range slider ────────────────────────────────────────────────────────── */
 input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
@@ -218,19 +234,19 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     <div class="card">
       <div class="card-title">Grid</div>
       <div><span class="card-val" id="grid-p">–</span><span class="card-unit">W</span></div>
-      <div class="bar-wrap"><div class="bar" id="bar-grid" style="width:0"></div></div>
+      <div class="bar-wrap"><div class="bar" id="bar-grid"></div></div>
       <div class="card-sub" id="grid-ui">– V / – A</div>
     </div>
     <div class="card">
       <div class="card-title">PV1</div>
       <div><span class="card-val" id="pv0-p">–</span><span class="card-unit">W</span></div>
-      <div class="bar-wrap"><div class="bar" id="bar-pv0" style="width:0"></div></div>
+      <div class="bar-wrap"><div class="bar" id="bar-pv0"></div></div>
       <div class="card-sub" id="pv0-ui">– V / – A</div>
     </div>
     <div class="card">
       <div class="card-title">PV2</div>
       <div><span class="card-val" id="pv1-p">–</span><span class="card-unit">W</span></div>
-      <div class="bar-wrap"><div class="bar" id="bar-pv1" style="width:0"></div></div>
+      <div class="bar-wrap"><div class="bar" id="bar-pv1"></div></div>
       <div class="card-sub" id="pv1-ui">– V / – A</div>
     </div>
   </div>
@@ -239,15 +255,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
   <div class="row2">
   <div class="card">
     <div class="sec" data-i18n="secStatus">Status</div>
-    <div id="s-active"><span class="status-text muted">–</span></div>
+    <div id="s-active"><span class="badge badge-lg b-off">–</span></div>
   </div>
   <div class="card">
     <div class="sec" data-i18n="secPowerLimit">Power Limit</div>
     <input type="range" min="2" max="100" value="100" id="limit-range"
            oninput="document.getElementById('range-val').textContent=this.value+'%'">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <span id="range-val" style="color:var(--accent);font-weight:700">100%</span>
-      <button class="btn btn-ok" onclick="setLimit()" data-i18n="btnSet">Set</button>
+    <div class="flex-between">
+      <span id="range-val" class="range-val">100%</span>
+      <button class="btn btn-muted text-ok" onclick="setLimit()" data-i18n="btnSet">Set</button>
     </div>
   </div>
   </div>
@@ -265,7 +281,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
       <span class="badge b-off" id="lbl-relay">–</span>
     </div>
     <div class="gpio-card" id="card-io1">
-      <div class="gpio-name">IO1</div>
+      <div class="gpio-name" data-i18n="lblIo1">IO1</div>
       <label class="toggle">
         <input type="checkbox" id="sw-io1" onchange="setGpio('io1',this.checked)">
         <span class="slider"></span>
@@ -273,7 +289,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
       <span class="badge b-off" id="lbl-io1">–</span>
     </div>
     <div class="gpio-card" id="card-io2">
-      <div class="gpio-name">IO2</div>
+      <div class="gpio-name" data-i18n="lblIo2">IO2</div>
       <label class="toggle">
         <input type="checkbox" id="sw-io2" onchange="setGpio('io2',this.checked)">
         <span class="slider"></span>
@@ -281,7 +297,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
       <span class="badge b-off" id="lbl-io2">–</span>
     </div>
     <div class="gpio-card" id="card-io3">
-      <div class="gpio-name">IO3</div>
+      <div class="gpio-name" data-i18n="lblIo3">IO3</div>
       <label class="toggle">
         <input type="checkbox" id="sw-io3" onchange="setGpio('io3',this.checked)">
         <span class="slider"></span>
@@ -365,7 +381,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
       <label><span data-i18n="lblUsername">Username</span><input type="text" id="c-web-user" placeholder="admin"></label>
       <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-web-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
     </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:4px" data-i18n="pWebServerHint">
+    <p class="hint hint-trailing" data-i18n="pWebServerHint">
       Port and auth changes only take effect after the automatic restart. With protection enabled, the browser will prompt for credentials on the next request.</p>
   </div>
   <div class="cfg-box">
@@ -387,7 +403,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
   </div>
   <div class="btn-row">
     <button class="btn btn-muted" onclick="loadConfig()" data-i18n="btnReset">Reset</button>
-    <button class="btn btn-ok"    onclick="saveConfig()" data-i18n="btnSave">Save</button>
+    <button class="btn btn-muted text-ok" onclick="saveConfig()" data-i18n="btnSave">Save</button>
   </div>
 </div>
 
@@ -395,32 +411,32 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 <div id="tab-system" class="tab">
   <div class="cfg-box">
     <h3 data-i18n="hFirmwareOta">Firmware OTA</h3>
-    <p style="color:var(--muted);font-size:12px;margin-bottom:12px" data-i18n="pFirmwareOta">
+    <p class="hint" data-i18n="pFirmwareOta">
       Upload a compiled .bin file. Gateway restarts after a successful update.</p>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <input type="file" accept=".bin" id="fw-file" style="display:none" onchange="onFilePicked('fw-file','fw-file-lbl')">
+    <div class="flex-row">
+      <input type="file" accept=".bin" id="fw-file" class="hidden-input" onchange="onFilePicked('fw-file','fw-file-lbl')">
       <button type="button" class="btn btn-muted" onclick="pickFile('fw-file')" data-i18n="btnChooseFile">Choose File</button>
-      <span id="fw-file-lbl" style="color:var(--muted);font-size:12px;flex:1" data-i18n="lblNoFileChosen">No file chosen</span>
-      <button class="btn btn-ok" onclick="doOta('firmware','fw-file','/update')" data-i18n="btnFlash">Flash</button>
+      <span id="fw-file-lbl" class="file-lbl" data-i18n="lblNoFileChosen">No file chosen</span>
+      <button class="btn btn-muted text-ok" onclick="doOta('firmware','fw-file','/update')" data-i18n="btnFlash">Flash</button>
     </div>
     <div class="ota-progress" id="fw-prog">
-      <div class="bar-wrap"><div class="bar" id="fw-bar" style="width:0"></div></div>
+      <div class="bar-wrap"><div class="bar" id="fw-bar"></div></div>
       <div class="ota-status" id="fw-status" data-i18n="otaUploading">Uploading…</div>
     </div>
   </div>
 
   <div class="cfg-box">
     <h3 data-i18n="hFilesystemOta">Filesystem OTA</h3>
-    <p style="color:var(--muted);font-size:12px;margin-bottom:12px" data-i18n="pFilesystemOta">
+    <p class="hint" data-i18n="pFilesystemOta">
       Upload a LittleFS .bin (data/www).</p>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <input type="file" accept=".bin" id="fs-file" style="display:none" onchange="onFilePicked('fs-file','fs-file-lbl')">
+    <div class="flex-row">
+      <input type="file" accept=".bin" id="fs-file" class="hidden-input" onchange="onFilePicked('fs-file','fs-file-lbl')">
       <button type="button" class="btn btn-muted" onclick="pickFile('fs-file')" data-i18n="btnChooseFile">Choose File</button>
-      <span id="fs-file-lbl" style="color:var(--muted);font-size:12px;flex:1" data-i18n="lblNoFileChosen">No file chosen</span>
-      <button class="btn btn-ok" onclick="doOta('filesystem','fs-file','/updatefs')" data-i18n="btnFlash">Flash</button>
+      <span id="fs-file-lbl" class="file-lbl" data-i18n="lblNoFileChosen">No file chosen</span>
+      <button class="btn btn-muted text-ok" onclick="doOta('filesystem','fs-file','/updatefs')" data-i18n="btnFlash">Flash</button>
     </div>
     <div class="ota-progress" id="fs-prog">
-      <div class="bar-wrap"><div class="bar" id="fs-bar" style="width:0"></div></div>
+      <div class="bar-wrap"><div class="bar" id="fs-bar"></div></div>
       <div class="ota-status" id="fs-status" data-i18n="otaUploading">Uploading…</div>
     </div>
   </div>
@@ -428,22 +444,22 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
   <div class="cfg-box" id="ota-check-box">
     <h3 data-i18n="hInternetUpdate">Internet Update</h3>
     <div class="ota-info" id="ota-check-info">–</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <div class="flex-row">
       <button class="btn btn-muted" id="btn-ota-check" onclick="checkUpdate()" data-i18n="btnCheck">Check</button>
-      <button class="btn btn-ok"    id="btn-ota-install" style="display:none" onclick="installUpdate()" data-i18n="btnInstallNow">Install now</button>
+      <button class="btn btn-muted text-ok" id="btn-ota-install" style="display:none" onclick="installUpdate()" data-i18n="btnInstallNow">Install now</button>
     </div>
   </div>
 
   <div class="cfg-box">
     <h3 data-i18n="hBackupConfig">Backup Configuration</h3>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px" data-i18n="pBackupHint">
+    <p class="hint" data-i18n="pBackupHint">
       Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.</p>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div class="flex-row">
       <a class="btn btn-muted" href="/api/config/backup" download data-i18n="btnDownloadBackup">Download Backup</a>
-      <input type="file" accept=".json" id="restore-file" style="display:none" onchange="onFilePicked('restore-file','restore-file-lbl')">
+      <input type="file" accept=".json" id="restore-file" class="hidden-input" onchange="onFilePicked('restore-file','restore-file-lbl')">
       <button type="button" class="btn btn-muted" onclick="pickFile('restore-file')" data-i18n="btnChooseFile">Choose File</button>
-      <span id="restore-file-lbl" style="color:var(--muted);font-size:12px;flex:1" data-i18n="lblNoFileChosen">No file chosen</span>
-      <button class="btn btn-ok" onclick="doRestore()" data-i18n="btnRestore">Restore</button>
+      <span id="restore-file-lbl" class="file-lbl" data-i18n="lblNoFileChosen">No file chosen</span>
+      <button class="btn btn-muted text-ok" onclick="doRestore()" data-i18n="btnRestore">Restore</button>
     </div>
   </div>
 
@@ -452,14 +468,16 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     <div id="sysinfo"></div>
   </div>
 
-  <div class="cfg-box" style="border-color:var(--red)">
-    <h3 style="color:var(--red)" data-i18n="hDangerZone">Danger Zone</h3>
-    <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
-      <button class="btn btn-muted"   onclick="doReboot()"  data-i18n="btnRebootGw">Reboot Gateway</button>
-      <button class="btn btn-danger"  onclick="doFactory()" data-i18n="btnFactoryReset">Factory Reset</button>
+  <div class="cfg-box">
+    <h3 data-i18n="hDangerZone">Danger Zone</h3>
+    <div class="dz-row">
+      <p data-i18n="lblRebootDevice">The device will restart. Current configuration is preserved.</p>
+      <button class="btn btn-muted text-ok" onclick="doReboot()" data-i18n="btnRebootGw">Reboot</button>
     </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:8px" data-i18n="pFactoryResetHint">
-      Factory Reset erases config.json and restarts.</p>
+    <div class="dz-row">
+      <p data-i18n="lblFactoryResetRow">Current configuration will be erased. The device restarts with factory settings.</p>
+      <button class="btn btn-muted text-danger" onclick="doFactory()" data-i18n="btnFactoryReset">Factory reset</button>
+    </div>
   </div>
 </div>
 
@@ -501,11 +519,13 @@ const I18N = {
     btnFlash: 'Flash', otaUploading: 'Uploading…',
     btnCheck: 'Check', btnInstallNow: 'Install now',
     pBackupHint: 'Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.',
-    btnDownloadBackup: 'Download Backup', btnRestore: 'Restore',
-    btnRebootGw: 'Reboot Gateway', btnFactoryReset: 'Factory Reset', hDangerZone: 'Danger Zone',
-    pFactoryResetHint: 'Factory Reset erases config.json and restarts.',
+    btnDownloadBackup: 'Download backup', btnRestore: 'Restore',
+    btnRebootGw: 'Reboot', btnFactoryReset: 'Factory reset', hDangerZone: 'Danger Zone',
+    lblRebootDevice: 'The device will restart. Current configuration is preserved.',
+    lblFactoryResetRow: 'Current configuration will be erased. The device restarts with factory settings.',
     btnChooseFile: 'Choose File', lblNoFileChosen: 'No file chosen',
     lblOn: 'ON', lblOff: 'OFF', lblRelay: 'Relay',
+    lblIo1: 'IO1', lblIo2: 'IO2', lblIo3: 'IO3',
     fmtFirmware: (fw, build) => `${fw} (Build ${build})`,
     rowFirmware: 'Firmware', rowMac: 'MAC', rowIp: 'IP', rowRssi: 'WiFi RSSI', rowUptime: 'Uptime', rowHeap: 'Free Heap', rowNtpTime: 'NTP Time',
     errGeneric: 'Error', errLoadConfig: 'Failed to load config', errSaveConfig: 'Error saving',
@@ -526,7 +546,7 @@ const I18N = {
     confirmFactoryReset: 'Factory reset? All settings will be erased!', msgFactoryReset: 'Factory reset — gateway restarting…',
   },
   de: {
-    navDashboard: 'Dashboard', navRelayIo: 'Relais / IO', navConfig: 'Konfiguration', navSystem: 'System',
+    navDashboard: 'Dashboard', navRelayIo: 'Relais / E/A', navConfig: 'Konfiguration', navSystem: 'System',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
     statActive: 'Aktiv', statStandby: 'Standby', statNoData: 'Keine Daten', statOffline: 'Offline',
     secPowerLimit: 'Leistungsbegrenzung', secStatus: 'Status', btnSet: 'Setzen',
@@ -553,9 +573,11 @@ const I18N = {
     pBackupHint: 'Backup enthält alle Einstellungen inkl. WLAN-/MQTT-/Web-Passwörter im Klartext — Datei sicher aufbewahren.',
     btnDownloadBackup: 'Backup herunterladen', btnRestore: 'Wiederherstellen',
     btnRebootGw: 'Neustart', btnFactoryReset: 'Werkseinstellungen', hDangerZone: 'Gefahrenzone',
-    pFactoryResetHint: 'Setzt das Gerät auf Werkseinstellungen zurück und löscht config.json.',
+    lblRebootDevice: 'Das Gerät wird neu gestartet. Die aktuelle Konfiguration bleibt erhalten.',
+    lblFactoryResetRow: 'Die aktuelle Konfiguration wird gelöscht. Das Gerät startet neu mit Werkseinstellungen.',
     btnChooseFile: 'Datei wählen', lblNoFileChosen: 'Keine Datei ausgewählt',
     lblOn: 'EIN', lblOff: 'AUS', lblRelay: 'Relais',
+    lblIo1: 'EA1', lblIo2: 'EA2', lblIo3: 'EA3',
     fmtFirmware: (fw, build) => `${fw} (Build ${build})`,
     rowFirmware: 'Firmware', rowMac: 'MAC', rowIp: 'IP', rowRssi: 'WiFi RSSI', rowUptime: 'Laufzeit', rowHeap: 'Freier Heap', rowNtpTime: 'NTP Zeit',
     errGeneric: 'Fehler', errLoadConfig: 'Config laden fehlgeschlagen', errSaveConfig: 'Fehler beim Speichern',
@@ -652,12 +674,12 @@ function setDot(id, ok) {
 // ─── Combined status badge (DTU online/offline + inverter active/standby) ──
 let _dtuOnline = null, _invActive = null;
 function updateStatusBadge() {
-  let cls, key;
-  if (_dtuOnline === false)      { cls = 'warn';  key = 'statOffline'; }
-  else if (_invActive === true)  { cls = '';      key = 'statActive'; }
-  else if (_invActive === false) { cls = 'muted'; key = 'statStandby'; }
-  else                            { cls = 'muted'; key = 'statNoData'; }
-  $('s-active').innerHTML = '<span class="status-text ' + cls + '">' + tr(key) + '</span>';
+  let cls, bcls, key;
+  if (_dtuOnline === false)      { cls = 'warn';  bcls = 'b-warn'; key = 'statOffline'; }
+  else if (_invActive === true)  { cls = '';      bcls = 'b-ok';   key = 'statActive'; }
+  else if (_invActive === false) { cls = 'muted'; bcls = 'b-off';  key = 'statStandby'; }
+  else                            { cls = 'muted'; bcls = 'b-off';  key = 'statNoData'; }
+  $('s-active').innerHTML = '<span class="badge badge-lg ' + bcls + '">' + tr(key) + '</span>';
   document.querySelectorAll('.hdr-sep').forEach(el => el.className = 'hdr-sep ' + cls);
   ['grid-p', 'pv0-p', 'pv1-p', 's-temp', 's-limit', 's-de', 's-te'].forEach(id => $(id).className = 'card-val ' + cls);
   ['bar-grid', 'bar-pv0', 'bar-pv1'].forEach(id => $(id).className = 'bar ' + cls);
