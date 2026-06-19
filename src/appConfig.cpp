@@ -7,6 +7,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Arduino.h>
+#include <esp_mac.h>
 
 AppConfig appConfig;
 
@@ -52,8 +53,12 @@ void configSetDefaults() {
     appConfig.mqttPort = MQTT_DEFAULT_PORT;
     strlcpy(appConfig.mqttUser,  "",                 sizeof(appConfig.mqttUser));
     strlcpy(appConfig.mqttPass,  "",                 sizeof(appConfig.mqttPass));
-    snprintf(appConfig.mqttTopic, sizeof(appConfig.mqttTopic),
-             "hmsgws3_%06llX", (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFF));
+    {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        snprintf(appConfig.mqttTopic, sizeof(appConfig.mqttTopic),
+                 "hmsgws3_%02X%02X%02X", mac[3], mac[4], mac[5]);
+    }
     appConfig.mqttRetain      = false;
     appConfig.mqttHaDiscovery = true;
     appConfig.mqttOpenDtu     = false;

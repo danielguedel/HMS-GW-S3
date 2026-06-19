@@ -9,6 +9,7 @@
 #include "config.h"
 #include "logger.h"
 #include <Arduino.h>
+#include <esp_mac.h>
 #include "mqtt_client.h"
 #include <ArduinoJson.h>
 
@@ -312,8 +313,12 @@ void taskMQTT(void* pvParameters) {
     // Build persistent config strings
     snprintf(_uri,      sizeof(_uri),
              "mqtt://%s:%d", appConfig.mqttHost, appConfig.mqttPort);
-    snprintf(_clientId, sizeof(_clientId),
-             "hmsgws3_%06llX", (unsigned long long)(ESP.getEfuseMac() & 0xFFFFFF));
+    {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        snprintf(_clientId, sizeof(_clientId),
+                 "hmsgws3_%02X%02X%02X", mac[3], mac[4], mac[5]);
+    }
     snprintf(_lwtTopic, sizeof(_lwtTopic),
              "%s/system/status", appConfig.mqttTopic);
 
