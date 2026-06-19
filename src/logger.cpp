@@ -21,6 +21,7 @@ void logInit() {
     _logMutex = xSemaphoreCreateMutex();
 }
 
+// Called via the LOG_E/LOG_W/LOG_I/LOG_D macros from any task; messages above appConfig.logLevel are dropped before formatting. Before logInit() runs (no mutex yet) it prints without a timestamp and without locking; afterwards it silently drops the line instead of blocking if the mutex isn't free within 50ms.
 void logMsg(uint8_t level, const char* module, const char* fmt, ...) {
     if (level > appConfig.logLevel) return;
 

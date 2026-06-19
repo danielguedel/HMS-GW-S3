@@ -26,6 +26,7 @@
 // Defined here, declared extern in systemState.h
 EventGroupHandle_t systemStateEvents;
 
+// Arduino entry point, runs once; performs the init sequence below then creates all tasks, which start running immediately (even before setup() returns) rather than waiting for loop().
 void setup() {
     // -- 1. DataStore  -  must be first; tasks may start immediately after --------
     dsInit();
@@ -84,6 +85,7 @@ void setup() {
           (unsigned long)ESP.getFreeHeap());
 }
 
+// Arduino main loop; unlike a typical sketch, all real work happens in the FreeRTOS tasks created in setup() — this only watches for EVT_FACTORY_RESET to erase the config file exactly once (the actual reboot is triggered by whichever task requested the reset).
 void loop() {
     // Factory reset: any task sets EVT_FACTORY_RESET; we erase config and
     // let taskSerial (or taskGPIO long-press handler) trigger the reboot.

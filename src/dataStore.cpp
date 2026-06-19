@@ -70,6 +70,7 @@ DataStore::GpioState dsGetGpio() {
     return copy;
 }
 
+// Unlike the other dsGet* functions, this consumes the command: a pending request is atomically cleared as part of the read, so each command is delivered to exactly one caller.
 DataStore::GpioCommand dsGetGpioCommand() {
     xSemaphoreTake(_mutex, portMAX_DELAY);
     DataStore::GpioCommand copy = ds.gpioCmd;

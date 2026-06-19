@@ -26,6 +26,7 @@ static void applyIo(int idx, bool state, DataStore::GpioState& gpio) {
 }
 
 // --- Factory reset via long BOOT press ---------------------------------------
+// Blocks (busy-waits in this task only) while BOOT_PIN is held low; once held for FACTORY_RESET_HOLD_MS it signals EVT_FACTORY_RESET, shows the LED pattern, and reboots — never returns in that case.
 static void checkFactoryReset() {
     if (digitalRead(BOOT_PIN) != LOW) return;
     uint32_t pressStart = millis();
@@ -42,6 +43,7 @@ static void checkFactoryReset() {
 }
 
 // --- Task ---------------------------------------------------------------------
+// FreeRTOS task entry point (pvParameters unused); initializes relay/IO pin modes from appConfig, then loops applying pending DataStore GPIO commands and debouncing INPUT pins (DEBOUNCE_MS) into DataStore; never returns.
 void taskGPIO(void* pvParameters) {
     // Config is loaded in main.cpp before tasks start  -  no wait needed here
 

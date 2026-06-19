@@ -75,6 +75,7 @@ struct PbReader {
     size_t         len;
     size_t         pos;
 
+    // Reads one little-endian-encoded protobuf varint starting at pos; returns false if the buffer ends before a terminating byte (high bit clear) is found.
     bool readVarint(uint64_t& val) {
         val = 0; int shift = 0;
         while (pos < len) {
@@ -85,10 +86,12 @@ struct PbReader {
         }
         return false;
     }
+    // Reads a protobuf field tag; wire is the wire type (0=varint, 1=64-bit, 2=length-delimited, 5=32-bit). Returns false at end of buffer.
     bool readTag(uint8_t& field, uint8_t& wire) {
         uint64_t v; if (!readVarint(v)) return false;
         field = (uint8_t)(v >> 3); wire = v & 0x07; return true;
     }
+    // Advances pos past a field's value without decoding it, based on its wire type; returns false if that would run past the buffer end.
     bool skipField(uint8_t wire) {
         if (wire == 0) { uint64_t v; return readVarint(v); }
         if (wire == 2) { uint64_t l; if (!readVarint(l)) return false; pos += l; return pos <= len; }
@@ -96,6 +99,7 @@ struct PbReader {
         if (wire == 1) { pos += 8; return pos <= len; }
         return false;
     }
+    // Reads a length-delimited submessage's bounds (start offset + length within the same buffer, no copy); returns false if msgLen would exceed the buffer.
     bool readSubMsg(size_t& start, size_t& msgLen) {
         uint64_t l; if (!readVarint(l)) return false;
         start = pos; msgLen = (size_t)l; pos += l; return pos <= len;
@@ -104,6 +108,7 @@ struct PbReader {
 
 // --- Parse SGSMO (grid data) --------------------------------------------------
 struct SGSMO { int32_t voltage=0,frequency=0,active_power=0,current=0,temperature=0,warning_number=0,power_limit=0,wifi_rssi=0; };
+// Decodes the grid-side fields of a SGSMO submessage; values are raw protocol integers, callers must scale them (see parseRealDataNew) to get real units.
 static SGSMO parseSGSMO(const uint8_t* buf, size_t len) {
     SGSMO d; PbReader r{buf,len,0};
     uint8_t f,w; uint64_t v;
@@ -125,6 +130,7 @@ static SGSMO parseSGSMO(const uint8_t* buf, size_t len) {
 
 // --- Parse PvMO (PV string data) ---------------------------------------------
 struct PvMO { int32_t port_number=0,voltage=0,current=0,power=0,energy_total=0,energy_daily=0; };
+// Decodes one PV-string submessage; values are raw protocol integers requiring caller-side scaling. The caller assigns PV1 vs PV2 by arrival order in the message, not by the decoded port_number field.
 static PvMO parsePvMO(const uint8_t* buf, size_t len) {
     PvMO d; PbReader r{buf,len,0};
     uint8_t f,w; uint64_t v;
@@ -144,6 +150,7 @@ static PvMO parsePvMO(const uint8_t* buf, size_t len) {
 }
 
 // --- Parse RealDataNew response -----------------------------------------------
+// Decodes a RealDataNew reply into pv (grid + both PV strings), scaling raw fields to volts/amps/watts/kWh and deriving pv.inverterActive/grid_dE/grid_tE; returns false (pv left untouched) if the embedded timestamp is 0, which the DTU sends when data isn't ready yet.
 static bool parseRealDataNew(const uint8_t* data, size_t len, DataStore::PvData& pv) {
     if (len < 11) return false;
     PbReader r{data+10, len-10, 0};
@@ -207,6 +214,7 @@ static void parseGetConfig(const uint8_t* data, size_t len, DataStore::PvData& p
 }
 
 // --- Packet builders ----------------------------------------------------------
+// ntpTime is a Unix epoch timestamp (seconds); 28800 is a fixed UTC+8 offset the Hoymiles DTU firmware expects regardless of the gateway's actual timezone.
 static size_t buildAppInfoReq(uint8_t* buf, size_t size, uint32_t ntpTime) {
     size_t n = 0;
     n += encodeField(buf+n, 2, 0, 28800);   // offset
@@ -216,6 +224,7 @@ static size_t buildAppInfoReq(uint8_t* buf, size_t size, uint32_t ntpTime) {
     return n;
 }
 
+// Same fixed UTC+8 offset as buildAppInfoReq, see there.
 static size_t buildRealDataNewReq(uint8_t* buf, size_t size, uint32_t ntpTime) {
     size_t n = 0;
     n += encodeField(buf+n, 4, 0, 28800);   // offset
@@ -223,6 +232,7 @@ static size_t buildRealDataNewReq(uint8_t* buf, size_t size, uint32_t ntpTime) {
     return n;
 }
 
+// Same fixed UTC+8 offset as buildAppInfoReq, see there.
 static size_t buildGetConfigReq(uint8_t* buf, size_t size, uint32_t ntpTime) {
     size_t n = 0;
     n += encodeField(buf+n, 4, 0, 28800);
@@ -252,6 +262,7 @@ static SemaphoreHandle_t  _rxMutex      = nullptr;
 static volatile uint32_t  _ntpTimeCache = 0;  // updated by task loop, read by onConnect without lock
 static volatile uint32_t _cloudPauseAt = 0;  // millis() of last ERR_RST -14
 
+// AsyncTCP RX callback, runs on the AsyncTCP library task (Core 0), not taskDTU's own core; copies into _rxBuf under _rxMutex with a 10ms timeout (drops the packet and logs a warning on contention instead of blocking the network task), then sets whichever ready flag is still pending.
 static void onData(void*, AsyncClient*, void* data, size_t len) {
     size_t copy = len < sizeof(_rxBuf) ? len : sizeof(_rxBuf);
     if (xSemaphoreTake(_rxMutex, pdMS_TO_TICKS(10)) != pdTRUE) {
@@ -269,6 +280,7 @@ static void onData(void*, AsyncClient*, void* data, size_t len) {
     _cfgReady = true;
 }
 
+// AsyncTCP callback (same task/core as onData); sends AppInfo immediately since the DTU expects the first byte very quickly after the TCP handshake. Reads _ntpTimeCache (no mutex, written only by the task loop before connecting) instead of calling dsGetSystem() to avoid blocking the network task on the DataStore mutex.
 static void onConnect(void*, AsyncClient* c) {
     _connected = true;
     _appReady  = false;
@@ -283,11 +295,13 @@ static void onConnect(void*, AsyncClient* c) {
     LOG_I(MOD_DTU, "TCP connected  -  sent AppInfo (%zu bytes)", msgLen);
 }
 
+// AsyncTCP callback (same task/core as onData); only flips a volatile flag, no locking needed.
 static void onDisconnect(void*, AsyncClient*) {
     _connected = false;
     LOG_W(MOD_DTU, "TCP disconnected");
 }
 
+// AsyncTCP callback (same task/core as onData); e is a lwIP err_t. -14 (ERR_RST) specifically means the DTU reset the connection because it's busy syncing with the Hoymiles cloud, so the task loop backs off for dtuCloudPause seconds.
 static void onError(void*, AsyncClient*, err_t e) {
     _connected = false;
     _lastError = (int)e;
@@ -300,6 +314,7 @@ static void onError(void*, AsyncClient*, err_t e) {
 }
 
 // --- Connect ------------------------------------------------------------------
+// Discards any previous AsyncClient and starts a fresh connection attempt; the actual result arrives asynchronously via onConnect/onError, not as a return value.
 static void dtuConnect() {
     if (_client) { delete _client; _client = nullptr; }
     _client = new AsyncClient();
@@ -313,6 +328,7 @@ static void dtuConnect() {
 }
 
 // --- Send helpers -------------------------------------------------------------
+// ntpTime: Unix epoch seconds to embed in the request. Clears _dataReady before sending so waitFor() can detect the new reply; returns false only if message assembly overflowed the local buffer.
 static bool sendRealDataNew(uint32_t ntpTime) {
     uint8_t pb[32], msg[64];
     size_t pbLen  = buildRealDataNewReq(pb, sizeof(pb), ntpTime);
@@ -324,6 +340,7 @@ static bool sendRealDataNew(uint32_t ntpTime) {
     return true;
 }
 
+// Same semantics as sendRealDataNew, but clears _cfgReady instead.
 static bool sendGetConfig(uint32_t ntpTime) {
     uint8_t pb[32], msg[64];
     size_t pbLen  = buildGetConfigReq(pb, sizeof(pb), ntpTime);
@@ -335,6 +352,7 @@ static bool sendGetConfig(uint32_t ntpTime) {
     return true;
 }
 
+// limitPct: target inverter power limit in percent (0-100); does not wait for a reply, the DTU applies it asynchronously.
 static bool sendSetPowerLimit(uint32_t ntpTime, int limitPct) {
     uint8_t pb[32], msg[64];
     size_t pbLen  = buildSetPowerLimitReq(pb, sizeof(pb), ntpTime, limitPct);
@@ -346,6 +364,7 @@ static bool sendSetPowerLimit(uint32_t ntpTime, int limitPct) {
 }
 
 // --- Wait helper with timeout -------------------------------------------------
+// Polls flag every 50ms (busy-wait, no notification/semaphore) until it becomes true or timeoutMs elapses; returns the flag's final state, so false means timeout.
 static bool waitFor(volatile bool& flag, uint32_t timeoutMs) {
     uint32_t t0 = millis();
     while (!flag && (millis() - t0) < timeoutMs)
@@ -369,6 +388,7 @@ static void setDtuCloudBusy(bool busy) {
 }
 
 // --- Task ---------------------------------------------------------------------
+// FreeRTOS task entry point (pvParameters unused, standard task signature); owns the DTU TCP connection lifecycle, periodic RealDataNew/GetConfig polling, power-limit commands and timeout, and never returns.
 void taskDTU(void* pvParameters) {
     _rxMutex = xSemaphoreCreateMutex();
     LOG_I(MOD_DTU, "Task started  -  target: %s:%d  interval: %ds",

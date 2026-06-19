@@ -14,6 +14,7 @@
 
 // --- Output helpers -----------------------------------------------------------
 
+// Trailing underscore avoids shadowing the standard library printf; formats into a fixed 256-byte stack buffer and writes straight to Serial (bypasses the logger).
 static void printf_(const char* fmt, ...) {
     char buf[256]; va_list ap; va_start(ap, fmt);
     vsnprintf(buf, sizeof(buf), fmt, ap); va_end(ap);
@@ -293,6 +294,7 @@ static void cmdRestart() {
 }
 
 // --- Command dispatcher -------------------------------------------------------
+// Splits line in place at the first space (NUL-terminates the verb there) and dispatches to the matching cmd* handler; line's contents are mutated, so callers must not reuse it as the original string afterwards.
 static void dispatch(char* line) {
     while (*line == ' ') line++;
     if (*line == '\0') return;
@@ -333,6 +335,7 @@ static void dispatch(char* line) {
 }
 
 // --- Task ---------------------------------------------------------------------
+// FreeRTOS task entry point (pvParameters unused); reads Serial byte-by-byte with local echo/backspace/CR-LF handling, dispatching one line at a time to dispatch(); never returns.
 void taskSerial(void* pvParameters) {
     static char    buf[128];
     static uint8_t pos    = 0;

@@ -228,6 +228,7 @@ static void applyConfigJson(JsonDocument& doc) {
     }
 }
 
+// Loads appConfig from CONFIG_FILE, recovering from a leftover /config.tmp (an interrupted configSave()) if the main file is missing; falls back to configSetDefaults() on any read/parse failure.
 void configLoad() {
     if (!LittleFS.exists(CONFIG_FILE)) {
         if (LittleFS.exists("/config.tmp")) {
@@ -261,6 +262,7 @@ void configLoad() {
           appConfig.mqttHost, appConfig.mqttPort);
 }
 
+// Parses and applies a config backup uploaded via the web GUI, then immediately persists it with configSave(). Returns false (appConfig left unchanged) on invalid JSON or if the document doesn't look like a config backup at all.
 bool configRestoreFromJson(const char* json, size_t len) {
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, json, len);
@@ -280,6 +282,7 @@ bool configRestoreFromJson(const char* json, size_t len) {
     return true;
 }
 
+// Serializes the full appConfig (flat keys matching applyConfigJson()/the web API) to CONFIG_FILE via write-to-temp-then-rename for crash safety.
 void configSave() {
     JsonDocument doc;
 

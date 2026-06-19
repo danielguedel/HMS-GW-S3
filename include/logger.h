@@ -18,6 +18,7 @@
 #define MOD_WIFI   "WIFI"
 
 void logInit();
+// level: 0=ERROR..3=DEBUG (see LOG_LEVEL_* in config.h); messages above appConfig.logLevel are dropped. Prefer the LOG_E/LOG_W/LOG_I/LOG_D macros below over calling this directly.
 void logMsg(uint8_t level, const char* module, const char* fmt, ...);
 
 // Convenience macros

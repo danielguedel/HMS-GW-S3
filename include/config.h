@@ -11,30 +11,30 @@
   #define BUILD_NUMBER 0
 #endif
 
-// --- GPIO Pin Defaults (anpassbar im Web-GUI, gespeichert in config.json) -----
+// --- GPIO Pin Defaults (configurable via the web GUI, persisted in config.json) -
 // Relay
 #ifndef RELAY_PIN
   #define RELAY_PIN        1    // GPIO1
 #endif
-// IO1–IO3 (generische IO-Pins, frei konfigurierbar im Web-GUI)
+// IO1-IO3 (generic IO pins, freely configurable via the web GUI)
 #ifndef IO1_PIN
-  #define IO1_PIN          2    // GPIO2  -  laut ESP32-S3-Datasheet für I2C SDA geeignet
+  #define IO1_PIN          2    // GPIO2  -  suitable for I2C SDA per the ESP32-S3 datasheet
 #endif
 #ifndef IO2_PIN
-  #define IO2_PIN          3    // GPIO3  -  laut ESP32-S3-Datasheet für I2C SCL geeignet
+  #define IO2_PIN          3    // GPIO3  -  suitable for I2C SCL per the ESP32-S3 datasheet
 #endif
 #ifndef IO3_PIN
-  #define IO3_PIN          4    // GPIO4  -  laut ESP32-S3-Datasheet für ADC1_CH3 geeignet
+  #define IO3_PIN          4    // GPIO4  -  suitable for ADC1_CH3 per the ESP32-S3 datasheet
 #endif
 
 // LED (WS2812B onboard)
 #ifndef LED_PIN
   #define LED_PIN         38    // GPIO38
 #endif
-#define NEOPIXEL_PIN      LED_PIN   // Rückwärts-Kompatibilität
+#define NEOPIXEL_PIN      LED_PIN   // backward compatibility
 
 // Boot / Factory Reset
-#define BOOT_PIN           0        // BOOT-Taste (GPIO0, intern  -  nicht Teil des IO-Arrays)
+#define BOOT_PIN           0        // BOOT button (GPIO0, internal  -  not part of the IO array)
 
 // --- NeoPixel / LED -----------------------------------------------------------
 #define LED_COUNT               1
@@ -55,8 +55,8 @@
 #define DTU_DEFAULT_CLOUD_PAUSE 30
 
 // --- Power Limit --------------------------------------------------------------
-#define POWER_LIMIT_DEFAULT     100  // Rückfall-Wert [%]
-#define POWER_LIMIT_TIMEOUT     0    // Timeout [s], 0 = deaktiviert
+#define POWER_LIMIT_DEFAULT     100  // fallback value [%]
+#define POWER_LIMIT_TIMEOUT     0    // timeout [s], 0 = disabled
 
 // --- Web Server ---------------------------------------------------------------
 #define WEB_DEFAULT_PORT   80
@@ -72,7 +72,7 @@
 #define MQTT_DEFAULT_TOPIC "hmsgws3"
 
 // --- Factory Reset ------------------------------------------------------------
-#define FACTORY_RESET_HOLD_MS  5000   // BOOT-Taste diese Dauer halten
+#define FACTORY_RESET_HOLD_MS  5000   // hold the BOOT button for this duration
 
 // --- FreeRTOS Task Priorities -------------------------------------------------
 #define TASK_PRIO_WIFI         5
@@ -81,7 +81,7 @@
 #define TASK_PRIO_MQTT         3
 #define TASK_PRIO_WEBSERVER    3
 #define TASK_PRIO_LED          2
-#define TASK_PRIO_NEOPIXEL     TASK_PRIO_LED   // Rückwärts-Kompatibilität
+#define TASK_PRIO_NEOPIXEL     TASK_PRIO_LED   // backward compatibility
 #define TASK_PRIO_SERIAL       2
 #define TASK_PRIO_SYSMONITOR   1
 
@@ -92,20 +92,20 @@
 #define STACK_WEBSERVER     8192
 #define STACK_GPIO          4096
 #define STACK_LED           3072
-#define STACK_NEOPIXEL      STACK_LED           // Rückwärts-Kompatibilität
+#define STACK_NEOPIXEL      STACK_LED           // backward compatibility
 #define STACK_SERIAL        4096
 #define STACK_SYSMONITOR    3072
 
 // --- FreeRTOS Core Assignment -------------------------------------------------
-// Core 0: ausschliesslich WiFi-Stack (lwIP)
-// Core 1: alle User-Tasks
+// Core 0: exclusively the WiFi stack (lwIP)
+// Core 1: all user tasks
 #define CORE_WIFI          1
 #define CORE_DTU           1
 #define CORE_MQTT          1
 #define CORE_WEBSERVER     1
 #define CORE_GPIO          1
 #define CORE_LED           1
-#define CORE_NEOPIXEL      CORE_LED             // Rückwärts-Kompatibilität
+#define CORE_NEOPIXEL      CORE_LED             // backward compatibility
 #define CORE_SERIAL        1
 #define CORE_SYSMONITOR    1
 

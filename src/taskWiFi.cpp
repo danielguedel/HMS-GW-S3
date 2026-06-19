@@ -15,6 +15,7 @@ static const uint32_t NTP_REFRESH_MS       = 3600000UL;  // 1 Stunde
 
 // --- Hilfsfunktionen ----------------------------------------------------------
 
+// Writes the current WiFi state into DataStore; which IP/RSSI/SSID source is read depends on whether connected (STA) or apMode (the device's own AP) is set — both false just clears the connected fields.
 static void updateSystemWifi(bool connected, bool apMode) {
     DataStore::SystemStatus sys = dsGetSystem();
     sys.wifiConnected = connected;
@@ -31,6 +32,7 @@ static void updateSystemWifi(bool connected, bool apMode) {
     dsSetSystem(sys);
 }
 
+// Blocks (this task only) until time(nullptr) reports a plausible date (> 2023-11-14, used as a "clock is real" sanity check) or NTP_SYNC_TIMEOUT_MS elapses; on success writes the epoch seconds into DataStore.
 static void syncNtp() {
     LOG_I(MOD_WIFI, "NTP sync  -  server: %s  tz: %d s", appConfig.ntpServer, appConfig.tzOffset);
     configTime(appConfig.tzOffset, 0, appConfig.ntpServer);
@@ -64,6 +66,7 @@ static void startApMode() {
 
 // --- Task ---------------------------------------------------------------------
 
+// FreeRTOS task entry point (pvParameters unused); owns the STA connection lifecycle (connect, AP fallback, NTP sync, RSSI/IP monitoring, reconnect on loss) for the device's whole lifetime; never returns.
 void taskWiFi(void* pvParameters) {
     LOG_I(MOD_WIFI, "Task started (Core %d)", xPortGetCoreID());
 

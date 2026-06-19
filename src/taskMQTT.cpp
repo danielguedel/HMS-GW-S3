@@ -21,10 +21,12 @@ static char _clientId[32];
 static char _lwtTopic[80];
 
 // --- Topic helpers ------------------------------------------------------------
+// Builds a full topic string by prefixing suffix with the configured mqttTopic ("<mqttTopic>/<suffix>").
 static String T(const char* suffix) {
     return String(appConfig.mqttTopic) + "/" + suffix;
 }
 
+// Publishes payload under T(suffix) with QoS 0; a no-op if the client object hasn't been created yet (taskMQTT() hasn't reached esp_mqtt_client_init()).
 static void pub(const char* suffix, const char* payload, bool retain = false) {
     if (!_client) return;
     esp_mqtt_client_publish(_client, T(suffix).c_str(), payload, 0, 0, retain ? 1 : 0);
@@ -41,6 +43,7 @@ static void pubInt(const char* suffix, int val, bool retain = false) {
 }
 
 // --- Publish PV data (Spec §5.3) ---------------------------------------------
+// Publishes the latest PV/grid measurement; uses the OpenDTU-compatible topic layout when appConfig.mqttOpenDtu is set, otherwise the gateway's own schema.
 static void publishPvData(const DataStore::PvData& pv) {
     bool r = appConfig.mqttRetain;
 
@@ -113,6 +116,7 @@ static void publishSystemStats() {
 }
 
 // --- HA Auto-Discovery (Spec §5.4) -------------------------------------------
+// Publishes a Home Assistant MQTT-discovery config for one sensor entity; pass nullptr for unit/devClass to omit those JSON fields.
 static void publishHaSensor(const char* uid, const char* name,
                              const char* stateSuffix, const char* unit,
                              const char* devClass) {
@@ -133,6 +137,7 @@ static void publishHaSensor(const char* uid, const char* name,
     esp_mqtt_client_publish(_client, discTopic, payload.c_str(), 0, 0, 1);
 }
 
+// Publishes a Home Assistant MQTT-discovery config for one switch entity (cmdSuffix is the topic HA writes "1"/"0" commands to).
 static void publishHaSwitch(const char* uid, const char* name,
                              const char* stateSuffix, const char* cmdSuffix) {
     char discTopic[128];
@@ -156,6 +161,7 @@ static void publishHaSwitch(const char* uid, const char* name,
 static int      _haIdx    = -1;
 static uint32_t _haNextMs = 0;
 
+// Call every loop iteration; self-rate-limited via _haNextMs and a no-op whenever no discovery sequence is in progress (_haIdx<0) or the client doesn't exist yet.
 static void haDiscoveryStep() {
     if (_haIdx < 0 || !_client)    return;
     if (millis() < _haNextMs)      return;
@@ -186,6 +192,7 @@ static void haDiscoveryStep() {
 }
 
 // --- Inbound message handler --------------------------------------------------
+// Maps an inbound control topic (exact match against the configured mqttTopic prefix) to a DataStore command or direct action; topic/data are already null-terminated copies made by the caller (mqttEventHandler).
 static void onMessage(const char* topic, const char* data) {
     String t    = String(topic);
     String base = String(appConfig.mqttTopic) + "/";
@@ -296,6 +303,7 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
 }
 
 // --- Task ---------------------------------------------------------------------
+// FreeRTOS task entry point (pvParameters unused); deletes itself immediately if no broker is configured or WiFi is in AP mode, otherwise starts the esp-mqtt client and loops publishing PV/GPIO/system data plus driving HA discovery; never returns in the normal case.
 void taskMQTT(void* pvParameters) {
     if (strlen(appConfig.mqttHost) == 0) {
         LOG_W(MOD_MQTT, "No broker configured  -  task idle");

@@ -11,6 +11,7 @@
 #define HEAP_WARN_THRESHOLD  20000   // warn if free heap < 20 KB
 #define HEAP_LOG_INTERVAL_MS 10000   // detailed log every 10 s
 
+// FreeRTOS task entry point (pvParameters unused); never returns, see file header above for its single responsibility.
 void taskSysMonitor(void* pvParameters) {
     LOG_I(MOD_SYS, "SysMonitor started  -  heap warn threshold: %d B", HEAP_WARN_THRESHOLD);
 

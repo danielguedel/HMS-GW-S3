@@ -69,6 +69,7 @@ static void logOtaPartitionState(const char* when) {
           next    ? next->label    : "?", name(nextSt));
 }
 
+// Writes back the backup taken by backupConfigBeforeFsOta(); a no-op if no backup was captured (e.g. first-ever boot). Requires an explicit LittleFS unmount/remount since the just-written CI filesystem image isn't visible to the already-mounted instance.
 static void restoreConfigAfterFsOta() {
     if (_fsOtaConfigBackup.length() == 0) return;
     LittleFS.end();
@@ -175,6 +176,7 @@ static void handleApiDtuGet(AsyncWebServerRequest* req) {
 }
 
 // --- POST /api/dtu  (DTU & system commands) ----------------------------------
+// Single endpoint for several distinct actions, selected by which JSON key is present: rebootGateway/factoryReset act immediately via EventGroup bits; powerLimit/inverterOn/rebootDtu/rebootInverter are queued as a DtuCommand for taskDTU to pick up.
 static void handleApiDtuPost(AsyncWebServerRequest* req, uint8_t* data,
                               size_t len, size_t /*index*/, size_t /*total*/) {
     JsonDocument doc;
@@ -255,6 +257,7 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
 }
 
 // --- POST /api/config ---------------------------------------------------------
+// Partial-update semantics: only JSON keys present in the body are applied to appConfig (missing keys keep their current value), then configSave() persists it. Always responds with reboot:true, but does not itself set EVT_REBOOT — the web GUI triggers the actual restart with a separate POST /api/dtu {rebootGateway:1} call.
 static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
                                  size_t len, size_t index, size_t total) {
     // Accumulate body chunks  -  ESPAsyncWebServer calls this once per TCP segment
@@ -376,6 +379,7 @@ static void handleApiConfigBackup(AsyncWebServerRequest* req) {
 
 // --- POST /api/config/restore  -  upload a previously downloaded backup -----
 static bool _restoreError = false;
+// ESPAsyncWebServer multipart-upload callback, invoked repeatedly as the file streams in (index/len describe the current chunk, final marks the last one); accumulates into bodyBuf and only parses once final is true. The actual HTTP response is sent separately by handleApiConfigRestoreDone() after this returns.
 static void handleApiConfigRestore(AsyncWebServerRequest* /*req*/, String /*filename*/,
                                     size_t index, uint8_t* data, size_t len, bool final) {
     static uint8_t bodyBuf[4096];
@@ -391,6 +395,7 @@ static void handleApiConfigRestore(AsyncWebServerRequest* /*req*/, String /*file
     if (!configRestoreFromJson((const char*)bodyBuf, index + len)) _restoreError = true;
 }
 
+// Runs after the upload in handleApiConfigRestore() completes; reports the error flag it set and triggers a reboot on success so the restored config takes effect.
 static void handleApiConfigRestoreDone(AsyncWebServerRequest* req) {
     if (_restoreError) {
         req->send(400, "application/json", "{\"error\":\"invalid config backup\"}");
@@ -401,6 +406,7 @@ static void handleApiConfigRestoreDone(AsyncWebServerRequest* req) {
 }
 
 // --- OTA firmware upload ------------------------------------------------------
+// ESPAsyncWebServer chunked-upload callback (one call per received chunk, index==0 starts a new Update, final flushes it); the HTTP response is sent afterwards by handleOtaDone().
 static void handleOtaUpload(AsyncWebServerRequest* /*req*/, String filename,
                              size_t index, uint8_t* data, size_t len, bool final) {
     if (index == 0) {
@@ -427,6 +433,7 @@ static void handleOtaUpload(AsyncWebServerRequest* /*req*/, String filename,
     }
 }
 
+// Shared completion callback for both /update and /updatefs; reflects whatever error state Update.hasError() left behind from the preceding upload handler.
 static void handleOtaDone(AsyncWebServerRequest* req) {
     if (Update.hasError()) req->send(500, "text/plain", String("OTA Error: ") + Update.errorString());
     else {
@@ -436,6 +443,7 @@ static void handleOtaDone(AsyncWebServerRequest* req) {
 }
 
 // --- OTA filesystem upload ----------------------------------------------------
+// Same chunked-upload pattern as handleOtaUpload(), but for U_SPIFFS; wraps the write in backupConfigBeforeFsOta()/restoreConfigAfterFsOta() since this overwrites the whole LittleFS partition including config.json.
 static void handleFsUpload(AsyncWebServerRequest* /*req*/, String filename,
                             size_t index, uint8_t* data, size_t len, bool final) {
     if (index == 0) {
@@ -551,6 +559,7 @@ static void handleApiOtaCheckPost(AsyncWebServerRequest* req) {
 }
 
 // --- POST /api/ota/url  (Internet OTA  -  Spec §10.2) ------------------------
+// Only validates and queues the URL(s)/MD5(s) for taskWebServer()'s loop to act on via doUrlOtaPartition() — the actual download/flash never happens inside this AsyncTCP callback.
 static void handleApiOtaUrl(AsyncWebServerRequest* req, uint8_t* data,
                              size_t len, size_t index, size_t total) {
     static uint8_t bodyBuf[768];
@@ -757,6 +766,7 @@ static void setupRoutes() {
 }
 
 // --- Task ---------------------------------------------------------------------
+// FreeRTOS task entry point (pvParameters unused); starts the web server once, then loops handling deferred reboot/OTA-check/URL-OTA work and the captive-portal DNS responder; never returns.
 void taskWebServer(void* pvParameters) {
     LOG_I(MOD_WEB, "Task started (Core %d)", xPortGetCoreID());
     // LittleFS, config, and WiFi are already initialized in main.cpp

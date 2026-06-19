@@ -118,13 +118,12 @@ struct DataStore {
         char     notes[128];         // Release-Notes
         uint32_t lastCheckMs;        // millis() des letzten Checks (0 = noch nie)
     } otaInfo;
-
-    // ── Mutex ──────────────────────────────────────────────────────────────
-    SemaphoreHandle_t mutex;
 };
 
 extern DataStore ds;
 ```
+
+Der Schutz-Mutex ist **nicht** Teil des Structs — er ist als `static SemaphoreHandle_t _mutex` privat in `dataStore.cpp` versteckt (seit Commit `8e843bf`) und für Code ausserhalb dieser Datei unerreichbar.
 
 ### 2.2 DataStore API
 
@@ -155,7 +154,7 @@ bool dsIsWifiConnected();
 bool dsPvValid();
 ```
 
-**Wichtig:** `ds.mutex` ist zwar Teil des öffentlichen Structs, darf aber **nie** direkt verwendet werden — ausschliesslich über die obigen API-Funktionen. `dsGetGpioCommand()`/`dsGetDtuCommand()` wurden hinzugefügt, um den früheren direkten `ds.mutex`-Zugriff in `taskGPIO`/`taskDTU` zu ersetzen.
+**Wichtig:** Der Mutex ist seit Commit `8e843bf` technisch unzugreifbar von ausserhalb `dataStore.cpp` — Zugriff auf `DataStore`-Felder ist daher ausschliesslich über die obigen API-Funktionen möglich. `dsGetGpioCommand()`/`dsGetDtuCommand()` wurden hinzugefügt, um den früheren direkten `ds.mutex`-Zugriff in `taskGPIO`/`taskDTU` zu ersetzen.
 
 ---
 
@@ -353,9 +352,9 @@ PubSubClient ist synchron-blockierend. `connect()` blockiert den Thread für >1 
 
 esp_mqtt_client_config_t cfg = {};
 cfg.uri         = "mqtt://10.1.1.41:1883";
-cfg.client_id   = "hmsgws3";
+cfg.client_id   = "hmsgws3_406194";        // letzte 3 Byte der WiFi-MAC, siehe esp_read_mac()
 cfg.keepalive   = 60;
-cfg.lwt_topic   = "hmsgws3/LWT";
+cfg.lwt_topic   = "hmsgws3_406194/system/status";  // "<mqttTopic>/system/status"
 cfg.lwt_msg     = "offline";
 cfg.lwt_msg_len = 7;
 cfg.lwt_retain  = 1;
@@ -383,6 +382,7 @@ Alle Callbacks laufen asynchron — kein Blocking, kein Watchdog.
 {mqttTopic}/system/uptime          Uptime [s]
 {mqttTopic}/system/rssi            WLAN-RSSI [dBm]
 {mqttTopic}/system/heap            Freier Heap [Bytes]
+{mqttTopic}/system/status          online/offline (retained, auch als LWT-Topic)
 
 # Steuertopics (Subscribe)
 {mqttTopic}/relay/set              Relay setzen (0/1)
@@ -519,7 +519,7 @@ struct AppConfig {
     uint16_t mqttPort;          // default: 1883
     char mqttUser[33];
     char mqttPass[65];
-    char mqttTopic[33];         // default: "hmsgws3"
+    char mqttTopic[33];         // default: "hmsgws3_XXXXXX" (letzte 3 Byte der WiFi-MAC, z.B. "hmsgws3_406194")
     bool mqttRetain;
     bool mqttHaDiscovery;       // HA Auto-Discovery aktivieren
     bool mqttOpenDtu;           // OpenDTU-kompatible Topics
