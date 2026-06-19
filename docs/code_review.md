@@ -56,7 +56,7 @@ Alle übrigen Abschnitte (DataStore, EventGroup, DTU-Protokoll, MQTT-Topics, Web
 
 Das DataStore-Muster ist jetzt vollständig eingehalten. Der frühere direkte `ds.mutex`-Zugriff in `taskGPIO.cpp` und `taskDTU.cpp` wurde durch `dsGetGpioCommand()`/`dsGetDtuCommand()` ersetzt (`dataStore.cpp:72-85`) — kein Task greift mehr unter Umgehung der API auf `ds.*` zu.
 
-**Verbleibend (kein Bug, Designhinweis):** `ds.mutex` ist weiterhin Teil des öffentlichen `DataStore`-Structs (`dataStore.h:121`) und könnte theoretisch direkt verwendet werden. Die Spec wurde mit einem expliziten Hinweis ergänzt ("nie direkt verwenden"); eine technische Durchsetzung (z. B. `private`-Wrapper) gibt es nicht.
+> **Update 2026-06-19 (behoben):** `mutex` ist nicht mehr Teil des öffentlichen `DataStore`-Structs — als `static SemaphoreHandle_t _mutex` in `dataStore.cpp` verschoben (Commit `8e843bf`). Verifiziert, dass kein Code ausserhalb von `dataStore.cpp` je auf `ds.mutex` zugriff; API-Signaturen unverändert. Der Designhinweis ist damit technisch durchgesetzt statt nur dokumentiert.
 
 > **Update 2026-06-17 (nach diesem Review):** Die zwei unabhängigen `LittleFS.remove(CONFIG_FILE)`-Pfade (§3.2/§6, ehemals P4) sind konsolidiert — `taskWebServer.cpp` löscht die Config nicht mehr selbst, sondern setzt nur noch `EVT_FACTORY_RESET`/`EVT_REBOOT`. Alleiniger Eigentümer ist jetzt `main.cpp`s `loop()`.
 
@@ -69,6 +69,8 @@ Das DataStore-Muster ist jetzt vollständig eingehalten. Der frühere direkte `d
 ### Korrektur gegenüber dem vorherigen Review
 
 **Der vormalige P1-Befund "`_rxBuf`/`_rxLen` Race Condition" ist falsch / bereits behoben.** Bei genauerer Prüfung (nicht nur Grep auf `_rxBuf`/`_rxLen`, sondern auf den vollständigen Funktionskörper) zeigt sich: Es existiert ein dediziertes `_rxMutex` (`taskDTU.cpp:251`), das sowohl in `onData()` (Z. 257-260, AsyncTCP-Callback auf Core 0) als auch an beiden Lesestellen in `taskDTU` (Z. 496-499, 513-516, Core 1) korrekt per `xSemaphoreTake`/`xSemaphoreGive` genommen wird. Das Mutex wird in `taskDTU()` (Z. 370) erzeugt, bevor `dtuConnect()` und damit die Callback-Registrierung erfolgt — kein Initialisierungs-Race. Die im vorherigen Review beschriebene Race Condition existiert im aktuellen Code nicht. Kein Handlungsbedarf.
+
+> **Update 2026-06-19 (Härtung):** `onData()` nutzte `xSemaphoreTake(_rxMutex, portMAX_DELAY)` — ein unbegrenztes Blockieren im AsyncTCP-Callback (lwIP-Thread), falls der Mutex gerade von `taskDTU` gehalten wird. Auf einen 10ms-Timeout umgestellt (Commit `8e843bf`); bei Fehlschlag wird eine `LOG_W`-Warnung ausgegeben und ohne Datenkopie/Ready-Flags zurückgekehrt, statt den Netzwerk-Thread zu stallen.
 
 ### Behoben seit letztem Review
 
