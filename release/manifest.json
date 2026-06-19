@@ -1,9 +1,9 @@
 {
   "version": "0.2.0",
-  "buildNumber": 222,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-222/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-222/littlefs.bin",
-  "md5": "e5c58658a411a35329fca86c7a410ecd",
-  "fs_md5": "123c310bcbab8f7680a5f56551f58639",
-  "notes": "Internet OTA fixed"
+  "buildNumber": 281,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-281/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-281/littlefs.bin",
+  "md5": "e70fa3639526646cdd979565276c6040",
+  "fs_md5": "12e833887cce33b7e8e1aead0f03fc37",
+  "notes": ""
 }
