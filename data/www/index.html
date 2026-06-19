@@ -257,7 +257,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
 <div id="tab-gpio" class="tab">
   <div class="gpio-grid">
     <div class="gpio-card">
-      <div class="gpio-name">Relay</div>
+      <div class="gpio-name" data-i18n="lblRelay">Relay</div>
       <label class="toggle">
         <input type="checkbox" id="sw-relay" onchange="setGpio('relay',this.checked)">
         <span class="slider"></span>
@@ -398,8 +398,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     <p style="color:var(--muted);font-size:12px;margin-bottom:12px" data-i18n="pFirmwareOta">
       Upload a compiled .bin file. Gateway restarts after a successful update.</p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <input type="file" accept=".bin" id="fw-file"
-             style="background:none;border:none;color:var(--text);padding:0;flex:1">
+      <input type="file" accept=".bin" id="fw-file" style="display:none" onchange="onFilePicked('fw-file','fw-file-lbl')">
+      <button type="button" class="btn btn-muted" onclick="pickFile('fw-file')" data-i18n="btnChooseFile">Choose File</button>
+      <span id="fw-file-lbl" style="color:var(--muted);font-size:12px;flex:1" data-i18n="lblNoFileChosen">No file chosen</span>
       <button class="btn btn-ok" onclick="doOta('firmware','fw-file','/update')" data-i18n="btnFlash">Flash</button>
     </div>
     <div class="ota-progress" id="fw-prog">
@@ -413,8 +414,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
     <p style="color:var(--muted);font-size:12px;margin-bottom:12px" data-i18n="pFilesystemOta">
       Upload a LittleFS .bin (data/www).</p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <input type="file" accept=".bin" id="fs-file"
-             style="background:none;border:none;color:var(--text);padding:0;flex:1">
+      <input type="file" accept=".bin" id="fs-file" style="display:none" onchange="onFilePicked('fs-file','fs-file-lbl')">
+      <button type="button" class="btn btn-muted" onclick="pickFile('fs-file')" data-i18n="btnChooseFile">Choose File</button>
+      <span id="fs-file-lbl" style="color:var(--muted);font-size:12px;flex:1" data-i18n="lblNoFileChosen">No file chosen</span>
       <button class="btn btn-ok" onclick="doOta('filesystem','fs-file','/updatefs')" data-i18n="btnFlash">Flash</button>
     </div>
     <div class="ota-progress" id="fs-prog">
@@ -438,8 +440,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
       Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.</p>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <a class="btn btn-muted" href="/api/config/backup" download data-i18n="btnDownloadBackup">Download Backup</a>
-      <input type="file" accept=".json" id="restore-file"
-             style="background:none;border:none;color:var(--text);padding:0;flex:1">
+      <input type="file" accept=".json" id="restore-file" style="display:none" onchange="onFilePicked('restore-file','restore-file-lbl')">
+      <button type="button" class="btn btn-muted" onclick="pickFile('restore-file')" data-i18n="btnChooseFile">Choose File</button>
+      <span id="restore-file-lbl" style="color:var(--muted);font-size:12px;flex:1" data-i18n="lblNoFileChosen">No file chosen</span>
       <button class="btn btn-ok" onclick="doRestore()" data-i18n="btnRestore">Restore</button>
     </div>
   </div>
@@ -450,7 +453,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 8px 0; }
   </div>
 
   <div class="cfg-box" style="border-color:var(--red)">
-    <h3 style="color:var(--red)">Danger Zone</h3>
+    <h3 style="color:var(--red)" data-i18n="hDangerZone">Danger Zone</h3>
     <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
       <button class="btn btn-muted"   onclick="doReboot()"  data-i18n="btnRebootGw">Reboot Gateway</button>
       <button class="btn btn-danger"  onclick="doFactory()" data-i18n="btnFactoryReset">Factory Reset</button>
@@ -499,8 +502,10 @@ const I18N = {
     btnCheck: 'Check', btnInstallNow: 'Install now',
     pBackupHint: 'Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.',
     btnDownloadBackup: 'Download Backup', btnRestore: 'Restore',
-    btnRebootGw: 'Reboot Gateway', btnFactoryReset: 'Factory Reset',
+    btnRebootGw: 'Reboot Gateway', btnFactoryReset: 'Factory Reset', hDangerZone: 'Danger Zone',
     pFactoryResetHint: 'Factory Reset erases config.json and restarts.',
+    btnChooseFile: 'Choose File', lblNoFileChosen: 'No file chosen',
+    lblOn: 'ON', lblOff: 'OFF', lblRelay: 'Relay',
     fmtFirmware: (fw, build) => `${fw} (Build ${build})`,
     rowFirmware: 'Firmware', rowMac: 'MAC', rowIp: 'IP', rowRssi: 'WiFi RSSI', rowUptime: 'Uptime', rowHeap: 'Free Heap', rowNtpTime: 'NTP Time',
     errGeneric: 'Error', errLoadConfig: 'Failed to load config', errSaveConfig: 'Error saving',
@@ -521,7 +526,7 @@ const I18N = {
     confirmFactoryReset: 'Factory reset? All settings will be erased!', msgFactoryReset: 'Factory reset — gateway restarting…',
   },
   de: {
-    navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
+    navDashboard: 'Dashboard', navRelayIo: 'Relais / IO', navConfig: 'Konfiguration', navSystem: 'System',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
     statActive: 'Aktiv', statStandby: 'Standby', statNoData: 'Keine Daten', statOffline: 'Offline',
     secPowerLimit: 'Leistungsbegrenzung', secStatus: 'Status', btnSet: 'Setzen',
@@ -547,8 +552,10 @@ const I18N = {
     btnCheck: 'Prüfen', btnInstallNow: 'Jetzt installieren',
     pBackupHint: 'Backup enthält alle Einstellungen inkl. WLAN-/MQTT-/Web-Passwörter im Klartext — Datei sicher aufbewahren.',
     btnDownloadBackup: 'Backup herunterladen', btnRestore: 'Wiederherstellen',
-    btnRebootGw: 'Gateway Neustart', btnFactoryReset: 'Factory Reset',
+    btnRebootGw: 'Gateway Neustart', btnFactoryReset: 'Factory Reset', hDangerZone: 'Gefahrenzone',
     pFactoryResetHint: 'Factory Reset löscht config.json und startet neu.',
+    btnChooseFile: 'Datei wählen', lblNoFileChosen: 'Keine Datei ausgewählt',
+    lblOn: 'EIN', lblOff: 'AUS', lblRelay: 'Relais',
     fmtFirmware: (fw, build) => `${fw} (Build ${build})`,
     rowFirmware: 'Firmware', rowMac: 'MAC', rowIp: 'IP', rowRssi: 'WiFi RSSI', rowUptime: 'Laufzeit', rowHeap: 'Freier Heap', rowNtpTime: 'NTP Zeit',
     errGeneric: 'Fehler', errLoadConfig: 'Config laden fehlgeschlagen', errSaveConfig: 'Fehler beim Speichern',
@@ -584,17 +591,19 @@ function applyI18n() {
 }
 
 function initLang() {
-  $('lang-btn').textContent = currentLang() === 'en' ? '🇩🇪' : '🇬🇧';
+  $('lang-btn').textContent = currentLang() === 'en' ? 'DE' : 'EN';
   applyI18n();
 }
 
 function toggleLang() {
   const next = currentLang() === 'en' ? 'de' : 'en';
   localStorage.setItem('lang', next);
-  $('lang-btn').textContent = next === 'en' ? '🇩🇪' : '🇬🇧';
+  $('lang-btn').textContent = next === 'en' ? 'DE' : 'EN';
   applyI18n();
   // Re-render anything currently showing dynamically-built/translated text
+  ['fw-file', 'fs-file', 'restore-file'].forEach(id => { if ($(id).files[0]) onFilePicked(id, id + '-lbl'); });
   refreshData();
+  refreshGpio();
   if ($('tab-system').classList.contains('active')) { loadSysInfo(); loadOtaStatus(); }
 }
 
@@ -728,7 +737,7 @@ function applyGpio(key, val) {
   if (!sw) return;
   sw.checked = !!val;
   if (lbl) {
-    lbl.textContent = val ? 'ON' : 'OFF';
+    lbl.textContent = val ? tr('lblOn') : tr('lblOff');
     lbl.className = 'badge ' + (val ? 'b-ok' : 'b-off');
   }
 }
@@ -747,7 +756,7 @@ async function setGpio(key, state) {
     await fetch('/api/gpio', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                body: JSON.stringify(body) });
     applyGpio(key, state);
-    toast(key + ' → ' + (state ? 'ON' : 'OFF'));
+    toast(key + ' → ' + (state ? tr('lblOn') : tr('lblOff')));
   } catch (e) { toast(tr('errGeneric'), false); }
 }
 
@@ -878,6 +887,13 @@ async function loadSysInfo() {
       '</span><span class="sv">' + v + '</span></div>'
     ).join('');
   } catch (e) {}
+}
+
+// ─── File picker (custom-styled, browser-native button text isn't i18n-able) ─
+function pickFile(inputId) { $(inputId).click(); }
+function onFilePicked(inputId, lblId) {
+  const f = $(inputId).files[0];
+  txt(lblId, f ? f.name : tr('lblNoFileChosen'));
 }
 
 // ─── OTA ──────────────────────────────────────────────────────────────────
