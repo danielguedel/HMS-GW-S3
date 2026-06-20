@@ -68,6 +68,14 @@ static size_t encodeField(uint8_t* buf, uint8_t fieldNum, uint8_t wireType, uint
     n += encodeVarint(buf + n, val);
     return n;
 }
+// Length-delimited field (wire type 2), e.g. for the CommandResDTO.data string used by SetPowerLimit.
+static size_t encodeStringField(uint8_t* buf, uint8_t fieldNum, const char* str) {
+    size_t len = strlen(str);
+    size_t n = encodeVarint(buf, ((uint64_t)fieldNum << 3) | 2);
+    n += encodeVarint(buf + n, (uint64_t)len);
+    memcpy(buf + n, str, len);
+    return n + len;
+}
 
 // --- Manual Protobuf decoder --------------------------------------------------
 struct PbReader {
@@ -199,15 +207,20 @@ static bool parseRealDataNew(const uint8_t* data, size_t len, DataStore::PvData&
     return true;
 }
 
-// --- Parse GetConfig response (field 3 = powerLimit, field 11 = DTU WiFi RSSI)
+// --- Parse GetConfig response (field 5 = limit_power_mypower, i.e. powerLimit*10; field 11 = DTU WiFi RSSI)
+// Field 5, not field 3: verified against a live capture where SetPowerLimit(50%) made field 5 read back
+// exactly 500 (= 50.0 * 10). Field 3 (lock_password in the request-side schema) is essentially always
+// absent/0 on the wire, which is why the original field-3 mapping always silently read 0.
 static void parseGetConfig(const uint8_t* data, size_t len, DataStore::PvData& pv) {
     if (len < 11) return;
     PbReader r{data+10, len-10, 0};
     uint8_t f,w; uint64_t v;
     while (r.readTag(f,w)) {
         if (w==0 && r.readVarint(v)) {
-            if (f==3)  pv.powerLimit = (int32_t)v;
-            if (f==11) pv.wifiRssi  = (int32_t)v;
+            // A 0 reading is transient/spurious (matches ohAnd/dtuGateway's readRespGetConfig guard) —
+            // keep the last known value instead of overwriting with a momentary glitch.
+            if (f==5 && v!=0)  pv.powerLimit = (int32_t)(v / 10);
+            if (f==11)         pv.wifiRssi   = (int32_t)v;
         } else r.skipField(w);
     }
     LOG_D(MOD_DTU, "GetConfig: powerLimit=%d%%  DTU RSSI=%d", pv.powerLimit, pv.wifiRssi);
@@ -240,12 +253,26 @@ static size_t buildGetConfigReq(uint8_t* buf, size_t size, uint32_t ntpTime) {
     return n;
 }
 
-// SetPowerLimit uses command 0xa3 0x0e with field 3 = limit [%] (matches GetConfig field mapping)
+// SetPowerLimit uses command 0xa3 0x05 with a CommandResDTO-shaped payload, per
+// ohAnd/dtuGateway's writeReqCommandSetPowerlimit() — NOT a dedicated SetPowerLimit
+// message with a plain int field (that guess, tried first, was wrong: it always
+// read back as 0% because the DTU never saw a recognized field at all).
+// The actual limit is a "A:<value>,B:0,C:0\r" string in field 7 (CommandResDTO.data),
+// where value = percent * 10, clamped to 20-1000 (i.e. 2.0%-100.0%).
 static size_t buildSetPowerLimitReq(uint8_t* buf, size_t size, uint32_t ntpTime, int limitPct) {
+    int limitLevel = limitPct * 10;
+    if (limitLevel > 1000)    limitLevel = 1000;
+    else if (limitLevel < 20) limitLevel = 20;
+
+    char data[24];
+    snprintf(data, sizeof(data), "A:%d,B:0,C:0\r", limitLevel);
+
     size_t n = 0;
-    n += encodeField(buf+n, 3, 0, (uint64_t)limitPct);
-    n += encodeField(buf+n, 4, 0, 28800);
-    n += encodeField(buf+n, 5, 0, ntpTime);
+    n += encodeField(buf+n, 1, 0, ntpTime);        // time
+    n += encodeField(buf+n, 2, 0, 8);               // action = CMD_ACTION_LIMIT_POWER
+    n += encodeField(buf+n, 4, 0, 1);                // package_nub
+    n += encodeField(buf+n, 6, 0, ntpTime);          // tid
+    n += encodeStringField(buf+n, 7, data);          // data
     return n;
 }
 
@@ -354,9 +381,9 @@ static bool sendGetConfig(uint32_t ntpTime) {
 
 // limitPct: target inverter power limit in percent (0-100); does not wait for a reply, the DTU applies it asynchronously.
 static bool sendSetPowerLimit(uint32_t ntpTime, int limitPct) {
-    uint8_t pb[32], msg[64];
+    uint8_t pb[64], msg[96];
     size_t pbLen  = buildSetPowerLimitReq(pb, sizeof(pb), ntpTime, limitPct);
-    size_t msgLen = buildMsg(msg, sizeof(msg), 0xa3, 0x0e, pb, pbLen);
+    size_t msgLen = buildMsg(msg, sizeof(msg), 0xa3, 0x05, pb, pbLen);
     if (!msgLen) return false;
     _client->write((const char*)msg, msgLen);
     LOG_I(MOD_DTU, "Sent SetPowerLimit: %d%%", limitPct);
