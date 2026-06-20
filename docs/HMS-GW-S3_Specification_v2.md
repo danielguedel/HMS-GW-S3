@@ -390,7 +390,8 @@ All callbacks run asynchronously — no blocking, no watchdog.
 {mqttTopic}/pv0/U, /pv0/I, /pv0/P PV1
 {mqttTopic}/pv1/U, /pv1/I, /pv1/P PV2
 {mqttTopic}/inverter/Temp          Temperature [°C]
-{mqttTopic}/inverter/PowerLimit    Power limit [%]
+{mqttTopic}/inverter/PowerLimit    Power limit [%] (confirmed by the DTU)
+{mqttTopic}/inverter/PowerLimitTarget  Target power limit [%] — last requested value, may briefly differ from PowerLimit until the DTU confirms it
 {mqttTopic}/relay/state            Relay state (0/1)
 {mqttTopic}/io{1-3}/state          GPIO state (0/1)
 {mqttTopic}/system/uptime          Uptime [s]
@@ -427,7 +428,7 @@ Discovery messages are sent 5 seconds after the MQTT connect, one every 500ms (p
 | POST | `/api/config/restore` | Upload a `config.json` backup, validate, apply + restart |
 | GET | `/api/gpio` | GPIO state |
 | POST | `/api/gpio` | Set GPIO |
-| GET | `/api/dtu` | DTU status (power limit, inverter active) |
+| GET | `/api/dtu` | DTU status (power limit, power limit target, inverter active) |
 | POST | `/api/dtu` | DTU control commands (power limit, reboot, inverter on/off) |
 | POST | `/update` | OTA firmware update (file upload) |
 | POST | `/updatefs` | OTA filesystem update (file upload) |
@@ -442,7 +443,7 @@ Discovery messages are sent 5 seconds after the MQTT connect, one every 500ms (p
   "pv0": { "v": 26.6, "i": 1.33, "p": 353.0, "dE": 1.591, "tE": 129.164 },
   "pv1": { "v": 27.7, "i": 1.07, "p": 296.0, "dE": 1.450, "tE": 112.300 },
   "grid": { "v": 241.9, "i": 2.53, "p": 610.0, "dE": 3.041, "tE": 241.464 },
-  "inverter": { "temp": 45.2, "powerLimit": 100, "active": true },
+  "inverter": { "temp": 45.2, "powerLimit": 100, "powerLimitSet": 100, "active": true },
   "timestamp": 1781430913,
   "valid": true
 }

@@ -87,7 +87,8 @@ static void publishPvData(const DataStore::PvData& pv) {
         pubFloat("pv1/dailyEnergy",  pv.pv1_dE,  3, r);
         pubFloat("pv1/totalEnergy",  pv.pv1_tE,  3, r);
         pubFloat("inverter/Temp",    pv.temp,     1, r);
-        pubInt  ("inverter/PowerLimit",    pv.powerLimit,     r);
+        pubInt  ("inverter/PowerLimit",       pv.powerLimit,    r);
+        pubInt  ("inverter/PowerLimitTarget",  pv.powerLimitSet, r);
         pubInt  ("inverter/warningsActive",pv.warningsActive, false);
     }
     LOG_D(MOD_MQTT, "Published PV data (ts=%lu)", (unsigned long)pv.timestamp);
@@ -178,10 +179,11 @@ static void haDiscoveryStep() {
         case  8: publishHaSensor("pv1_u",   "PV2 Voltage",       "pv1/U",             "V",   "voltage");     break;
         case  9: publishHaSensor("temp",    "Inverter Temp",     "inverter/Temp",     "°C",  "temperature"); break;
         case 10: publishHaSensor("pwr_lim", "Power Limit",       "inverter/PowerLimit","%",  nullptr);       break;
-        case 11: publishHaSwitch("relay", "Relay", "relay/state", "relay/set"); break;
-        case 12: publishHaSwitch("io1",   "IO 1",  "io1/state",   "io1/set");   break;
-        case 13: publishHaSwitch("io2",   "IO 2",  "io2/state",   "io2/set");   break;
-        case 14: publishHaSwitch("io3",   "IO 3",  "io3/state",   "io3/set");   break;
+        case 11: publishHaSensor("pwr_lim_tgt","Power Limit Target","inverter/PowerLimitTarget","%",nullptr); break;
+        case 12: publishHaSwitch("relay", "Relay", "relay/state", "relay/set"); break;
+        case 13: publishHaSwitch("io1",   "IO 1",  "io1/state",   "io1/set");   break;
+        case 14: publishHaSwitch("io2",   "IO 2",  "io2/state",   "io2/set");   break;
+        case 15: publishHaSwitch("io3",   "IO 3",  "io3/state",   "io3/set");   break;
         default:
             LOG_I(MOD_MQTT, "HA discovery complete (%d entities)", _haIdx);
             _haIdx = -1;
@@ -266,7 +268,7 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
             if (appConfig.mqttHaDiscovery) {
                 _haIdx    = 0;
                 _haNextMs = millis() + 5000;
-                LOG_I(MOD_MQTT, "HA discovery scheduled in 5s (15 entities)");
+                LOG_I(MOD_MQTT, "HA discovery scheduled in 5s (16 entities)");
             }
             break;
         }

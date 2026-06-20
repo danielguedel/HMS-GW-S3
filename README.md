@@ -192,6 +192,7 @@ All topics under `<mqttTopic>/` (default: `hmsgws3_XXXXXX`).
 | `pv1/P`, `pv1/U`, `pv1/I`, `pv1/dailyEnergy`, `pv1/totalEnergy` | float | Every DTU update |
 | `inverter/Temp` | float °C | Every DTU update |
 | `inverter/PowerLimit` | int % | Every DTU update |
+| `inverter/PowerLimitTarget` | int % | Every DTU update — last requested value, may briefly differ from `PowerLimit` until the DTU confirms it |
 | `inverter/warningsActive` | int | Every DTU update |
 | `relay/state`, `io1/state` … `io3/state` | 0 or 1 | On change |
 | `system/uptime`, `system/rssi`, `system/heap` | int | Every 60 s |

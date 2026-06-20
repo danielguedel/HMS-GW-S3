@@ -16,6 +16,10 @@
 
 // --- Power limit timeout state ------------------------------------------------
 static uint32_t _powerLimitSetAt = 0;  // millis() when a non-default limit was set, 0 = inactive
+// True once powerLimitSet has been written at least once this boot (manually, via timeout
+// reset, or via the GetConfig self-heal below) — NOT the same as "powerLimitSet != 0", since
+// 0 is a legitimate value (powerLimitDefault is validated to 0-100, not 2-100).
+static bool _powerLimitSetInitialized = false;
 
 // --- CRC16 MODBUS -------------------------------------------------------------
 // Initial=0xFFFF, Poly=0x8005, RefIn=true, RefOut=true, XorOut=0x0000
@@ -446,6 +450,7 @@ void taskDTU(void* pvParameters) {
                         sendSetPowerLimit(t, appConfig.powerLimitDefault);
                         pv.powerLimitSet = appConfig.powerLimitDefault;
                         dsSetPv(pv);
+                        _powerLimitSetInitialized = true;
                     }
                 }
                 _powerLimitSetAt = 0;
@@ -461,6 +466,7 @@ void taskDTU(void* pvParameters) {
                 DataStore::PvData pv = dsGetPv();
                 pv.powerLimitSet = cmd.powerLimitValue;
                 dsSetPv(pv);
+                _powerLimitSetInitialized = true;
                 _powerLimitSetAt = (cmd.powerLimitValue != appConfig.powerLimitDefault) ? millis() : 0;
                 dsClearDtuCommand();
             } else if (cmd.rebootDtu && _connected) {
@@ -565,6 +571,13 @@ void taskDTU(void* pvParameters) {
                 memcpy(localBuf, (const uint8_t*)_rxBuf, localLen);
                 xSemaphoreGive(_rxMutex);
                 parseGetConfig(localBuf, localLen, newPv);
+                // First-ever confirmed reading and no manual target set yet: default the
+                // target to the confirmed value so the dashboard doesn't show a spurious
+                // "pending" state for a target that was never actually requested.
+                if (!_powerLimitSetInitialized) {
+                    newPv.powerLimitSet      = newPv.powerLimit;
+                    _powerLimitSetInitialized = true;
+                }
             } else {
                 LOG_D(MOD_DTU, "GetConfig timeout (non-fatal)");
             }

@@ -104,9 +104,10 @@ static void handleApiData(AsyncWebServerRequest* req) {
     doc["grid"]["p"]  = serialized(String(pv.grid_p,  1));
     doc["grid"]["dE"] = serialized(String(pv.grid_dE, 3));
     doc["grid"]["tE"] = serialized(String(pv.grid_tE, 3));
-    doc["inverter"]["temp"]       = serialized(String(pv.temp, 1));
-    doc["inverter"]["powerLimit"] = pv.powerLimit;
-    doc["inverter"]["active"]     = pv.inverterActive;
+    doc["inverter"]["temp"]         = serialized(String(pv.temp, 1));
+    doc["inverter"]["powerLimit"]    = pv.powerLimit;
+    doc["inverter"]["powerLimitSet"] = pv.powerLimitSet;
+    doc["inverter"]["active"]       = pv.inverterActive;
     doc["timestamp"]              = pv.timestamp;
     doc["valid"]                  = pv.valid;
     String out; serializeJson(doc, out);
