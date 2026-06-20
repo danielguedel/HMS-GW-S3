@@ -1,20 +1,20 @@
 # Code Review — HMS-GW-S3
 
-**Datum:** 2026-06-17
-**Basis:** Commit `07ffd0d` (fix: Race-Condition FW+FS OTA), abgeglichen gegen die synchronisierte Spezifikation v2 (`docs/HMS-GW-S3_Spezifikation_v2.md`)
+**Date:** 2026-06-17
+**Based on:** Commit `07ffd0d` (fix: race condition FW+FS OTA), cross-checked against the synchronized specification v2 (`docs/HMS-GW-S3_Specification_v2.md`)
 **Reviewer:** Claude Sonnet 4.6
 
 ---
 
-## Vorbemerkung — Verhältnis zum vorherigen Review
+## Preamble — Relationship to the Previous Review
 
-Das vorherige Review (Basis: Commit `4c4983d`/`4bc063a`, 2026-06-15/16) ist inzwischen grösstenteils veraltet: fast alle dort als offen markierten P1/P2-Befunde wurden in der Zwischenzeit behoben. Dieses Review verifiziert den aktuellen Code-Stand neu, Zeile für Zeile, gegen die frisch synchronisierte Spezifikation.
+The previous review (based on commit `4c4983d`/`4bc063a`, 2026-06-15/16) is now largely outdated: almost all P1/P2 findings flagged as open there have since been fixed. This review re-verifies the current code state line by line against the freshly synchronized specification.
 
 ---
 
-## 0. Update 2026-06-17 (Produktionsvorfall) — Config-Verlust bei Filesystem-OTA
+## 0. Update 2026-06-17 (Production Incident) — Config Loss on Filesystem OTA
 
-Nach diesem Review trat auf einem produktiven Gateway ein realer Vorfall auf: ein Internet-OTA (Firmware + Filesystem) führte dazu, dass nach dem Reboot WiFi/DTU/MQTT/GPIO-Konfiguration komplett auf Werkseinstellungen zurückgesetzt waren. Per Serial-Log eindeutig belegt:
+After this review, a real incident occurred on a production gateway: an Internet OTA (firmware + filesystem) caused the WiFi/DTU/MQTT/GPIO configuration to be completely reset to factory defaults after reboot. Clearly documented via serial log:
 
 ```
 [INF] [OTA ] URL-OTA FS complete: 524288 B
@@ -24,138 +24,138 @@ Nach diesem Review trat auf einem produktiven Gateway ein realer Vorfall auf: ei
 [E][WiFiSTA.cpp:232] begin(): SSID too long or missing!
 ```
 
-**Root Cause:** `Update.begin(..., U_SPIFFS)` (sowohl in `handleFsUpload()` als auch in `doUrlOtaPartition()`) überschreibt die komplette LittleFS-Partition mit dem von CI gebauten `littlefs.bin`, das nur `data/www/*` enthält — `/config.json` ist bewusst gitignored und nie Teil des Build-Images. Jedes Filesystem-OTA (egal ob lokaler Upload oder Internet-URL) hat daher bisher zwangsläufig die laufzeit-persistierte Config gelöscht.
+**Root cause:** `Update.begin(..., U_SPIFFS)` (in both `handleFsUpload()` and `doUrlOtaPartition()`) overwrites the entire LittleFS partition with the CI-built `littlefs.bin`, which only contains `data/www/*` — `/config.json` is deliberately gitignored and never part of the build image. Every filesystem OTA (whether local upload or Internet URL) therefore inevitably deleted the runtime-persisted config.
 
-**Fix:** `backupConfigBeforeFsOta()`/`restoreConfigAfterFsOta()` in `taskWebServer.cpp` — sichert `/config.json` vor dem `Update.begin(..., U_SPIFFS)`-Aufruf in den RAM, remounted LittleFS nach `Update.end()` und schreibt die Config zurück. In beiden FS-OTA-Pfaden (Upload + URL) sowie deren Fehlerpfaden (best effort) verdrahtet.
+**Fix:** `backupConfigBeforeFsOta()`/`restoreConfigAfterFsOta()` in `taskWebServer.cpp` — backs up `/config.json` to RAM before the `Update.begin(..., U_SPIFFS)` call, remounts LittleFS after `Update.end()`, and writes the config back. Wired into both FS-OTA paths (upload + URL) and their error paths (best effort).
 
-## 0.1 Update 2026-06-17 (Nachtrag) — Vermeintlicher "OTA-Revert"-Bug war ein Versionierungsfehler im Release-Workflow
+## 0.1 Update 2026-06-17 (Addendum) — Apparent "OTA Revert" Bug Was a Versioning Error in the Release Workflow
 
-Nach dem Config-Fix wurde wiederholt beobachtet, dass ein Internet-OTA (z. B. auf "Build 211") nach Download/Schreiben/`Update.end()` — allesamt erfolgreich, inkl. MD5-Verifikation — nach dem Reboot eine ÄLTERE Build-Nummer meldete. Tiefe Diagnose (otadata-Status-Logging via neuem `otainfo`-Konsolenbefehl, direkte Flash-Auslese der OTA-Partitionen per `esptool read_flash` + MD5-Vergleich, vollständiger Werks-Reflash von Bootloader+Partitionstabelle, Timing-Variation vor `ESP.restart()`) zeigte: **die OTA-Partition (`app1`) enthielt durchgehend exakt das korrekte, MD5-verifizierte Firmware-Image** — kein Schreib-, Bootloader- oder Partitions-Problem.
+After the config fix, it was repeatedly observed that an Internet OTA (e.g. to "Build 211") — download/write/`Update.end()` all successful, including MD5 verification — reported an OLDER build number after reboot. Deep diagnosis (otadata status logging via the new `otainfo` console command, direct flash readout of the OTA partitions via `esptool read_flash` + MD5 comparison, full factory reflash of bootloader + partition table, timing variations before `ESP.restart()`) showed: **the OTA partition (`app1`) consistently contained exactly the correct, MD5-verified firmware image** — no write, bootloader, or partition issue.
 
-**Tatsächliche Ursache:** `extra_scripts = pre:version_inc.py` (`platformio.ini`) inkrementiert `include/buildnumber.txt` bei **jedem** `pio run`-Aufruf, ohne Rücksicht auf das Target. Der Release-Workflow rief `pio run` (Firmware) **und separat** `pio run -t buildfs` (Filesystem) auf — das inkrementiert den Zähler zweimal pro Release. `firmware.bin` für "Build N" hatte dadurch tatsächlich `BUILD_NUMBER=N-1` einkompiliert, während Manifest und Git-Tag den Wert NACH dem zweiten (Filesystem-)Lauf zeigten (`N`). Die Firmware lief die ganze Zeit korrekt — nur mit einer um 1 niedrigeren, aber intern konsistenten Versionsnummer als im Manifest behauptet.
+**Actual cause:** `extra_scripts = pre:version_inc.py` (`platformio.ini`) increments `include/buildnumber.txt` on **every** `pio run` invocation, regardless of target. The release workflow called `pio run` (firmware) **and separately** `pio run -t buildfs` (filesystem) — incrementing the counter twice per release. `firmware.bin` for "Build N" had therefore actually compiled in `BUILD_NUMBER=N-1`, while the manifest and Git tag showed the value AFTER the second (filesystem) run (`N`). The firmware ran correctly the whole time — just with a version number one lower than, but internally consistent with, what the manifest claimed.
 
-**Fix:** `.github/workflows/release.yml` liest die Build-Nummer jetzt sofort nach dem Firmware-Build (vor `buildfs`) und schreibt sie nach dem Filesystem-Build explizit zurück in `include/buildnumber.txt`, damit der committete Wert wieder mit dem tatsächlich einkompilierten `BUILD_NUMBER` übereinstimmt.
+**Fix:** `.github/workflows/release.yml` now reads the build number immediately after the firmware build (before `buildfs`) and explicitly writes it back to `include/buildnumber.txt` after the filesystem build, so the committed value matches the `BUILD_NUMBER` actually compiled in.
 
-**Lektion:** Bei einem reproduzierbaren, aber unplausiblen Befund (Schreiben erfolgreich, Inhalt verifiziert korrekt, trotzdem "falsches" Verhalten) zuerst die Versionsbuchhaltung selbst hinterfragen, bevor tiefer in Firmware-/Hardware-Ebenen gegraben wird — der Fehler lag hier nie im Code, der tatsächlich ausgeführt wurde, sondern in der Beschriftung.
+**Lesson:** When facing a reproducible but implausible finding (write succeeded, content verified correct, yet "wrong" behavior), question the version bookkeeping itself before digging deeper into firmware/hardware layers — the bug here was never in the code that actually ran, but in its labeling.
 
-Dieser Befund hätte bei der vorherigen Review-Runde auffallen können/sollen — die Internet-OTA-Implementierung wurde zwar gegen die Spec abgeglichen, aber nicht gegen den Effekt eines `U_SPIFFS`-Updates auf bereits vorhandene Laufzeitdateien auf derselben Partition geprüft.
-
----
-
-## 1. Spezifikations-Konformität
-
-Die Spezifikation wurde vor diesem Review gegen den Code abgeglichen und aktualisiert (DataStore-API, EventGroup-Bits, Web-API-Endpunkte, AppConfig-Felder, Internet-OTA-Ablauf, Logger-Farben, Konsolen-Kommandos, Web-Dashboard-Tabs). Es bestehen daher **keine offenen Abweichungen** zwischen Code und Spec — mit zwei Ausnahmen, die in der Spec selbst explizit als "geplant, noch nicht implementiert" markiert sind:
-
-- **§6.4 Zugriffsschutz und Port:** Benutzername/Passwort-Schutz (`webAuthEnabled`/`webUser`/`webPass`) und konfigurierbarer Web-Port (`webPort`) sind spezifiziert, aber im Code (`taskWebServer.cpp`, `appConfig.h`) noch nicht vorhanden. `AsyncWebServer server` ist weiterhin ein globales statisches Objekt mit fixem `WEB_DEFAULT_PORT` (`taskWebServer.cpp:21`, `config.h:62`). Kein Bug — schlicht noch nicht umgesetzt.
-
-Alle übrigen Abschnitte (DataStore, EventGroup, DTU-Protokoll, MQTT-Topics, Web-API, LED-Zustände, Konsole, Dateistruktur) stimmen 1:1 mit dem Code überein.
+This finding could/should have surfaced during the previous review round — the Internet OTA implementation was checked against the spec, but not against the effect of a `U_SPIFFS` update on runtime files already present on the same partition.
 
 ---
 
-## 2. Task-Abhängigkeiten
+## 1. Specification Conformance
 
-Das DataStore-Muster ist jetzt vollständig eingehalten. Der frühere direkte `ds.mutex`-Zugriff in `taskGPIO.cpp` und `taskDTU.cpp` wurde durch `dsGetGpioCommand()`/`dsGetDtuCommand()` ersetzt (`dataStore.cpp:72-85`) — kein Task greift mehr unter Umgehung der API auf `ds.*` zu.
+The specification was cross-checked against the code and updated before this review (DataStore API, EventGroup bits, web API endpoints, AppConfig fields, Internet OTA flow, logger colors, console commands, web dashboard tabs). There are therefore **no open discrepancies** between code and spec — with two exceptions explicitly marked in the spec itself as "planned, not yet implemented":
 
-> **Update 2026-06-19 (behoben):** `mutex` ist nicht mehr Teil des öffentlichen `DataStore`-Structs — als `static SemaphoreHandle_t _mutex` in `dataStore.cpp` verschoben (Commit `8e843bf`). Verifiziert, dass kein Code ausserhalb von `dataStore.cpp` je auf `ds.mutex` zugriff; API-Signaturen unverändert. Der Designhinweis ist damit technisch durchgesetzt statt nur dokumentiert.
+- **§6.4 Access Protection and Port:** Username/password protection (`webAuthEnabled`/`webUser`/`webPass`) and a configurable web port (`webPort`) are specified but not yet present in the code (`taskWebServer.cpp`, `appConfig.h`). `AsyncWebServer server` is still a global static object with a fixed `WEB_DEFAULT_PORT` (`taskWebServer.cpp:21`, `config.h:62`). Not a bug — simply not yet implemented.
 
-> **Update 2026-06-17 (nach diesem Review):** Die zwei unabhängigen `LittleFS.remove(CONFIG_FILE)`-Pfade (§3.2/§6, ehemals P4) sind konsolidiert — `taskWebServer.cpp` löscht die Config nicht mehr selbst, sondern setzt nur noch `EVT_FACTORY_RESET`/`EVT_REBOOT`. Alleiniger Eigentümer ist jetzt `main.cpp`s `loop()`.
-
-`setLedState()` wird weiterhin aus drei Tasks aufgerufen (`taskDTU`, `taskWebServer`, `taskGPIO`) und schreibt ungeschützt auf `volatile bool`/`volatile LedState_t` (`taskNeoPixel.cpp:34-39`). Auf ESP32 sind das atomare 1-/4-Byte-Writes — unkritisch, aber ohne formales Speichermodell-Guarantee (unverändert seit letztem Review).
+All other sections (DataStore, EventGroup, DTU protocol, MQTT topics, web API, LED states, console, file structure) match the code 1:1.
 
 ---
 
-## 3. FreeRTOS-Sicherheit
+## 2. Task Dependencies
 
-### Korrektur gegenüber dem vorherigen Review
+The DataStore pattern is now fully adhered to. The previous direct `ds.mutex` access in `taskGPIO.cpp` and `taskDTU.cpp` was replaced with `dsGetGpioCommand()`/`dsGetDtuCommand()` (`dataStore.cpp:72-85`) — no task accesses `ds.*` directly, bypassing the API, anymore.
 
-**Der vormalige P1-Befund "`_rxBuf`/`_rxLen` Race Condition" ist falsch / bereits behoben.** Bei genauerer Prüfung (nicht nur Grep auf `_rxBuf`/`_rxLen`, sondern auf den vollständigen Funktionskörper) zeigt sich: Es existiert ein dediziertes `_rxMutex` (`taskDTU.cpp:251`), das sowohl in `onData()` (Z. 257-260, AsyncTCP-Callback auf Core 0) als auch an beiden Lesestellen in `taskDTU` (Z. 496-499, 513-516, Core 1) korrekt per `xSemaphoreTake`/`xSemaphoreGive` genommen wird. Das Mutex wird in `taskDTU()` (Z. 370) erzeugt, bevor `dtuConnect()` und damit die Callback-Registrierung erfolgt — kein Initialisierungs-Race. Die im vorherigen Review beschriebene Race Condition existiert im aktuellen Code nicht. Kein Handlungsbedarf.
+> **Update 2026-06-19 (fixed):** `mutex` is no longer part of the public `DataStore` struct — moved to a `static SemaphoreHandle_t _mutex` in `dataStore.cpp` (commit `8e843bf`). Verified that no code outside `dataStore.cpp` ever accessed `ds.mutex`; API signatures unchanged. The design guideline is now technically enforced rather than merely documented.
 
-> **Update 2026-06-19 (Härtung):** `onData()` nutzte `xSemaphoreTake(_rxMutex, portMAX_DELAY)` — ein unbegrenztes Blockieren im AsyncTCP-Callback (lwIP-Thread), falls der Mutex gerade von `taskDTU` gehalten wird. Auf einen 10ms-Timeout umgestellt (Commit `8e843bf`); bei Fehlschlag wird eine `LOG_W`-Warnung ausgegeben und ohne Datenkopie/Ready-Flags zurückgekehrt, statt den Netzwerk-Thread zu stallen.
+> **Update 2026-06-17 (after this review):** The two independent `LittleFS.remove(CONFIG_FILE)` paths (§3.2/§6, formerly P4) have been consolidated — `taskWebServer.cpp` no longer deletes the config itself, it only sets `EVT_FACTORY_RESET`/`EVT_REBOOT`. The sole owner is now `main.cpp`'s `loop()`.
 
-### Behoben seit letztem Review
+`setLedState()` is still called from three tasks (`taskDTU`, `taskWebServer`, `taskGPIO`) and writes unprotected to `volatile bool`/`volatile LedState_t` (`taskNeoPixel.cpp:34-39`). On ESP32 these are atomic 1-/4-byte writes — non-critical, but without a formal memory-model guarantee (unchanged since the last review).
 
-- **`vTaskDelay` + `ESP.restart()` in AsyncWebServer-Callbacks** — jetzt über `EVT_REBOOT`/`EVT_FACTORY_RESET`-Bits deferred; der eigentliche Restart läuft in der Task-Loop von `taskWebServer` (`taskWebServer.cpp:574-580`), nicht mehr im lwIP/AsyncTCP-Thread.
-- **`onConnect`-Callback mit `dsGetSystem()` + `portMAX_DELAY`** — ersetzt durch `_ntpTimeCache` (lock-freier `volatile uint32_t`, vor dem Connect aus dem Task-Kontext gefüllt). Kein Mutex-Zugriff mehr im AsyncTCP-Callback (`taskDTU.cpp:252, 442`).
-- **`_rxBuf`/`_rxLen` Race Condition** — siehe Korrektur oben, war kein aktueller Befund.
+---
 
-### WARNUNG
+## 3. FreeRTOS Safety
 
-**3.2 Potenzielle Deadlock-Kette: DataStore-Mutex + Log-Mutex** — `logger.cpp`, `dataStore.cpp`
+### Correction Relative to the Previous Review
 
-Unverändert, weiterhin nur theoretisches Risiko: Aktuell ruft keine DataStore-Funktion `logMsg()` auf und umgekehrt. Bleibt ein Risiko für künftige Erweiterungen, kein aktueller Bug.
+**The former P1 finding "`_rxBuf`/`_rxLen` race condition" is incorrect / already fixed.** Closer inspection (not just a grep on `_rxBuf`/`_rxLen`, but reading the complete function bodies) shows: a dedicated `_rxMutex` exists (`taskDTU.cpp:251`), correctly taken/given via `xSemaphoreTake`/`xSemaphoreGive` both in `onData()` (lines 257-260, AsyncTCP callback on Core 0) and at both read sites in `taskDTU` (lines 496-499, 513-516, Core 1). The mutex is created in `taskDTU()` (line 370) before `dtuConnect()` and thus before callback registration — no initialization race. The race condition described in the previous review does not exist in the current code. No action needed.
+
+> **Update 2026-06-19 (hardening):** `onData()` used `xSemaphoreTake(_rxMutex, portMAX_DELAY)` — an unbounded block in the AsyncTCP callback (lwIP thread) if the mutex was currently held by `taskDTU`. Changed to a 10ms timeout (commit `8e843bf`); on failure, a `LOG_W` warning is emitted and the function returns without copying data or setting ready flags, instead of stalling the network thread.
+
+### Fixed Since the Last Review
+
+- **`vTaskDelay` + `ESP.restart()` in AsyncWebServer callbacks** — now deferred via `EVT_REBOOT`/`EVT_FACTORY_RESET` bits; the actual restart runs in `taskWebServer`'s task loop (`taskWebServer.cpp:574-580`), no longer in the lwIP/AsyncTCP thread.
+- **`onConnect` callback with `dsGetSystem()` + `portMAX_DELAY`** — replaced with `_ntpTimeCache` (a lock-free `volatile uint32_t`, populated from task context before connecting). No more mutex access in the AsyncTCP callback (`taskDTU.cpp:252, 442`).
+- **`_rxBuf`/`_rxLen` race condition** — see correction above, was not a current finding.
+
+### WARNING
+
+**3.2 Potential Deadlock Chain: DataStore Mutex + Log Mutex** — `logger.cpp`, `dataStore.cpp`
+
+Unchanged, still only a theoretical risk: currently no DataStore function calls `logMsg()` and vice versa. Remains a risk for future extensions, not a current bug.
 
 ### INFO
 
-**3.3 `waitFor()` nutzt 50ms-Polling** — `taskDTU.cpp` — unverändert, funktional korrekt, aber unnötige Wakeups statt FreeRTOS-Notification/Semaphore.
+**3.3 `waitFor()` uses 50ms polling** — `taskDTU.cpp` — unchanged, functionally correct, but unnecessary wakeups instead of a FreeRTOS notification/semaphore.
 
-**3.4 `_dataFlash`/`_currentState` ohne formales Speichermodell** — `taskNeoPixel.cpp:34-39` — unverändert, in der Praxis unkritisch (siehe Abschnitt 2).
-
----
-
-## 4. Speicher
-
-### Behoben seit letztem Review
-
-**`localBuf[2048]` ist jetzt `static`** statt Stack-Variable (`taskDTU.cpp:384`) — kein Stack-Druck mehr im 8192-Byte-`taskDTU`-Stack.
-
-### Unverändert (Info, kein Handlungsbedarf)
-
-- ArduinoJson `JsonDocument` in `taskWebServer.cpp`/`taskMQTT.cpp`-Handlern: Heap-Allokation pro Request, kurzlebig, begrenzte Fragmentierung.
-- `String`-Felder in `DataStore::SystemStatus` (`wifiIp`, `wifiSsid`, `fwVersion`, `macAddress`): impliziter Copy bei jedem `dsSetSystem()`.
-- `T(suffix)` in `taskMQTT.cpp`: temporäre `String`-Allokation pro `pub()`-Aufruf, bei PV-Daten 20+ pro Zyklus.
-- PSRAM (8 MB vorhanden) wird nicht explizit genutzt (`ps_malloc`/`PSRAM_ATTR`); statische Arrays wie `_rxBuf[2048]` liegen im DRAM-BSS.
+**3.4 `_dataFlash`/`_currentState` without a formal memory model** — `taskNeoPixel.cpp:34-39` — unchanged, non-critical in practice (see section 2).
 
 ---
 
-## 5. Fehlerbehandlung
+## 4. Memory
 
-### Behoben seit letztem Review
+### Fixed Since the Last Review
 
-**OTA-Fehlerbehandlung** — `_otaFwError`/`_otaFsError`-Flags vorhanden (`taskWebServer.cpp:279, 285, 289, 310, 316, 320`). Nach einem `Update.begin()`-Fehler werden nachfolgende Chunk-Callbacks korrekt ignoriert, statt blind weiterzuschreiben.
+**`localBuf[2048]` is now `static`** instead of a stack variable (`taskDTU.cpp:384`) — no more stack pressure on the 8192-byte `taskDTU` stack.
 
-**Konfigurationsvalidierung — behoben seit diesem Review:** `powerLimitDefault` wird auf 0–100 geclampt, `mqttPort` auf 1–65535 (Fallback `MQTT_DEFAULT_PORT`), `ledBrightness` auf 0–255, und alle GPIO-Pin-Felder (`relay.pin`, `io[i].pin`, `ledPin`) über einen gemeinsamen `clampPin()`-Helper auf den gültigen ESP32-S3-Bereich 0–48 (Fallback auf den Build-Default) — analog zum bereits vorhandenen `dtuInterval`-Clamp (`appConfig.cpp`). `IoMode` hatte bereits vorher einen Bounds-Check (`appConfig.cpp`) und einen `default`-Case im `switch` (`taskGPIO.cpp`).
+### Unchanged (Info, No Action Needed)
 
-### Unverändert
-
-- **WiFi-Verlust während DTU-Poll:** `taskDTU` wartet nach Fails nicht explizit auf `EVT_WIFI_CONNECTED`, sondern versucht sofort erneut zu verbinden → bis zu ~90s (3×30s Cooldown) bis zur Wiederherstellung nach WiFi-Reconnect. Funktional korrekt, aber ineffizient.
-- **Watchdog:** Kein explizites `esp_task_wdt_reset()`; alle Tasks sind kooperativ (`vTaskDelay`), löst in der Praxis nicht aus. Der 30s-Cooldown in `taskDTU` (`vTaskDelay(pdMS_TO_TICKS(30000))`) bleibt ein theoretisches Risiko, falls der Task-WDT für diesen Task aktiviert würde.
-
----
-
-## 6. Sonstige Befunde
-
-### Behoben seit letztem Review
-
-- `DTU_CONNECT_TIMEOUT_MS` wird jetzt verwendet (`taskDTU.cpp:444`), kein Hardcode `3000` mehr.
-- Doppeltes Config-Log beim Start nicht mehr vorhanden — `main.cpp` loggt keine Config-Felder mehr separat, nur `appConfig.cpp:177`.
-- ANSI-Farben im Logger implementiert (`logger.cpp:13-18`) — Spec war veraltet, Code war schon korrekt.
-- Konsolenbefehle `tasks`/`heap`/`uptime`/`ledtest` vollständig implementiert (`taskSerial.cpp`).
-- Internet-OTA via URL vollständig implementiert (war in Spec v2 nur als Vorhaben beschrieben).
-- **Browser-Cache:** `serveStatic` setzt jetzt `Cache-Control: no-cache` (`taskWebServer.cpp:550`) — Filesystem-OTA-Updates sind ohne Hard-Refresh sichtbar.
-- **`AsyncClient::close(bool)` Deprecation-Warning** behoben — alle drei Aufrufstellen (`taskDTU.cpp:418, 463, 491`) nutzen jetzt `close()` ohne Argument.
-- **Factory-Reset-Doppel-`remove()`** behoben — siehe Update-Hinweis in Abschnitt 2.
-
-### Weiterhin offen
-
-**6.1 `include/buildnumber.txt` nicht in `.gitignore`**
-
-Bewusste Design-Entscheidung (siehe Projekt-Memory): die Datei wird absichtlich getrackt, damit der GitHub-Actions-Release-Workflow auf eine konsistente Buildnummer zugreifen kann. Erscheint deshalb nach jedem lokalen Build als `modified` in `git status` — kein Fix nötig, nur zur Kenntnis.
-
-**6.2 `mqttOpenDtu`-Modus publiziert keine GPIO-Daten** — `taskMQTT.cpp`
-
-Unverändert: im OpenDTU-kompatiblen Modus werden nur PV-Daten im OpenDTU-Schema publiziert; GPIO/System-Topics nutzen weiterhin das normale Schema. Konsistent, aber nicht OpenDTU-kompatibel für GPIO-Steuerung via HA.
+- ArduinoJson `JsonDocument` in `taskWebServer.cpp`/`taskMQTT.cpp` handlers: heap allocation per request, short-lived, limited fragmentation.
+- `String` fields in `DataStore::SystemStatus` (`wifiIp`, `wifiSsid`, `fwVersion`, `macAddress`): implicit copy on every `dsSetSystem()`.
+- `T(suffix)` in `taskMQTT.cpp`: temporary `String` allocation per `pub()` call, 20+ per cycle for PV data.
+- PSRAM (8 MB available) is not used explicitly (`ps_malloc`/`PSRAM_ATTR`); static arrays such as `_rxBuf[2048]` live in DRAM BSS.
 
 ---
 
-## Priorisierte Massnahmen
+## 5. Error Handling
 
-Alle P1–P4-Befunde aus diesem Review sind behoben (Cache-Control-Header, konsolidiertes Factory-Reset-`remove()`, Bounds-Validierung für Config-Felder, `AsyncClient::close()`-Deprecation). Es bleiben nur informative Hinweise ohne Handlungsbedarf:
+### Fixed Since the Last Review
 
-| Prio | Bereich | Hinweis |
+**OTA error handling** — `_otaFwError`/`_otaFsError` flags are present (`taskWebServer.cpp:279, 285, 289, 310, 316, 320`). After an `Update.begin()` failure, subsequent chunk callbacks are correctly ignored instead of blindly continuing to write.
+
+**Configuration validation — fixed since this review:** `powerLimitDefault` is clamped to 0–100, `mqttPort` to 1–65535 (falls back to `MQTT_DEFAULT_PORT`), `ledBrightness` to 0–255, and all GPIO pin fields (`relay.pin`, `io[i].pin`, `ledPin`) via a shared `clampPin()` helper to the valid ESP32-S3 range 0–48 (falls back to the build default) — analogous to the already-existing `dtuInterval` clamp (`appConfig.cpp`). `IoMode` already had a bounds check (`appConfig.cpp`) and a `default` case in the `switch` (`taskGPIO.cpp`) beforehand.
+
+### Unchanged
+
+- **WiFi loss during DTU polling:** after failures, `taskDTU` does not explicitly wait for `EVT_WIFI_CONNECTED`, but retries connecting immediately → up to ~90s (3×30s cooldown) before recovery after a WiFi reconnect. Functionally correct, but inefficient.
+- **Watchdog:** no explicit `esp_task_wdt_reset()`; all tasks are cooperative (`vTaskDelay`), so it does not trigger in practice. The 30s cooldown in `taskDTU` (`vTaskDelay(pdMS_TO_TICKS(30000))`) remains a theoretical risk if the task WDT were enabled for this task.
+
+---
+
+## 6. Other Findings
+
+### Fixed Since the Last Review
+
+- `DTU_CONNECT_TIMEOUT_MS` is now used (`taskDTU.cpp:444`), no more hardcoded `3000`.
+- Duplicate config log at startup is gone — `main.cpp` no longer logs config fields separately, only `appConfig.cpp:177`.
+- ANSI colors implemented in the logger (`logger.cpp:13-18`) — the spec was outdated, the code was already correct.
+- Console commands `tasks`/`heap`/`uptime`/`ledtest` fully implemented (`taskSerial.cpp`).
+- Internet OTA via URL fully implemented (was only described as planned in spec v2).
+- **Browser cache:** `serveStatic` now sets `Cache-Control: no-cache` (`taskWebServer.cpp:550`) — filesystem OTA updates are visible without a hard refresh.
+- **`AsyncClient::close(bool)` deprecation warning** fixed — all three call sites (`taskDTU.cpp:418, 463, 491`) now use `close()` without an argument.
+- **Duplicate factory-reset `remove()`** fixed — see update note in section 2.
+
+### Still Open
+
+**6.1 `include/buildnumber.txt` not in `.gitignore`**
+
+Deliberate design decision (see project memory): the file is intentionally tracked so the GitHub Actions release workflow can rely on a consistent build number. Therefore appears as `modified` in `git status` after every local build — no fix needed, noted for awareness only.
+
+**6.2 `mqttOpenDtu` mode does not publish GPIO data** — `taskMQTT.cpp`
+
+Unchanged: in OpenDTU-compatible mode, only PV data is published in the OpenDTU schema; GPIO/system topics still use the normal schema. Consistent, but not OpenDTU-compatible for GPIO control via HA.
+
+---
+
+## Prioritized Action Items
+
+All P1–P4 findings from this review have been fixed (Cache-Control header, consolidated factory-reset `remove()`, bounds validation for config fields, `AsyncClient::close()` deprecation). Only informational notes without required action remain:
+
+| Priority | Area | Note |
 |------|---------|---------|
-| Info | Projekt | `include/buildnumber.txt` bewusst getrackt (Release-Workflow) — erscheint nach jedem Build als `modified` |
-| Info | MQTT | `mqttOpenDtu`-Modus publiziert GPIO/System nicht im OpenDTU-Schema — nur relevant bei OpenDTU-kompatibler HA-GPIO-Steuerung |
-| Info | Build | `version_inc.py` inkrementiert bei jedem Build, auch bei Fehlern — bekanntes SCons-Verhalten |
-| Info | FreeRTOS | Theoretische Deadlock-Kette DataStore-Mutex + Log-Mutex, aktuell nicht erreichbar — bei künftigen Erweiterungen beachten: keine Logs aus DataStore-Funktionen, kein DataStore-Zugriff aus `logMsg()` |
-| Info | FreeRTOS | `waitFor()` nutzt 50ms-Polling statt Notification/Semaphore — funktional korrekt, geringe CPU-Verschwendung |
-| Info | Fehlerbehandlung | `taskDTU` wartet nach WiFi-Verlust nicht explizit auf `EVT_WIFI_CONNECTED` — bis zu ~90s Wiederherstellungszeit nach Reconnect |
+| Info | Project | `include/buildnumber.txt` intentionally tracked (release workflow) — appears as `modified` after every build |
+| Info | MQTT | `mqttOpenDtu` mode does not publish GPIO/system in the OpenDTU schema — only relevant for OpenDTU-compatible HA GPIO control |
+| Info | Build | `version_inc.py` increments on every build, even on failures — known SCons behavior |
+| Info | FreeRTOS | Theoretical deadlock chain DataStore mutex + log mutex, currently unreachable — keep in mind for future extensions: no logging from DataStore functions, no DataStore access from `logMsg()` |
+| Info | FreeRTOS | `waitFor()` uses 50ms polling instead of a notification/semaphore — functionally correct, minor CPU waste |
+| Info | Error handling | `taskDTU` does not explicitly wait for `EVT_WIFI_CONNECTED` after WiFi loss — up to ~90s recovery time after reconnect |

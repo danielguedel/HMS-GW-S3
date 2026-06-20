@@ -27,7 +27,7 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | 💾 Config backup/restore | Download the full `config.json` (incl. passwords) from the System tab, restore it later in one upload |
 | 🔄 OTA updates | Firmware/filesystem via web file upload, or by URL (downloads + flashes directly from the gateway) |
 | 🆕 Internet update check | Polls a JSON manifest (e.g. GitHub Releases) for newer versions — one-click install from the web GUI, plus a GitHub Actions workflow to publish releases |
-| 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 19 commands at 115200 baud |
+| 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 20 commands at 115200 baud |
 | 🧵 FreeRTOS | 8 independent tasks on Core 1 — Core 0 reserved for WiFi stack |
 | 🗄️ DataStore | Central in-memory data store — no direct task-to-task dependencies |
 
@@ -171,6 +171,7 @@ esptool.py --chip esp32s3 --baud 921600 \
 | `tasks` | FreeRTOS task list |
 | `heap` | Heap usage |
 | `uptime` | Uptime (seconds + d/h/m/s) |
+| `otainfo` | OTA partition info (running/next, boot state) |
 | `ledtest` | Cycle through all LED states |
 | `restart` | Reboot gateway |
 | `reset` | Factory reset (clears config.json) |
@@ -230,7 +231,7 @@ Configure a manifest URL (`otaManifestUrl` in System config — defaults to this
 release/manifest.json
 {
   "version": "0.2.0",
-  "buildNumber": 202,
+  "buildNumber": 281,
   "url":    "https://github.com/<owner>/<repo>/releases/download/<tag>/firmware.bin",
   "fs_url": "https://github.com/<owner>/<repo>/releases/download/<tag>/littlefs.bin",
   "md5":    "<md5 of firmware.bin>",
@@ -321,7 +322,7 @@ HMS-GW-S3/
 ├── data/www/
 │   └── index.html            # Web dashboard SPA (LittleFS)
 ├── docs/
-│   ├── HMS-GW-S3_Spezifikation_v2.md  # Full architecture specification
+│   ├── HMS-GW-S3_Specification_v2.md  # Full architecture specification
 │   └── code_review.md        # Latest code review findings
 ├── release/
 │   └── manifest.json         # Version manifest polled by the Internet update check
