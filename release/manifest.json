@@ -1,9 +1,9 @@
 {
   "version": "0.2.0",
-  "buildNumber": 281,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-281/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-281/littlefs.bin",
-  "md5": "e70fa3639526646cdd979565276c6040",
-  "fs_md5": "12e833887cce33b7e8e1aead0f03fc37",
-  "notes": ""
+  "buildNumber": 297,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-297/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-297/littlefs.bin",
+  "md5": "a1f3df525c13c8af5f7b8caec0c6d1b2",
+  "fs_md5": "3d998e669676814f5305cf00a397d0fe",
+  "notes": "Power limit fix + dashboard target display"
 }
