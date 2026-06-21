@@ -603,39 +603,54 @@ Stored as JSON in LittleFS (`/config.json`).
 
 ### 9.1 Design Principles
 
-Inspired by the **Shelly web UI**: modern, clean, professional.
+**"Neon Flow"** dark-mode design — glowing neon-tube accents on a near-black background, no light theme (the glow aesthetic only works on dark; the previous dark/light toggle was removed along with the old Shelly-style theme).
 
-- **Dark mode** as the default (toggleable via icon button, preference stored in `localStorage`)
-- **Bilingual** (English default, German toggleable via a flag icon button to the left of the dark/light toggle, preference in `localStorage`) — `I18N` object (`en`/`de`) + `data-i18n`/`data-i18n-ph` attributes + `tr(key, ...args)` lookup, analogous to the theme-toggle pattern
-- Color palette: dark gray `#1a1a2e` / `#16213e` background, accent color green `#00b894` for production data/active status, orange for warnings/offline states, gray for neutral/standby states
+- **Dark only**, no theme toggle — `:root` defines the palette directly, no `[data-theme]` variants
+- **Bilingual** (English default, German toggleable via a `DE`/`EN` icon button in the header, preference in `localStorage`) — `I18N` object (`en`/`de`) + `data-i18n`/`data-i18n-ph` attributes + `tr(key, ...args)` lookup
+- **Color palette** (`:root` custom properties), each color carries one consistent meaning, not used decoratively:
+
+  | Color | Var | Meaning |
+  |---|---|---|
+  | Cyan `#2bf0ff` | `--cyan` | Data / connected / confirmed / default action buttons |
+  | Pink `#ff2bd6` | `--pink` | Attention / danger / hard error / title-glow accent |
+  | Violet `#b04bff` | `--purple` | Parameter / configuration (box titles, card titles, input text) |
+  | Lime `#c8ff2b` | `--lime` | Status "Active" (the one true "all good" state) |
+  | Orange `#ff9d2b` | `--orange` | Status "Offline"/warning, pending power-limit, non-destructive danger-zone actions (Reboot) |
+  | Gray `var(--muted)` | `--muted` | Default body text, muted/standby/off states |
+
 - Typography: system font stack (`-apple-system, BlinkMacSystemFont, "Segoe UI"`)
-- Titles/section headings consistently in blue, uppercase (`.card-title`, `.sec`, `.cfg-box h3`, `.gpio-name`)
-- Card layout for dashboard elements
+- Card/box/section titles consistently in violet, uppercase (`.card-title`, `.sec`, `.gpio-name`) — **except** Config/System box headers, which use the same violet but at a larger size (`.cfg-box h3`); Grid/PV1/PV2 card titles are gray like other dashboard titles, not violet
+- Card layout for dashboard elements. Dashboard `.card` elements have a **permanent** glowing border (`::before` gradient-mask trick, colored via a `--glow` CSS custom property per card) since they show the "hero" live data; `.cfg-box`/`.gpio-card` elements only glow on `:hover` (a permanent multi-color glow across 4–8 simultaneously visible boxes per tab would look busy)
+- Status indicators (the big dashboard status text and the small Relay/IO ON/OFF badges) render as **plain glowing text, no pill/badge background** — pill shapes are reserved for actual clickable buttons, so a status indicator is never visually confused with something tappable
 - Responsive: mobile-first, works on a smartphone without zooming
-- No external dependencies — everything in `index.html` (inline CSS + JS)
+- No external dependencies — everything in `index.html` (inline CSS + JS + inline SVG logo)
 - Auto-refresh: PV data every 10s (`refreshData()`), connection status/header info every 15s (`refreshInfo()`), time/date in the header every second (`tickClock()`)
 
-**Header:** On the left, the title "⚡ HMS-GW-S3" plus an info bar (MAC address | firmware+build | date | time, separated by `.hdr-sep` dashes). On the right, the language toggle and dark/light toggle. The date/time format is fixed as `DD.MM.YYYY` / `HH:MM:SS` (`fmtDate()`/`fmtTime()`), independent of the UI language — identical to the format in the System tab (`loadSysInfo()`).
+**Header:** title on the left — an inline SVG logo (a neon-tube lightning bolt in pink + two signal arcs in cyan, both with a white-hot core stroke under the colored glow stroke) followed by "HMS-GW-S3", the whole title wrapped in a link to the project's GitHub repo. On the right, stacked in two rows: the WiFi/DTU/MQTT status dots plus the `DE`/`EN` language button on top, the info bar (MAC | firmware+build | date | time, separated by `.hdr-sep` dashes) below. The date/time format is fixed as `DD.MM.YYYY` / `HH:MM:SS` (`fmtDate()`/`fmtTime()`), independent of the UI language — identical to the format in the System tab (`loadSysInfo()`).
+
+A standalone, purely visual exploration of this design (mock data, never wired to the device) lives at `design/neon-dashboard.html` — useful as a reference when iterating on styling without touching the production file or needing a live gateway.
 
 ### 9.2 Dashboard Tab — PV Output Display
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  ⚡ HMS-GW-S3  MAC|FW+Build|Date|Time   🇬🇧 🌙       │  ← Header
-├───────────────────────┬───────────────────────────────┤
-│  Status               │  Power Limit                   │
-│  ACTIVE                │  [════════●══] 100%  [ Set ]  │  ← Status card +
-├──────┬──────┬─────────┼─────────────────────────────┤     Power-limit card
-│ Temp │Limit │Yield tdy│ Total                          │  ← Temp/Limit/Yield/
-│45.2°C│ 100% │ 3.04 kWh│ 241.4 kWh                      │     Total cards
-├──────┴──────┴─────────┴─────────────────────────────┤
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │  Grid    │  │  PV1     │  │  PV2     │            │  ← Power cards: power [W]
-│  │ 610 W    │  │ 353 W    │  │ 296 W    │            │     + bar display (% of
-│  │ ▓▓▓▓░░░  │  │ ▓▓▓░░░░  │  │ ▓▓░░░░░  │            │     a max value) + sub-
-│  │241.9V/2.5A│  │ 26.6V/1.3A│ │ 27.7V/1.1A│           │     line voltage/current
-│  └──────────┘  └──────────┘  └──────────┘            │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  ⚡≈ HMS-GW-S3                    ● WiFi ● DTU ● MQTT  [DE]  │  ← Header, row 1
+│                                  MAC | FW+Build | Date | Time │  ← Header, row 2
+├────────────────────────────────────────────────────────────────┤
+│  Status               │  Power Limit                          │
+│  ACTIVE (glow text)   │  [════════●══] 100%  [ Set ]          │  ← Status card +
+├──────┬──────┬─────────┼──────────────────────────────────────┤     Power-limit card
+│ Temp │Limit │Yield tdy│ Total                                  │  ← Temp/Limit/Yield/
+│45.2°C│ 100% │ 3.04 kWh│ 241.4 kWh                              │     Total cards
+├──────┴──────┴─────────┴──────────────────────────────────────┤
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
+│  │  Grid    │  │  PV1     │  │  PV2     │                    │  ← Power cards: power [W]
+│  │ 610 W    │  │ 353 W    │  │ 296 W    │                    │     + bar display (% of
+│  │ ▓▓▓▓░░░  │  │ ▓▓▓░░░░  │  │ ▓▓░░░░░  │                    │     a max value) + sub-
+│  │241.9V/2.5A│  │ 26.6V/1.3A│ │ 27.7V/1.1A│                   │     line voltage/current
+│  └──────────┘  └──────────┘  └──────────┘                    │
+│   cyan glow      pink glow     violet glow                    │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 The cards are updated every 10s via `GET /api/data.json` (`pv0`/`pv1`/`grid` → power, bar width, voltage/current subline; `inverter` → temp/limit cards). The daily-yield/total-yield cards come from `pv0.dE+pv1.dE+grid.dE` and the `tE` fields respectively. All four cards (Temp/Limit/Yield/Total) are always visible and show `–` as a placeholder as long as no valid data is available — they are NO LONGER hidden (unlike in an earlier version).
@@ -647,13 +662,13 @@ The cards are updated every 10s via `GET /api/data.json` (`pv0`/`pv1`/`grid` →
 | State | Condition | Color |
 |---|---|---|
 | **Offline** | `dtuOnline === false` | Orange (`var(--orange)`) |
-| **Active** | DTU online + `inverter.active === true` | Green (`var(--accent)`) |
+| **Active** | DTU online + `inverter.active === true` | Lime (`var(--lime)`) |
 | **Standby** | DTU online + `inverter.active === false` | Gray (`var(--muted)`) |
 | **No data** (transition) | DTU online, but no PV data received yet | Gray (`var(--muted)`) |
 
-The status card renders the state as colored text in the same font style as the header title "HMS-GW-S3" (`status-text`, 17px/700/.5px letter spacing) — no pill badge, no dot indicator. The same color class (empty/`warn`/`muted`) is additionally applied synchronously to the following elements, so the entire dashboard reflects the connection/operating state:
-- Header separator dashes (`.hdr-sep`)
-- Grid/PV1/PV2 values and progress bars (`.card-val`/`.bar`) — as a result, PV1/PV2 deliberately have **no** distinct color of their own anymore (previously blue/orange); a color-coded distinction between sources was deemed unnecessary
+The status renders as plain glowing text (`.badge-lg` with a `.b-ok`/`.b-warn`/`.b-off` color class) — no pill background, no dot indicator; pill shapes are reserved for buttons. The same `cls`/`bcls` state additionally drives:
+- Header separator dashes (`.hdr-sep` — empty/`warn`/`muted`)
+- Grid/PV1/PV2 values and progress bars (`.card-val`/`.bar` — same empty/`warn`/`muted` classes override the card's own glow color to orange/gray when the DTU is offline or there's no live data; when data is live and the DTU is online, each card keeps its own glow: Grid cyan, PV1 pink, PV2 violet via a `--glow` custom property per `.card`)
 - Temp/Limit/daily-yield/Total values (`s-temp`/`s-limit`/`s-de`/`s-te`)
 
 **Browser tab title:** On every refresh with valid data, `document.title` is set to the current grid power, e.g. `"610 W — HMS-GW-S3"` — allows reading the current output even with a minimized/inactive browser tab (e.g. when overviewing multiple tabs).
@@ -775,7 +790,7 @@ HMS-GW-S3/
 ├── version_inc.py
 ├── data/
 │   └── www/
-│       └── index.html          (dashboard SPA — dark mode, Shelly-style design)
+│       └── index.html          (dashboard SPA — "Neon Flow" dark-glow design)
 ├── include/
 │   ├── config.h                (build constants, stack sizes, pin defaults)
 │   ├── appConfig.h             (AppConfig struct)

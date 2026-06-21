@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Dashboard — HMS-GW-S3 (Experiment)</title>
+<style>
+  :root {
+    --bg:        #06060a;
+    --surface:   #0d0d16;
+    --surface2:  #11111c;
+    --border:    #232336;
+    --text:      #e8e8f0;
+    --text-dim:  #8a8aa0;
+    --pink:      #ff2bd6;
+    --cyan:      #2bf0ff;
+    --purple:    #b04bff;
+    --lime:      #c8ff2b;
+    --orange:    #ff9d2b;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% -10%, #1a0f2e 0%, var(--bg) 55%);
+    color: var(--text-dim);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: 60px;
+  }
+
+  /* ── Header ──────────────────────────────────────────────────────────── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+  h1 a {
+    color: #fff;
+    text-decoration: none;
+    display: flex; align-items: center; gap: 8px;
+    text-shadow: 0 0 6px var(--pink), 0 0 18px var(--pink), 0 0 42px rgba(255, 43, 214, .5);
+  }
+  h1 svg { height: 26px; width: auto; flex-shrink: 0; }
+
+  .hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+  .dots { display: flex; align-items: center; gap: 14px; }
+  .dot-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+  .dot.ok   { background: var(--cyan); box-shadow: 0 0 6px var(--cyan), 0 0 14px var(--cyan); }
+  .dot.warn { background: var(--pink); box-shadow: 0 0 6px var(--pink), 0 0 14px var(--pink); }
+  .dot.off  { background: var(--text-dim); box-shadow: none; }
+
+  .hdr-info {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-dim); flex-wrap: wrap;
+  }
+  .hdr-sep { color: var(--cyan); text-shadow: 0 0 6px var(--cyan); }
+
+  .icon-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    padding: 3px 10px; border-radius: 999px; cursor: pointer;
+    transition: border-color .2s ease, color .2s ease, box-shadow .2s ease;
+  }
+  .icon-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px -2px var(--cyan); }
+
+  /* ── Nav ─────────────────────────────────────────────────────────────── */
+  nav {
+    display: flex; gap: 4px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  nav button {
+    background: none; border: none; color: var(--text-dim);
+    font: inherit; font-weight: 600; font-size: 13px; line-height: 1.2;
+    padding: 10px 16px 8px; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color .2s ease, border-color .2s ease;
+  }
+  nav button.active {
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+  nav button:hover { color: var(--text); }
+
+  main { max-width: 920px; margin: 0 auto; padding: 24px 20px; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  /* ── Grid / cards ────────────────────────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px; margin-bottom: 14px;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(135deg, var(--glow, var(--cyan)), transparent 60%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; opacity: .8;
+    pointer-events: none;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 0 24px -6px var(--glow, var(--cyan)); }
+
+  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); margin-bottom: 12px; }
+  .card-val   { font-size: 28px; font-weight: 700; color: var(--glow, var(--cyan)); text-shadow: 0 0 10px var(--glow, var(--cyan)); line-height: 1; }
+  .card-unit  { font-size: 14px; color: var(--text-dim); margin-left: 3px; }
+  .card-sub   { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+
+  .card.grid-p { --glow: var(--cyan); }
+  .card.pv0    { --glow: var(--pink); }
+  .card.pv1    { --glow: var(--purple); }
+
+  .bar-wrap { height: 5px; background: var(--surface2); border-radius: 3px; margin-top: 10px; overflow: visible; }
+  .bar { height: 100%; border-radius: 3px; background: var(--glow, var(--cyan)); box-shadow: 0 0 8px var(--glow, var(--cyan)); transition: width .6s ease; width: 0; }
+
+  .sec { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); margin-bottom: 12px; }
+
+  /* ── Status badge ────────────────────────────────────────────────────── */
+  .status-text { font-size: 18px; font-weight: 800; letter-spacing: .5px; }
+  .status-text.active  { color: var(--lime);   text-shadow: 0 0 10px var(--lime); }
+  .status-text.standby { color: var(--orange); text-shadow: 0 0 10px var(--orange); }
+  .status-text.offline { color: var(--pink);   text-shadow: 0 0 10px var(--pink); }
+
+  /* ── Power limit slider (reuses the .bar-wrap/.bar look from the dashboard cards) ── */
+  .range-wrap { position: relative; height: 18px; margin: 10px 0; }
+  .range-wrap .bar-wrap { position: absolute; top: 50%; left: 0; right: 0; margin: 0; transform: translateY(-50%); }
+  .range-wrap input[type=range] {
+    position: absolute; inset: 0; width: 100%; margin: 0;
+    appearance: none; -webkit-appearance: none; background: transparent; border: none; outline: none; cursor: pointer;
+  }
+  .range-wrap input[type=range]:focus,
+  .range-wrap input[type=range]:active,
+  .range-wrap input[type=range]:focus-visible { outline: none; box-shadow: none; }
+  .range-wrap input[type=range]::-webkit-slider-runnable-track { background: transparent; height: 100%; border: none; }
+  .range-wrap input[type=range]:focus::-webkit-slider-runnable-track,
+  .range-wrap input[type=range]:active::-webkit-slider-runnable-track { background: transparent; border: none; box-shadow: none; }
+  .range-wrap input[type=range]::-moz-range-track { background: transparent; height: 100%; border: none; }
+  .range-wrap input[type=range]:focus::-moz-range-track,
+  .range-wrap input[type=range]:active::-moz-range-track { background: transparent; border: none; box-shadow: none; }
+  .range-wrap input[type=range]::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--cyan); cursor: pointer;
+    box-shadow: 0 0 8px var(--cyan), 0 0 16px var(--cyan);
+  }
+  .range-wrap input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%; border: none; background: var(--cyan); cursor: pointer;
+    box-shadow: 0 0 8px var(--cyan), 0 0 16px var(--cyan);
+  }
+  .range-wrap input[type=range].pending::-webkit-slider-thumb { background: var(--orange); box-shadow: 0 0 8px var(--orange), 0 0 16px var(--orange); }
+  .range-wrap input[type=range].pending::-moz-range-thumb { background: var(--orange); box-shadow: 0 0 8px var(--orange), 0 0 16px var(--orange); }
+  .bar.pending { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+  .range-val { color: var(--cyan); font-weight: 700; text-shadow: 0 0 8px var(--cyan); }
+  .range-val.pending { color: var(--orange); text-shadow: 0 0 8px var(--orange); }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
+  .btn {
+    font: inherit; font-weight: 600; font-size: 13px; color: var(--cyan);
+    background: transparent; border: 1.5px solid var(--cyan); border-radius: 999px;
+    padding: 9px 20px; cursor: pointer; text-decoration: none; display: inline-block;
+    box-shadow: 0 0 8px -2px var(--cyan);
+    transition: box-shadow .2s ease, background-color .2s ease, transform .15s ease;
+  }
+  .btn:hover { background: rgba(43,240,255,.08); box-shadow: 0 0 16px -2px var(--cyan), 0 0 40px -10px var(--cyan); }
+  .btn:active { transform: scale(.97); }
+  .btn-danger { color: var(--pink); border-color: var(--pink); box-shadow: 0 0 8px -2px var(--pink); }
+  .btn-danger:hover { background: rgba(255,43,214,.08); box-shadow: 0 0 16px -2px var(--pink), 0 0 40px -10px var(--pink); }
+  .btn-warn { color: var(--orange); border-color: var(--orange); box-shadow: 0 0 8px -2px var(--orange); }
+  .btn-warn:hover { background: rgba(255,157,43,.08); box-shadow: 0 0 16px -2px var(--orange), 0 0 40px -10px var(--orange); }
+  .btn-row { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .flex-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* ── GPIO toggle cards ───────────────────────────────────────────────── */
+  .gpio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
+  .gpio-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 18px; text-align: center;
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  .gpio-card:hover { transform: translateY(-2px); box-shadow: 0 0 24px -8px var(--cyan); }
+  .gpio-name { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); margin-bottom: 12px; }
+
+  .toggle { position: relative; display: inline-block; width: 46px; height: 26px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider {
+    position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 999px; cursor: pointer; transition: .2s;
+  }
+  .toggle .slider::before {
+    content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+    background: var(--text-dim); border-radius: 50%; transition: .2s;
+  }
+  .toggle input:checked + .slider { background: rgba(43,240,255,.12); border-color: var(--cyan); box-shadow: 0 0 12px -2px var(--cyan); }
+  .toggle input:checked + .slider::before { transform: translateX(20px); background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+
+  .badge { display: inline-block; margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: .5px; }
+  .b-on  { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+  .b-off { color: var(--text-dim); }
+
+  /* ── Config forms ────────────────────────────────────────────────────── */
+  .cfg-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 18px; margin-bottom: 14px;
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  .cfg-box:hover { transform: translateY(-2px); box-shadow: 0 0 24px -8px var(--purple); }
+  .cfg-box h3 { margin: 0 0 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--purple); text-shadow: 0 0 6px var(--purple); }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-top: 12px; }
+  label:first-of-type { margin-top: 0; }
+  .row2 > label { margin-top: 0; }
+  .cfg-box > *:last-child { margin-bottom: 0; }
+
+  input[type=text], input[type=number], input[type=password], select {
+    width: 100%; margin-top: 6px; padding: 9px 12px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--purple); font: inherit; font-size: 13px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(43,240,255,.2); }
+  .cfg-box input:focus, .cfg-box select:focus { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(176,75,255,.25); }
+
+  .chk-row { display: flex; gap: 18px; flex-wrap: wrap; margin: 12px 0; }
+  .cfg-box h3 + .chk-row { margin-top: 0; }
+  .chk-row label { display: flex; align-items: center; gap: 8px; margin-top: 0; font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .chk-row input[type=checkbox] {
+    appearance: none; -webkit-appearance: none;
+    width: 17px; height: 17px; flex-shrink: 0;
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 5px;
+    cursor: pointer; position: relative;
+    transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+  }
+  .chk-row input[type=checkbox]:hover { border-color: var(--cyan); }
+  .chk-row input[type=checkbox]:checked {
+    border-color: var(--cyan);
+    background: rgba(43,240,255,.12);
+    box-shadow: 0 0 8px -1px var(--cyan), 0 0 18px -4px var(--cyan);
+  }
+  .chk-row input[type=checkbox]:checked::after {
+    content: ""; position: absolute; left: 5px; top: 1px;
+    width: 5px; height: 9px;
+    border: solid var(--cyan); border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .hint { font-size: 11px; color: var(--text-dim); margin: 0 0 12px; }
+  .hint-trailing { margin: 12px 0 0; }
+
+  /* ── System tab ──────────────────────────────────────────────────────── */
+  .file-lbl { color: var(--text-dim); font-size: 12px; flex: 1; }
+  .hidden-input { display: none; }
+  .ota-progress { display: none; margin-top: 12px; }
+  .ota-progress.show { display: block; }
+  .ota-status { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .ota-info { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; min-height: 18px; }
+  #sysinfo .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  #sysinfo .row:last-child { border-bottom: none; }
+  #sysinfo .row span:last-child { color: var(--cyan); font-weight: 600; }
+
+  .dz-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .dz-row:last-child { border-bottom: none; }
+  .dz-row p { margin: 0; font-size: 12px; color: var(--text-dim); max-width: 60%; }
+
+  /* ── Toast ───────────────────────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface); border: 1px solid var(--cyan); border-radius: 10px;
+    padding: 12px 20px; font-size: 12px; color: var(--text-dim);
+    box-shadow: 0 0 24px -4px var(--cyan);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.err { border-color: var(--pink); box-shadow: 0 0 24px -4px var(--pink); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .btn, .bar, .toggle .slider, .toggle .slider::before { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <a href="https://github.com/danielguedel/HMS-GW-S3" target="_blank" rel="noopener">
+      <svg viewBox="0 0 115 100" aria-hidden="true">
+        <defs>
+          <filter id="logoGlowPink" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="h"/><feMerge><feMergeNode in="h"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id="logoGlowCyan" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="h"/><feMerge><feMergeNode in="h"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <g transform="translate(-5,0)">
+          <path d="M55 6 L24 50 L44 50 L34 94 L80 40 L56 40 Z" fill="none" stroke="#ff2bd6" stroke-width="9" stroke-linejoin="round" stroke-linecap="round" filter="url(#logoGlowPink)"/>
+          <path d="M55 6 L24 50 L44 50 L34 94 L80 40 L56 40 Z" fill="none" stroke="#fff" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
+        </g>
+        <g transform="translate(0,-5)">
+          <path d="M75 18 a32 32 0 0 1 0 64" stroke="#2bf0ff" stroke-width="7" stroke-linecap="round" fill="none" filter="url(#logoGlowCyan)"/>
+          <path d="M75 30 a20 20 0 0 1 0 40" stroke="#2bf0ff" stroke-width="7" stroke-linecap="round" fill="none" filter="url(#logoGlowCyan)"/>
+          <path d="M75 18 a32 32 0 0 1 0 64" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+          <path d="M75 30 a20 20 0 0 1 0 40" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+        </g>
+      </svg>
+      HMS-GW-S3 // NEON
+    </a>
+  </h1>
+  <div class="hdr-right">
+    <div class="dots">
+      <div class="dot-wrap"><span class="dot ok" id="d-wifi"></span>WiFi</div>
+      <div class="dot-wrap"><span class="dot ok" id="d-dtu"></span>DTU</div>
+      <div class="dot-wrap"><span class="dot ok" id="d-mqtt"></span>MQTT</div>
+      <button class="icon-btn" id="lang-btn" onclick="toggleLang()" title="Language">DE</button>
+    </div>
+    <div class="hdr-info">
+      <span id="hi-mac">1C:DB:D4:40:61:94</span>
+      <span class="hdr-sep">|</span>
+      <span id="hi-fw">0.2.0 (Build 297)</span>
+      <span class="hdr-sep">|</span>
+      <span id="hi-date">21.06.2026</span>
+      <span class="hdr-sep">|</span>
+      <span id="hi-time">12:00:00</span>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('dashboard',this)" data-i18n="navDashboard">Dashboard</button>
+  <button onclick="showTab('gpio',this)" data-i18n="navRelayIo">Relay / IO</button>
+  <button onclick="showTab('config',this)" data-i18n="navConfig">Config</button>
+  <button onclick="showTab('system',this)" data-i18n="navSystem">System</button>
+</nav>
+
+<main>
+
+  <!-- ════ DASHBOARD ══════════════════════════════════════════════════ -->
+  <div id="tab-dashboard" class="tab active">
+
+    <div class="grid">
+      <div class="card"><div class="card-title" data-i18n="statTemp">Temp</div><div><span class="card-val" id="s-temp">43.0</span><span class="card-unit">°C</span></div></div>
+      <div class="card"><div class="card-title" data-i18n="statLimit">Limit</div><div><span class="card-val" id="s-limit">100</span><span class="card-unit">%</span></div></div>
+      <div class="card"><div class="card-title" data-i18n="statYieldToday">Yield today</div><div><span class="card-val" id="s-de">1.748</span><span class="card-unit">kWh</span></div></div>
+      <div class="card"><div class="card-title" data-i18n="statTotal">Total</div><div><span class="card-val" id="s-te">151.8</span><span class="card-unit">kWh</span></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card grid-p">
+        <div class="card-title">Grid</div>
+        <div><span class="card-val" id="grid-p">577</span><span class="card-unit">W</span></div>
+        <div class="bar-wrap"><div class="bar" id="bar-grid" style="width:64%"></div></div>
+        <div class="card-sub" id="grid-ui">241.2 V / 2.39 A</div>
+      </div>
+      <div class="card pv0">
+        <div class="card-title">PV1</div>
+        <div><span class="card-val" id="pv0-p">321</span><span class="card-unit">W</span></div>
+        <div class="bar-wrap"><div class="bar" id="bar-pv0" style="width:71%"></div></div>
+        <div class="card-sub" id="pv0-ui">25.7 V / 12.51 A</div>
+      </div>
+      <div class="card pv1">
+        <div class="card-title">PV2</div>
+        <div><span class="card-val" id="pv1-p">293</span><span class="card-unit">W</span></div>
+        <div class="bar-wrap"><div class="bar" id="bar-pv1" style="width:65%"></div></div>
+        <div class="card-sub" id="pv1-ui">26.1 V / 11.22 A</div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="card">
+        <div class="sec" data-i18n="secStatus">Status</div>
+        <div class="status-text active" id="s-active" data-i18n="statActive">Active</div>
+      </div>
+      <div class="card">
+        <div class="sec" data-i18n="secPowerLimit">Power Limit</div>
+        <div class="range-wrap">
+          <div class="bar-wrap"><div class="bar" id="bar-limit" style="width:100%"></div></div>
+          <input type="range" min="2" max="100" value="100" id="limit-range" oninput="onLimitInput(this.value)">
+        </div>
+        <div class="flex-between">
+          <span id="range-val" class="range-val">100%</span>
+          <button class="btn" onclick="setLimit()" data-i18n="btnSet">Set</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════ GPIO / RELAY ═══════════════════════════════════════════════ -->
+  <div id="tab-gpio" class="tab">
+    <div class="gpio-grid">
+      <div class="gpio-card">
+        <div class="gpio-name" data-i18n="lblRelay">Relay</div>
+        <label class="toggle"><input type="checkbox" id="sw-relay" onchange="setGpio('relay',this.checked)"><span class="slider"></span></label>
+        <div><span class="badge b-off" id="lbl-relay">OFF</span></div>
+      </div>
+      <div class="gpio-card">
+        <div class="gpio-name" data-i18n="lblIo1">IO1</div>
+        <label class="toggle"><input type="checkbox" id="sw-io1" checked onchange="setGpio('io1',this.checked)"><span class="slider"></span></label>
+        <div><span class="badge b-on" id="lbl-io1">ON</span></div>
+      </div>
+      <div class="gpio-card">
+        <div class="gpio-name" data-i18n="lblIo2">IO2</div>
+        <label class="toggle"><input type="checkbox" id="sw-io2" onchange="setGpio('io2',this.checked)"><span class="slider"></span></label>
+        <div><span class="badge b-off" id="lbl-io2">OFF</span></div>
+      </div>
+      <div class="gpio-card">
+        <div class="gpio-name" data-i18n="lblIo3">IO3</div>
+        <label class="toggle"><input type="checkbox" id="sw-io3" onchange="setGpio('io3',this.checked)"><span class="slider"></span></label>
+        <div><span class="badge b-off" id="lbl-io3">OFF</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ CONFIG ═══════════════════════════════════════════════════════ -->
+  <div id="tab-config" class="tab">
+    <div class="cfg-box">
+      <h3>WiFi</h3>
+      <label><span data-i18n="lblSsid">SSID</span><input type="text" value="GUEWLAN-CH"></label>
+      <label><span data-i18n="lblPassword">Password</span><input type="password" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
+      <div class="chk-row"><label><input type="checkbox" checked> <span data-i18n="lblApFallback">AP fallback if no STA</span></label></div>
+    </div>
+    <div class="cfg-box">
+      <h3 data-i18n="hNetwork">Network</h3>
+      <div class="chk-row"><label><input type="checkbox"> <span data-i18n="lblStaticIp">Static IP address (instead of DHCP)</span></label></div>
+      <div class="row2">
+        <label><span data-i18n="lblIpAddress">IP Address</span><input type="text" placeholder="192.168.1.50"></label>
+        <label><span data-i18n="lblSubnet">Subnet Mask</span><input type="text" placeholder="255.255.255.0"></label>
+      </div>
+      <label><span data-i18n="lblGateway">Gateway (also used as DNS)</span><input type="text" placeholder="192.168.1.1"></label>
+    </div>
+    <div class="cfg-box">
+      <h3>DTU (Hoymiles)</h3>
+      <div class="row2">
+        <label><span data-i18n="lblHostIp">Host / IP</span><input type="text" value="10.1.1.143"></label>
+        <label><span data-i18n="lblPort">Port</span><input type="number" value="10081"></label>
+      </div>
+      <div class="row2">
+        <label><span data-i18n="lblPollInterval">Poll interval (s, min 31)</span><input type="number" value="31" min="31"></label>
+        <label><span data-i18n="lblCloudPause">Cloud pause (s)</span><input type="number" value="30" min="0"></label>
+      </div>
+      <label><span data-i18n="lblRebootAfterFails">Reboot after fails</span><input type="number" value="3" min="0"></label>
+    </div>
+    <div class="cfg-box">
+      <h3>MQTT</h3>
+      <div class="row2">
+        <label><span data-i18n="lblBrokerHost">Broker Host</span><input type="text" value="10.1.1.41"></label>
+        <label><span data-i18n="lblPort">Port</span><input type="number" value="1883"></label>
+      </div>
+      <div class="row2">
+        <label><span data-i18n="lblUsername">Username</span><input type="text" value="mqttclient"></label>
+        <label><span data-i18n="lblPassword">Password</span><input type="password" data-i18n-ph="phUnchangedShort" placeholder="(unchanged)"></label>
+      </div>
+      <label><span data-i18n="lblTopic">Topic</span><input type="text" value="hmsgws3_406194"></label>
+      <div class="chk-row">
+        <label><input type="checkbox" checked> <span data-i18n="lblHaDiscovery">HA Auto-Discovery</span></label>
+        <label><input type="checkbox"> <span data-i18n="lblOpenDtu">OpenDTU mode</span></label>
+        <label><input type="checkbox"> <span data-i18n="lblRetain">Retain</span></label>
+      </div>
+    </div>
+    <div class="cfg-box">
+      <h3 data-i18n="hPowerControl">Power Control</h3>
+      <div class="row2">
+        <label><span data-i18n="lblDefaultLimit">Default limit (%)</span><input type="number" value="100" min="2" max="100"></label>
+        <label><span data-i18n="lblPlimTimeout">Timeout (s, 0=disabled)</span><input type="number" value="60" min="0"></label>
+      </div>
+    </div>
+    <div class="cfg-box">
+      <h3 data-i18n="hNtpTime">NTP &amp; Time</h3>
+      <div class="row2">
+        <label><span data-i18n="lblNtpServer">NTP Server</span><input type="text" value="pool.ntp.org"></label>
+        <label><span data-i18n="lblTzOffset">Timezone Offset (s)</span><input type="number" value="3600"></label>
+      </div>
+    </div>
+    <div class="cfg-box">
+      <h3 data-i18n="hWebServer">Web Server</h3>
+      <label><span data-i18n="lblPort">Port</span><input type="number" value="80" min="1" max="65535"></label>
+      <div class="chk-row"><label><input type="checkbox"> <span data-i18n="lblWebAuth">Username/password protection</span></label></div>
+      <div class="row2">
+        <label><span data-i18n="lblUsername">Username</span><input type="text" placeholder="admin"></label>
+        <label><span data-i18n="lblPassword">Password</span><input type="password" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
+      </div>
+      <p class="hint hint-trailing" data-i18n="pWebServerHint">Port and auth changes only take effect after the automatic restart.</p>
+    </div>
+    <div class="cfg-box">
+      <h3>System</h3>
+      <div class="row2">
+        <label><span data-i18n="lblLedBrightness">LED Brightness (0–255)</span><input type="number" value="80" min="0" max="255"></label>
+        <label><span data-i18n="lblLogLevel">Log Level</span>
+          <select>
+            <option data-i18n="optLogError">0 — Error</option><option data-i18n="optLogWarning">1 — Warning</option><option selected data-i18n="optLogInfo">2 — Info</option><option data-i18n="optLogDebug">3 — Debug</option>
+          </select>
+        </label>
+      </div>
+      <label><span data-i18n="lblManifestUrl">Manifest URL (empty = disabled)</span><input type="text" value="https://raw.githubusercontent.com/danielguedel/HMS-GW-S3/main/release/manifest.json"></label>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="resetConfig()" data-i18n="btnReset">Reset</button>
+      <button class="btn" onclick="saveConfig()" data-i18n="btnSave">Save</button>
+    </div>
+  </div>
+
+  <!-- ════ SYSTEM ═════════════════════════════════════════════════════════ -->
+  <div id="tab-system" class="tab">
+    <div class="cfg-box">
+      <h3 data-i18n="hFirmwareOta">Firmware OTA</h3>
+      <p class="hint" data-i18n="pFirmwareOta">Upload a compiled .bin file. Gateway restarts after a successful update.</p>
+      <div class="flex-row">
+        <input type="file" accept=".bin" id="fw-file" class="hidden-input" onchange="onFilePicked('fw-file','fw-file-lbl')">
+        <button type="button" class="btn" onclick="pickFile('fw-file')" data-i18n="btnChooseFile">Choose File</button>
+        <span id="fw-file-lbl" class="file-lbl" data-i18n="lblNoFileChosen">No file chosen</span>
+        <button class="btn" onclick="doOta('fw')" data-i18n="btnFlash">Flash</button>
+      </div>
+      <div class="ota-progress" id="fw-prog">
+        <div class="bar-wrap"><div class="bar" id="fw-bar" style="width:0%"></div></div>
+        <div class="ota-status" id="fw-status" data-i18n="otaUploading">Uploading…</div>
+      </div>
+    </div>
+
+    <div class="cfg-box">
+      <h3 data-i18n="hFilesystemOta">Filesystem OTA</h3>
+      <p class="hint" data-i18n="pFilesystemOta">Upload a LittleFS .bin (data/www).</p>
+      <div class="flex-row">
+        <input type="file" accept=".bin" id="fs-file" class="hidden-input" onchange="onFilePicked('fs-file','fs-file-lbl')">
+        <button type="button" class="btn" onclick="pickFile('fs-file')" data-i18n="btnChooseFile">Choose File</button>
+        <span id="fs-file-lbl" class="file-lbl" data-i18n="lblNoFileChosen">No file chosen</span>
+        <button class="btn" onclick="doOta('fs')" data-i18n="btnFlash">Flash</button>
+      </div>
+      <div class="ota-progress" id="fs-prog">
+        <div class="bar-wrap"><div class="bar" id="fs-bar" style="width:0%"></div></div>
+        <div class="ota-status" id="fs-status" data-i18n="otaUploading">Uploading…</div>
+      </div>
+    </div>
+
+    <div class="cfg-box">
+      <h3 data-i18n="hInternetUpdate">Internet Update</h3>
+      <div class="ota-info" id="ota-check-info">Up to date — v0.2.0 (Build 297)</div>
+      <div class="flex-row">
+        <button class="btn" id="btn-ota-check" onclick="checkUpdate()" data-i18n="btnCheck">Check</button>
+        <button class="btn" id="btn-ota-install" style="display:none" onclick="installNow()" data-i18n="btnInstallNow">Install now</button>
+      </div>
+    </div>
+
+    <div class="cfg-box">
+      <h3 data-i18n="hBackupConfig">Backup Configuration</h3>
+      <p class="hint" data-i18n="pBackupHint">Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.</p>
+      <div class="flex-row">
+        <button type="button" class="btn" onclick="downloadBackup()" data-i18n="btnDownloadBackup">Download Backup</button>
+        <input type="file" accept=".json" id="restore-file" class="hidden-input" onchange="onFilePicked('restore-file','restore-file-lbl')">
+        <button type="button" class="btn" onclick="pickFile('restore-file')" data-i18n="btnChooseFile">Choose File</button>
+        <span id="restore-file-lbl" class="file-lbl" data-i18n="lblNoFileChosen">No file chosen</span>
+        <button class="btn" onclick="restoreConfig()" data-i18n="btnRestore">Restore</button>
+      </div>
+    </div>
+
+    <div class="cfg-box">
+      <h3 data-i18n="hDeviceInfo">Device Information</h3>
+      <div id="sysinfo">
+        <div class="row"><span data-i18n="rowFirmware">Firmware</span><span>0.2.0 (Build 297)</span></div>
+        <div class="row"><span data-i18n="rowMac">MAC</span><span>1C:DB:D4:40:61:94</span></div>
+        <div class="row"><span data-i18n="rowIp">IP</span><span>10.1.1.145</span></div>
+        <div class="row"><span data-i18n="rowRssi">WiFi RSSI</span><span>-48 dBm</span></div>
+        <div class="row"><span data-i18n="rowUptime">Uptime</span><span>2h 14m</span></div>
+        <div class="row"><span data-i18n="rowHeap">Free Heap</span><span>192 KB</span></div>
+      </div>
+    </div>
+
+    <div class="cfg-box">
+      <h3 data-i18n="hDangerZone">Danger Zone</h3>
+      <div class="dz-row">
+        <p data-i18n="lblRebootDevice">The device will restart. Current configuration is preserved.</p>
+        <button class="btn btn-warn" onclick="rebootGw()" data-i18n="btnRebootGw">Reboot</button>
+      </div>
+      <div class="dz-row">
+        <p data-i18n="lblFactoryResetRow">Current configuration will be erased. The device restarts with factory settings.</p>
+        <button class="btn btn-danger" onclick="factoryReset()" data-i18n="btnFactoryReset">Factory reset</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const txt = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+
+// ─── i18n ─────────────────────────────────────────────────────────────────
+const I18N = {
+  en: {
+    navDashboard: 'Dashboard', navRelayIo: 'Relay / IO', navConfig: 'Config', navSystem: 'System',
+    statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Yield today', statTotal: 'Total',
+    statActive: 'Active', secPowerLimit: 'Power Limit', secStatus: 'Status', btnSet: 'Set',
+    hNetwork: 'Network', hPowerControl: 'Power Control', hNtpTime: 'NTP & Time', hWebServer: 'Web Server',
+    hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
+    hBackupConfig: 'Backup Configuration', hDeviceInfo: 'Device Information',
+    lblSsid: 'SSID', lblPassword: 'Password', lblApFallback: 'AP fallback if no STA',
+    lblStaticIp: 'Static IP address (instead of DHCP)', lblIpAddress: 'IP Address', lblSubnet: 'Subnet Mask',
+    lblGateway: 'Gateway (also used as DNS)', lblHostIp: 'Host / IP', lblPort: 'Port',
+    lblPollInterval: 'Poll interval (s, min 31)', lblCloudPause: 'Cloud pause (s)',
+    lblRebootAfterFails: 'Reboot after fails', lblBrokerHost: 'Broker Host', lblUsername: 'Username',
+    lblTopic: 'Topic', lblHaDiscovery: 'HA Auto-Discovery', lblOpenDtu: 'OpenDTU mode', lblRetain: 'Retain',
+    lblDefaultLimit: 'Default limit (%)', lblPlimTimeout: 'Timeout (s, 0=disabled)',
+    lblNtpServer: 'NTP Server', lblTzOffset: 'Timezone Offset (s)', lblWebAuth: 'Username/password protection',
+    lblLedBrightness: 'LED Brightness (0–255)', lblLogLevel: 'Log Level',
+    lblManifestUrl: 'Manifest URL (empty = disabled)',
+    optLogError: '0 — Error', optLogWarning: '1 — Warning', optLogInfo: '2 — Info', optLogDebug: '3 — Debug',
+    phUnchanged: '(leave unchanged)', phUnchangedShort: '(unchanged)',
+    pWebServerHint: 'Port and auth changes only take effect after the automatic restart.',
+    btnReset: 'Reset', btnSave: 'Save',
+    pFirmwareOta: 'Upload a compiled .bin file. Gateway restarts after a successful update.',
+    pFilesystemOta: 'Upload a LittleFS .bin (data/www).',
+    btnFlash: 'Flash', otaUploading: 'Uploading…',
+    btnCheck: 'Check', btnInstallNow: 'Install now',
+    pBackupHint: 'Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.',
+    btnDownloadBackup: 'Download Backup', btnRestore: 'Restore',
+    btnRebootGw: 'Reboot', btnFactoryReset: 'Factory reset', hDangerZone: 'Danger Zone',
+    lblRebootDevice: 'The device will restart. Current configuration is preserved.',
+    lblFactoryResetRow: 'Current configuration will be erased. The device restarts with factory settings.',
+    btnChooseFile: 'Choose File', lblNoFileChosen: 'No file chosen',
+    lblOn: 'ON', lblOff: 'OFF', lblRelay: 'Relay', lblIo1: 'IO1', lblIo2: 'IO2', lblIo3: 'IO3',
+    rowFirmware: 'Firmware', rowMac: 'MAC', rowIp: 'IP', rowRssi: 'WiFi RSSI', rowUptime: 'Uptime', rowHeap: 'Free Heap',
+    msgConfigReloaded: 'Config reloaded', msgSaved: 'Saved — gateway restarting…',
+    msgRestarting: 'Restarting…', msgFactoryReset: 'Factory reset — gateway restarting…',
+    confirmFactoryReset: 'Factory reset? All settings will be erased!',
+    msgOtaDone: 'Done — gateway restarting…', msgOtaComplete: 'OTA complete',
+    msgBackupDownloaded: 'Backup downloaded', msgRestored: 'Restored — gateway restarting…',
+    msgChecking: 'Checking…', msgUpToDate: (v, b) => `Up to date — v${v} (Build ${b})`,
+    msgNoUpdate: 'No update available', msgUpdateStarted: 'Update started — gateway restarts after flashing',
+    demoSuffix: ' (Demo)',
+  },
+  de: {
+    navDashboard: 'Dashboard', navRelayIo: 'Relais / E/A', navConfig: 'Konfiguration', navSystem: 'System',
+    statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
+    statActive: 'Aktiv', secPowerLimit: 'Leistungsbegrenzung', secStatus: 'Status', btnSet: 'Setzen',
+    hNetwork: 'Netzwerk', hPowerControl: 'Leistungsregelung', hNtpTime: 'NTP & Zeit', hWebServer: 'Web-Server',
+    hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
+    hBackupConfig: 'Konfiguration sichern', hDeviceInfo: 'Geräteinformationen',
+    lblSsid: 'SSID', lblPassword: 'Passwort', lblApFallback: 'AP-Fallback wenn kein STA',
+    lblStaticIp: 'Feste IP-Adresse (statt DHCP)', lblIpAddress: 'IP-Adresse', lblSubnet: 'Subnetzmaske',
+    lblGateway: 'Gateway (wird auch als DNS verwendet)', lblHostIp: 'Host / IP', lblPort: 'Port',
+    lblPollInterval: 'Poll-Intervall (s, min 31)', lblCloudPause: 'Cloud-Pause (s)',
+    lblRebootAfterFails: 'Reboot nach Fails', lblBrokerHost: 'Broker Host', lblUsername: 'Benutzername',
+    lblTopic: 'Topic', lblHaDiscovery: 'HA Auto-Discovery', lblOpenDtu: 'OpenDTU-Modus', lblRetain: 'Retain',
+    lblDefaultLimit: 'Standard-Limit (%)', lblPlimTimeout: 'Timeout (s, 0=deaktiviert)',
+    lblNtpServer: 'NTP Server', lblTzOffset: 'Zeitzone-Offset (s)', lblWebAuth: 'Benutzername/Passwort-Schutz',
+    lblLedBrightness: 'LED Helligkeit (0–255)', lblLogLevel: 'Log-Level',
+    lblManifestUrl: 'Manifest URL (leer = deaktiviert)',
+    optLogError: '0 — Error', optLogWarning: '1 — Warnung', optLogInfo: '2 — Info', optLogDebug: '3 — Debug',
+    phUnchanged: '(unverändert lassen)', phUnchangedShort: '(unverändert)',
+    pWebServerHint: 'Port- und Auth-Änderungen werden erst nach dem automatischen Neustart aktiv.',
+    btnReset: 'Zurücksetzen', btnSave: 'Speichern',
+    pFirmwareOta: 'Kompilierte .bin-Datei hochladen. Gateway startet nach erfolgreichem Update neu.',
+    pFilesystemOta: 'LittleFS .bin (data/www) hochladen.',
+    btnFlash: 'Flash', otaUploading: 'Hochladen…',
+    btnCheck: 'Prüfen', btnInstallNow: 'Jetzt installieren',
+    pBackupHint: 'Backup enthält alle Einstellungen inkl. WLAN-/MQTT-/Web-Passwörter im Klartext — Datei sicher aufbewahren.',
+    btnDownloadBackup: 'Backup herunterladen', btnRestore: 'Wiederherstellen',
+    btnRebootGw: 'Neustart', btnFactoryReset: 'Werkseinstellungen', hDangerZone: 'Gefahrenzone',
+    lblRebootDevice: 'Das Gerät wird neu gestartet. Die aktuelle Konfiguration bleibt erhalten.',
+    lblFactoryResetRow: 'Die aktuelle Konfiguration wird gelöscht. Das Gerät startet neu mit Werkseinstellungen.',
+    btnChooseFile: 'Datei wählen', lblNoFileChosen: 'Keine Datei ausgewählt',
+    lblOn: 'EIN', lblOff: 'AUS', lblRelay: 'Relais', lblIo1: 'EA1', lblIo2: 'EA2', lblIo3: 'EA3',
+    rowFirmware: 'Firmware', rowMac: 'MAC', rowIp: 'IP', rowRssi: 'WiFi RSSI', rowUptime: 'Laufzeit', rowHeap: 'Freier Heap',
+    msgConfigReloaded: 'Konfiguration neu geladen', msgSaved: 'Gespeichert — Gateway startet neu…',
+    msgRestarting: 'Neustart…', msgFactoryReset: 'Werkseinstellungen werden zurückgesetzt — Gateway startet neu…',
+    confirmFactoryReset: 'Auf Werkseinstellungen zurücksetzen? Alle Einstellungen werden gelöscht!',
+    msgOtaDone: 'Fertig — Gateway startet neu…', msgOtaComplete: 'OTA abgeschlossen',
+    msgBackupDownloaded: 'Backup heruntergeladen', msgRestored: 'Wiederhergestellt — Gateway startet neu…',
+    msgChecking: 'Prüfe…', msgUpToDate: (v, b) => `Aktuell — v${v} (Build ${b})`,
+    msgNoUpdate: 'Kein Update verfügbar', msgUpdateStarted: 'Update gestartet — Gateway startet nach dem Flash neu',
+    demoSuffix: ' (Demo)',
+  },
+};
+
+function currentLang() { return localStorage.getItem('lang') || 'en'; }
+function tr(key, ...args) {
+  const dict = I18N[currentLang()] || I18N.en;
+  const v = dict[key] ?? I18N.en[key] ?? key;
+  return typeof v === 'function' ? v(...args) : v;
+}
+
+function refreshDynamicTexts() {
+  Object.keys(gpioLabels).forEach(key => {
+    const el = $('lbl-' + key);
+    if (!el) return;
+    el.textContent = el.classList.contains('b-on') ? tr('lblOn') : tr('lblOff');
+  });
+  if ($('btn-ota-install').style.display === 'none') {
+    txt('ota-check-info', tr('msgUpToDate', '0.2.0', '297'));
+  }
+}
+
+function applyI18n() {
+  document.documentElement.lang = currentLang();
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
+  refreshDynamicTexts();
+}
+
+function initLang() {
+  $('lang-btn').textContent = currentLang() === 'en' ? 'DE' : 'EN';
+  applyI18n();
+}
+
+function toggleLang() {
+  const next = currentLang() === 'en' ? 'de' : 'en';
+  localStorage.setItem('lang', next);
+  $('lang-btn').textContent = next === 'en' ? 'DE' : 'EN';
+  applyI18n();
+}
+
+// ─── Tabs ───────────────────────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  $('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─── Clock ──────────────────────────────────────────────────────────────
+const pad2 = n => String(n).padStart(2, '0');
+function tickClock() {
+  const d = new Date();
+  txt('hi-time', `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`);
+  txt('hi-date', `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()}`);
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ─── Toast ──────────────────────────────────────────────────────────────
+let toastTimer = null;
+function toast(msg, ok = true) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', !ok);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ─── Simulated live data ────────────────────────────────────────────────
+let baseGrid = 577, basePv0 = 321, basePv1 = 293;
+function jitter(base) { return Math.round(base * (1 + (Math.random() - 0.5) * 0.1)); }
+function pct(v, max) { return Math.min(100, Math.max(0, v / max * 100)).toFixed(0) + '%'; }
+
+function simTick() {
+  const grid = jitter(baseGrid), pv0 = jitter(basePv0), pv1 = jitter(basePv1);
+  txt('grid-p', grid); $('bar-grid').style.width = pct(grid, 900);
+  txt('pv0-p', pv0);   $('bar-pv0').style.width = pct(pv0, 450);
+  txt('pv1-p', pv1);   $('bar-pv1').style.width = pct(pv1, 450);
+  txt('s-temp', (43 + (Math.random() - 0.5) * 2).toFixed(1));
+}
+setInterval(simTick, 4000);
+
+// ─── Power limit (pending → confirmed, simulated) ───────────────────────
+let confirmedLimit = 100;
+function rangePct(v) {
+  const r = $('limit-range');
+  return ((v - r.min) / (r.max - r.min) * 100) + '%';
+}
+function onLimitInput(v) {
+  txt('range-val', v + '%');
+  $('bar-limit').style.width = rangePct(v);
+}
+
+function setLimit() {
+  const val = parseInt($('limit-range').value);
+  txt('range-val', val + '%');
+  $('bar-limit').style.width = rangePct(val);
+  $('range-val').classList.add('pending');
+  $('limit-range').classList.add('pending');
+  $('bar-limit').classList.add('pending');
+  toast('Limit → ' + val + '%');
+  setTimeout(() => {
+    confirmedLimit = val;
+    txt('s-limit', val);
+    $('range-val').classList.remove('pending');
+    $('limit-range').classList.remove('pending');
+    $('bar-limit').classList.remove('pending');
+  }, 2000);
+}
+
+// ─── GPIO toggles (visual only) ──────────────────────────────────────────
+const gpioLabels = { relay: 'lblRelay', io1: 'lblIo1', io2: 'lblIo2', io3: 'lblIo3' };
+function setGpio(key, state) {
+  txt('lbl-' + key, state ? tr('lblOn') : tr('lblOff'));
+  const lbl = $('lbl-' + key);
+  lbl.className = 'badge ' + (state ? 'b-on' : 'b-off');
+  toast(tr(gpioLabels[key]) + ' → ' + (state ? tr('lblOn') : tr('lblOff')));
+}
+
+// ─── File pickers / OTA simulation ───────────────────────────────────────
+function pickFile(id) { $(id).click(); }
+function onFilePicked(inputId, lblId) {
+  const f = $(inputId).files[0];
+  txt(lblId, f ? f.name : tr('lblNoFileChosen'));
+}
+function doOta(kind) {
+  const prog = $(kind + '-prog'), bar = $(kind + '-bar'), status = $(kind + '-status');
+  prog.classList.add('show');
+  bar.style.width = '0%';
+  status.textContent = tr('otaUploading');
+  let p = 0;
+  const iv = setInterval(() => {
+    p += 20;
+    bar.style.width = Math.min(p, 100) + '%';
+    if (p >= 100) {
+      clearInterval(iv);
+      status.textContent = tr('msgOtaDone') + tr('demoSuffix');
+      toast(tr('msgOtaComplete') + tr('demoSuffix'));
+    }
+  }, 300);
+}
+function checkUpdate() {
+  txt('ota-check-info', tr('msgChecking'));
+  setTimeout(() => {
+    txt('ota-check-info', tr('msgUpToDate', '0.2.0', '297'));
+    toast(tr('msgNoUpdate') + tr('demoSuffix'));
+  }, 1200);
+}
+
+// ─── Config / Danger Zone / Internet Update actions (visual only) ───────
+function resetConfig() { toast(tr('msgConfigReloaded') + tr('demoSuffix')); }
+function saveConfig() { toast(tr('msgSaved') + tr('demoSuffix')); }
+function rebootGw() { toast(tr('msgRestarting') + tr('demoSuffix')); }
+function factoryReset() {
+  if (confirm(tr('confirmFactoryReset'))) toast(tr('msgFactoryReset') + tr('demoSuffix'));
+}
+function downloadBackup() { toast(tr('msgBackupDownloaded') + tr('demoSuffix')); }
+function restoreConfig() { toast(tr('msgRestored') + tr('demoSuffix')); }
+function installNow() { toast(tr('msgUpdateStarted') + tr('demoSuffix')); }
+
+initLang();
+</script>
+
+</body>
+</html>
