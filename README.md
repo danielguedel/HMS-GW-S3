@@ -17,7 +17,7 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | Feature | Details |
 |---|---|
 | ⚡ Solar data | PV1/PV2 power, voltage, current · Grid feed-in · Daily & total energy · Temperature |
-| 🌐 Web dashboard | Live data, GPIO controls, config tabs — responsive Dark Mode SPA at `http://<ip>`, English/German UI toggle |
+| 🌐 Web dashboard | Live data, GPIO controls, config tabs — responsive "Neon Flow" dark-glow SPA at `http://<ip>`, English/German UI toggle |
 | 📡 MQTT | Full publish/subscribe · Home Assistant auto-discovery · OpenDTU-compatible mode |
 | 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/dtu`, `/api/config`, `/api/ota/*` |
 | 🌈 NeoPixel LED | Onboard WS2812B (GPIO38) — 11 states via colour & animation |
@@ -103,7 +103,7 @@ esptool.py --chip esp32s3 --baud 921600 \
 
 | URL | Description |
 |---|---|
-| `http://<device-ip>` | Dashboard (Dark Mode) |
+| `http://<device-ip>` | Dashboard ("Neon Flow" dark-glow design) |
 | `http://hmsgws3.local` | mDNS (if supported by your OS) |
 | `http://<ip>/api/data.json` | Live inverter data (JSON) |
 | `http://<ip>/api/info.json` | System info (JSON) |
