@@ -1,9 +1,9 @@
 {
-  "version": "0.2.0",
-  "buildNumber": 297,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-297/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-297/littlefs.bin",
-  "md5": "a1f3df525c13c8af5f7b8caec0c6d1b2",
-  "fs_md5": "3d998e669676814f5305cf00a397d0fe",
-  "notes": "Power limit fix + dashboard target display"
+  "version": "0.3.0",
+  "buildNumber": 300,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-300/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-300/littlefs.bin",
+  "md5": "f69c0e08431bb5d85fb5816d9df8bb93",
+  "fs_md5": "2271a5fb314a4136b9c3d0532f6cb096",
+  "notes": "Web-GUI im Neon-Flow-Dark-Glow-Design neu gestaltet: neue Farbpalette mit klarer Bedeutung pro Farbe, durchgaengiger Glow-Effekt, neues SVG-Logo, ueberarbeitete Buttons/Badges/Checkboxen. Light/Dark-Theme-Umschalter entfernt (Neon-Look ist bewusst dark-only)."
 }
