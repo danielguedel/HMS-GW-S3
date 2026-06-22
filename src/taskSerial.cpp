@@ -1,4 +1,4 @@
-// taskSerial.cpp  -  v2 (Konsolen-Kommandos, DataStore pattern)
+// taskSerial.cpp  -  v2 (console commands, DataStore pattern)
 // Reads commands from Serial line by line, dispatches via DataStore API.
 // All command output goes to Serial directly (not routed through the logger).
 

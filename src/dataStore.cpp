@@ -8,11 +8,11 @@ void dsInit() {
     _mutex = xSemaphoreCreateMutex();
     configASSERT(_mutex);
 
-    // PvData  -  Nullwerte / ungültig
+    // PvData  -  zero values / invalid
     memset(&ds.pv, 0, sizeof(ds.pv));
     ds.pv.valid = false;
 
-    // SystemStatus  -  Nullwerte / offline
+    // SystemStatus  -  zero values / offline
     ds.system.wifiConnected   = false;
     ds.system.wifiApMode      = false;
     ds.system.wifiIp          = "";
@@ -31,23 +31,23 @@ void dsInit() {
     ds.system.macAddress      = "";
     ds.system.ntpTime         = 0;
 
-    // GpioState  -  alles aus
+    // GpioState  -  all off
     ds.gpio.relay = false;
     memset(ds.gpio.gpio, 0, sizeof(ds.gpio.gpio));
 
-    // GpioCommand  -  kein Befehl ausstehend
+    // GpioCommand  -  no command pending
     ds.gpioCmd.pending = false;
     ds.gpioCmd.target  = 0;
     ds.gpioCmd.state   = false;
 
-    // DtuCommand  -  kein Befehl ausstehend
+    // DtuCommand  -  no command pending
     memset(&ds.dtuCmd, 0, sizeof(ds.dtuCmd));
 
-    // OtaInfo  -  kein Check durchgeführt
+    // OtaInfo  -  no check performed yet
     memset(&ds.otaInfo, 0, sizeof(ds.otaInfo));
 }
 
-// --- Lesen --------------------------------------------------------------------
+// --- Reading --------------------------------------------------------------------
 
 DataStore::PvData dsGetPv() {
     xSemaphoreTake(_mutex, portMAX_DELAY);
@@ -86,7 +86,7 @@ DataStore::DtuCommand dsGetDtuCommand() {
     return copy;
 }
 
-// --- Schreiben ----------------------------------------------------------------
+// --- Writing ----------------------------------------------------------------
 
 void dsSetPv(const DataStore::PvData& data) {
     xSemaphoreTake(_mutex, portMAX_DELAY);

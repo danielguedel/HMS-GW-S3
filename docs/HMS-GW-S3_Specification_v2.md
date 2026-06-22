@@ -424,8 +424,9 @@ Discovery messages are sent 5 seconds after the MQTT connect, one every 500ms (p
 | GET | `/api/info.json` | System info, connection status |
 | GET | `/api/config` | Current configuration (without passwords) |
 | POST | `/api/config` | Save configuration |
-| GET | `/api/config/backup` | Full `config.json` as a download (incl. passwords in plaintext) |
+| GET | `/api/config/backup` | `config.json` as a download, WiFi/MQTT/web passwords stripped |
 | POST | `/api/config/restore` | Upload a `config.json` backup, validate, apply + restart |
+| POST | `/api/config/lang` | Persist the dashboard display language (`en`/`de`) only — no restart |
 | GET | `/api/gpio` | GPIO state |
 | POST | `/api/gpio` | Set GPIO |
 | GET | `/api/dtu` | DTU status (power limit, power limit target, inverter active) |
@@ -473,11 +474,15 @@ Discovery messages are sent 5 seconds after the MQTT connect, one every 500ms (p
 - **Configurable port:** `appConfig.webPort` (default: 80). For this, `server` was changed from a global static `AsyncWebServer` object to a pointer, allocated only in `setupRoutes()` (after `configLoad()`) via `new AsyncWebServer(appConfig.webPort)`.
 - Both settings only take effect after the automatic restart (like all config changes). After a port change, the web GUI must subsequently be accessed under the new port number; with auth protection active, the browser will automatically prompt for credentials on the next access (native Basic Auth popup).
 
-### 6.5 Configuration Backup/Restore (implemented 2026-06-18)
+### 6.5 Configuration Backup/Restore (implemented 2026-06-18, passwords redacted 2026-06-22)
 
-- **Backup:** `GET /api/config/backup` returns the complete, raw `config.json` as a file download (`Content-Disposition: attachment`) — **including** WiFi/MQTT/web-auth passwords in plaintext, a deliberate decision so a restore really restores everything without having to re-enter passwords. Reads directly from LittleFS (`req->send(LittleFS, CONFIG_FILE, "application/json", true)`), no detour through `appConfig`.
-- **Restore:** `POST /api/config/restore` (file upload, like `/update`/`/updatefs`) validates the uploaded file (must parse as JSON AND contain at least `wifiSsid` or `dtuHost`, to reject random unrelated files), applies it via `applyConfigJson()` — the same validation/clamping logic as `configLoad()` — and saves it via `configSave()`. On invalid content: `400`, the config remains unchanged.
-- **Important implementation pitfall:** ESPAsyncWebServer's simple string routes are "backward compatible" — a route `/api/config` also matches `/api/config/backup` and `/api/config/restore` by prefix (`path.startsWith(_value + "/")`). The more specific routes **must be registered before** `/api/config` (`setupRoutes()`), otherwise the broader `/api/config` handler intercepts the request — which is exactly what happened during implementation (the backup silently returned the password-free `GET /api/config` response instead of the actual file) and was only discovered by comparing the in-memory value with the response actually delivered.
+- **Backup:** `GET /api/config/backup` reads `config.json` from LittleFS, parses it into a `JsonDocument`, removes the `wifiPass`/`mqttPass`/`webPass` keys, then serializes and sends the result (`Content-Disposition: attachment`) — credentials never leave the device via this download. Originally this streamed the raw file directly (`req->send(LittleFS, CONFIG_FILE, ...)`, no parsing); the redaction requires the parse/strip/re-serialize detour instead.
+- **Restore:** `POST /api/config/restore` (file upload, like `/update`/`/updatefs`) validates the uploaded file (must parse as JSON AND contain at least `wifiSsid` or `dtuHost`, to reject random unrelated files), applies it via `applyConfigJson()` — the same validation/clamping logic as `configLoad()` — and saves it via `configSave()`. On invalid content: `400`, the config remains unchanged. Because `applyConfigJson()` resets to defaults before applying the uploaded keys, and the redacted backup no longer contains the password keys at all, **restoring a backup clears WiFi/MQTT/web passwords** — the UI hint text on the Backup Configuration card says so, and the user must re-enter them afterward.
+- **Important implementation pitfall:** ESPAsyncWebServer's simple string routes are "backward compatible" — a route `/api/config` also matches `/api/config/backup`, `/api/config/restore` and `/api/config/lang` by prefix (`path.startsWith(_value + "/")`). The more specific routes **must be registered before** `/api/config` (`setupRoutes()`), otherwise the broader `/api/config` handler intercepts the request — which is exactly what happened during implementation (the backup silently returned the password-free `GET /api/config` response instead of the actual file) and was only discovered by comparing the in-memory value with the response actually delivered.
+
+### 6.6 UI Language Persistence (implemented 2026-06-22)
+
+The dashboard's EN/DE toggle used to persist only in the browser's `localStorage` (per-browser, not per-device). It now persists in `appConfig.uiLang` (`"en"`/`"de"`, default `"en"`) on the gateway itself, so any browser opening the dashboard sees the language last chosen on that device. On page load, `loadLang()` reads `uiLang` from the existing `GET /api/config` response; the `DE`/`EN` header button posts to the dedicated `POST /api/config/lang` instead of the general `POST /api/config`, because the language is purely cosmetic and never read by firmware logic — unlike a normal settings save, it must **not** trigger the gateway restart that `POST /api/config` always causes.
 
 ---
 
@@ -519,7 +524,7 @@ struct AppConfig {
     // DTU
     char dtuHost[40];
     uint16_t dtuPort;           // default: 10081
-    int  dtuInterval;           // poll interval [s], default: 31
+    int  dtuInterval;           // poll interval [s], default: 31, min: 1 (DTU_MIN_INTERVAL)
     int  dtuCloudPause;         // wait time during cloud sync [s], default: 30
     int  dtuRebootAfterFails;   // reconnect after N failures, default: 3
 
@@ -569,6 +574,9 @@ struct AppConfig {
     char     webUser[33];       // username, default: "admin"
     char     webPass[65];       // password
     uint16_t webPort;           // web GUI port, default: 80
+
+    // Web GUI — purely cosmetic, never read by firmware logic
+    char uiLang[3];             // dashboard display language, "en" or "de", default: "en"
 };
 ```
 
@@ -606,17 +614,17 @@ Stored as JSON in LittleFS (`/config.json`).
 **"Neon Flow"** dark-mode design — glowing neon-tube accents on a near-black background, no light theme (the glow aesthetic only works on dark; the previous dark/light toggle was removed along with the old Shelly-style theme).
 
 - **Dark only**, no theme toggle — `:root` defines the palette directly, no `[data-theme]` variants
-- **Bilingual** (English default, German toggleable via a `DE`/`EN` icon button in the header, preference in `localStorage`) — `I18N` object (`en`/`de`) + `data-i18n`/`data-i18n-ph` attributes + `tr(key, ...args)` lookup
+- **Bilingual** (English default, German toggleable via a `DE`/`EN` icon button in the header, preference persisted on the device in `appConfig.uiLang` — see §6.6, not per-browser `localStorage`) — `I18N` object (`en`/`de`) + `data-i18n`/`data-i18n-ph` attributes + `tr(key, ...args)` lookup
 - **Color palette** (`:root` custom properties), each color carries one consistent meaning, not used decoratively:
 
   | Color | Var | Meaning |
   |---|---|---|
-  | Cyan `#2bf0ff` | `--cyan` | Data / connected / confirmed / default action buttons |
-  | Pink `#ff2bd6` | `--pink` | Attention / danger / hard error / title-glow accent |
-  | Violet `#b04bff` | `--purple` | Parameter / configuration (box titles, card titles, input text) |
-  | Lime `#c8ff2b` | `--lime` | Status "Active" (the one true "all good" state) |
-  | Orange `#ff9d2b` | `--orange` | Status "Offline"/warning, pending power-limit, non-destructive danger-zone actions (Reboot) |
-  | Gray `var(--muted)` | `--muted` | Default body text, muted/standby/off states |
+  | Cyan `#2bf0ff` | `--cyan` | Active / connected / confirmed / default action buttons |
+  | Pink `#ff2bd6` | `--pink` | Inactive / disconnected / no data / danger / hard error / title-glow accent; also an unconfirmed power-limit setpoint (§9.2) |
+  | Violet `#b04bff` | `--purple` | Parameter / configuration (box titles, card titles, input text); also the mid tier of the Grid card's power-dependent glow and the "update available" notice |
+  | Gray `var(--muted)` | `--muted` | Default body text, neutral states, header separators |
+
+  As of 2026-06-22 the palette intentionally has **only two status colors** (cyan = good, pink = not-good) instead of the earlier four-color scheme (cyan/pink/lime/orange) — `--lime` and `--orange` were removed, and every "not fully connected/active" state (DTU offline, inverter standby, no data yet) now renders identically in pink instead of being split across orange (warning) and gray (neutral). This was a deliberate simplification, not an oversight.
 
 - Typography: system font stack (`-apple-system, BlinkMacSystemFont, "Segoe UI"`)
 - Card/box/section titles consistently in violet, uppercase (`.card-title`, `.sec`, `.gpio-name`) — **except** Config/System box headers, which use the same violet but at a larger size (`.cfg-box h3`); Grid/PV1/PV2 card titles are gray like other dashboard titles, not violet
@@ -649,27 +657,34 @@ A standalone, purely visual exploration of this design (mock data, never wired t
 │  │ ▓▓▓▓░░░  │  │ ▓▓▓░░░░  │  │ ▓▓░░░░░  │                    │     a max value) + sub-
 │  │241.9V/2.5A│  │ 26.6V/1.3A│ │ 27.7V/1.1A│                   │     line voltage/current
 │  └──────────┘  └──────────┘  └──────────┘                    │
-│   cyan glow      pink glow     violet glow                    │
+│   cyan glow      cyan glow      cyan glow   (all active)      │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 The cards are updated every 10s via `GET /api/data.json` (`pv0`/`pv1`/`grid` → power, bar width, voltage/current subline; `inverter` → temp/limit cards). The daily-yield/total-yield cards come from `pv0.dE+pv1.dE+grid.dE` and the `tE` fields respectively. All four cards (Temp/Limit/Yield/Total) are always visible and show `–` as a placeholder as long as no valid data is available — they are NO LONGER hidden (unlike in an earlier version).
 
-**Status display (centralized via `updateStatusBadge()`):** The status card combines two independent data sources into one of four states:
-- `dtuOnline` from `GET /api/info.json` (`dtu` field) — DTU connection
+**Status display (centralized via `updateStatusBadge()`):** The status card combines three connectivity sources plus the inverter's feed-in state into a single `active` boolean, with a more specific text label underneath:
+- `wifi`/`dtu`/`mqtt` from `GET /api/info.json` — all three must be connected
 - `inverter.active` from `GET /api/data.json` — feed-in in progress
 
-| State | Condition | Color |
+| State (label) | Condition | Color |
 |---|---|---|
-| **Offline** | `dtuOnline === false` | Orange (`var(--orange)`) |
-| **Active** | DTU online + `inverter.active === true` | Lime (`var(--lime)`) |
-| **Standby** | DTU online + `inverter.active === false` | Gray (`var(--muted)`) |
-| **No data** (transition) | DTU online, but no PV data received yet | Gray (`var(--muted)`) |
+| **Active** | WiFi + DTU + MQTT connected, **and** `inverter.active === true` | Cyan (`var(--cyan)`) |
+| **Standby** | all connected, but `inverter.active === false` | Pink (`var(--pink)`) |
+| **No data** (transition) | all connected, but no PV data received yet | Pink (`var(--pink)`) |
+| **Offline** | WiFi, DTU, **or** MQTT not connected | Pink (`var(--pink)`) |
 
-The status renders as plain glowing text (`.badge-lg` with a `.b-ok`/`.b-warn`/`.b-off` color class) — no pill background, no dot indicator; pill shapes are reserved for buttons. The same `cls`/`bcls` state additionally drives:
-- Header separator dashes (`.hdr-sep` — empty/`warn`/`muted`)
-- Grid/PV1/PV2 values and progress bars (`.card-val`/`.bar` — same empty/`warn`/`muted` classes override the card's own glow color to orange/gray when the DTU is offline or there's no live data; when data is live and the DTU is online, each card keeps its own glow: Grid cyan, PV1 pink, PV2 violet via a `--glow` custom property per `.card`)
-- Temp/Limit/daily-yield/Total values (`s-temp`/`s-limit`/`s-de`/`s-te`)
+Only **Active** is cyan; the other three labels are textually distinct (so the user still knows *why* it isn't active) but render in the same pink, per the two-color simplification in §9.1. The status renders as plain glowing text (`.badge-lg` with a `.b-ok`/`.b-err` color class) — no pill background, no dot indicator; pill shapes are reserved for buttons. The same `active` boolean additionally drives, via `--glow` on each `.card`:
+- Grid/PV1/PV2/Temp/Limit/Yield/Total card borders and `.card-val`/`.bar` text+fill colors — cyan when active, pink otherwise. PV1 and PV2 no longer have a distinct color from Grid (removed 2026-06-22); all three default to cyan when active.
+- The **Grid** card is additionally power-tiered while active — `gridGlow(p)`: cyan below 200 W, violet 200–400 W, pink above 400 W (text/border/bar all follow this tier instead of the plain "active" cyan).
+- The **Power Limit** card is explicitly *excluded* from this connectivity-driven glow (`#tab-dashboard .card:not(#card-limit)` in `updateStatusBadge()`) — see the dedicated paragraph below for why.
+- Header separator dashes (`.hdr-sep`) are **not** status-driven — always plain gray (`var(--muted)`), changed 2026-06-22 after user feedback that a status-reactive header didn't fit the rest of the "calm chrome, lively data" concept.
+- Temp/Limit/daily-yield/Total values (`s-temp`/`s-limit`/`s-de`/`s-te`) follow the same cyan/pink `active` rule as the cards above.
+
+**Power Limit card — independent pending/confirmed coloring (2026-06-22):** Unlike every other dashboard element, the Power Limit card's color does **not** depend on WiFi/DTU/MQTT/inverter state at all. A power-limit setpoint is a command that can always be sent — `POST /api/dtu {powerLimit}` queues it in the `DataStore` unconditionally, and `taskDTU.cpp` forwards it as soon as the DTU is reachable, so the slider and "Set" button are never disabled. Instead, the card's border/glow, the slider thumb/fill, the `%` text, and the "Set" button itself all share one rule, computed purely from `powerLimitSet !== powerLimit`:
+- **Pink** — the value was sent (or is about to be) but not yet confirmed by the DTU's next `GetConfig` poll (`updateLimitGlow(true)`, set immediately on clicking "Set" for instant feedback, and again whenever `refreshData()`'s poll still shows a mismatch).
+- **Cyan** — `powerLimitSet === powerLimit`, i.e. confirmed.
+There is deliberately no frontend timeout that flips a stuck pending state to an error color — if the DTU never confirms, it stays pink indefinitely (the existing `powerLimitTimeout` safety auto-revert in `taskDTU.cpp`, §4a, is a separate, backend-only mechanism). A toast notification fires both when the user clicks "Set" (pink-bordered) and again the moment a previously-pending value gets confirmed (cyan-bordered, `_limitWasPending` transition tracked in `refreshData()`).
 
 **Browser tab title:** On every refresh with valid data, `document.title` is set to the current grid power, e.g. `"610 W — HMS-GW-S3"` — allows reading the current output even with a minimized/inactive browser tab (e.g. when overviewing multiple tabs).
 

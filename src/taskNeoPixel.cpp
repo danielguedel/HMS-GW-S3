@@ -3,13 +3,13 @@
 // setLedState() is only used for one-shot transients (LED_DATA_FLASH).
 //
 // Colour semantics:
-//   Weiss   → Neutral        (BOOT)
-//   Blau    → Wartend        (WIFI_CONNECTING, AP_MODE)
-//   Orange  → Teilausfall    (DTU_OFFLINE, DATA_FLASH)
-//   Cyan    → Nebenkanal     (NO_MQTT)
-//   Grün    → OK             (OPERATIONAL, STANDBY)
-//   Magenta → Systemvorgang  (OTA)
-//   Rot     → Kritisch       (ERROR, FACTORY_RESET)
+//   White   → Neutral            (BOOT)
+//   Blue    → Waiting            (WIFI_CONNECTING, AP_MODE)
+//   Orange  → Partial outage     (DTU_OFFLINE, DATA_FLASH)
+//   Cyan    → Secondary channel  (NO_MQTT)
+//   Green   → OK                 (OPERATIONAL, STANDBY)
+//   Magenta → System operation   (OTA)
+//   Red     → Critical           (ERROR, FACTORY_RESET)
 
 #include "taskLED.h"
 #include "dataStore.h"
@@ -196,37 +196,37 @@ void taskLED(void* pvParameters) {
         switch (_currentState) {
 
             case LED_BOOT:
-                // Weiss  -  1 Hz blink (fallback, boot sequence runs above)
+                // White  -  1 Hz blink (fallback, boot sequence runs above)
                 blinkOnce(COL_WHITE, 250, 250, _currentState);
                 break;
 
             case LED_WIFI_CONNECTING:
-                // Blau  -  1 Hz blink (ruhig, wartend)
+                // Blue  -  1 Hz blink (calm, waiting)
                 blinkOnce(COL_BLUE, 250, 250, _currentState);
                 break;
 
             case LED_AP_MODE:
-                // Blau  -  3× kurz + Pause (dringlicher: braucht Nutzeraktion)
+                // Blue  -  3x short + pause (more urgent: needs user action)
                 tripleBlink(COL_BLUE, _currentState);
                 break;
 
             case LED_DTU_OFFLINE:
-                // Orange  -  Doppelblink (Teilausfall)
+                // Orange  -  double blink (partial outage)
                 doubleBlink(COL_ORANGE, 150, 700, _currentState);
                 break;
 
             case LED_NO_MQTT:
-                // Cyan  -  langsamer Puls 4s (unkritisch, läuft weiter)
+                // Cyan  -  slow pulse 4s (non-critical, keeps running)
                 pulse(COL_CYAN, 4000, _currentState);
                 break;
 
             case LED_OPERATIONAL:
-                // Grün  -  Herzschlag 5s (alles gut, ruhig)
+                // Green  -  heartbeat 5s (all good, calm)
                 heartbeat(COL_GREEN, 5000, _currentState);
                 break;
 
             case LED_STANDBY:
-                // Grün  -  sehr langer Puls 10s, 10% Helligkeit (Nacht, kaum sichtbar)
+                // Green  -  very long pulse 10s, 10% brightness (night, barely visible)
                 pulse(COL_GREEN, 10000, _currentState,
                       (uint8_t)(appConfig.ledBrightness * 10 / 100 + 1));
                 break;
@@ -237,17 +237,17 @@ void taskLED(void* pvParameters) {
                 break;
 
             case LED_OTA:
-                // Magenta  -  schnell 5 Hz (Systemvorgang, unverwechselbar)
+                // Magenta  -  fast 5 Hz (system operation, unmistakable)
                 blinkOnce(COL_MAGENTA, 100, 100, _currentState);
                 break;
 
             case LED_ERROR:
-                // Rot  -  schnell 4 Hz (kritisch, dringend)
+                // Red  -  fast 4 Hz (critical, urgent)
                 blinkOnce(COL_RED, 125, 125, _currentState);
                 break;
 
             case LED_FACTORY_RESET:
-                // Rot  -  dauerhaft an (irreversibler Vorgang)
+                // Red  -  steady on (irreversible operation)
                 setColor(COL_RED);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 break;

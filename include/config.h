@@ -2,7 +2,7 @@
 
 // --- Firmware Version ---------------------------------------------------------
 #ifndef FW_VERSION
-  #define FW_VERSION "0.2.0"
+  #define FW_VERSION "0.3.1"
 #endif
 #ifndef FW_DATE
   #define FW_DATE __DATE__
@@ -47,7 +47,7 @@
 
 // --- DTU Defaults -------------------------------------------------------------
 #define DTU_DEFAULT_PORT        10081
-#define DTU_MIN_INTERVAL        31
+#define DTU_MIN_INTERVAL        1
 #define DTU_DEFAULT_INTERVAL    31
 #define DTU_CONNECT_TIMEOUT_MS  5000
 #define DTU_RESPONSE_TIMEOUT_MS 5000

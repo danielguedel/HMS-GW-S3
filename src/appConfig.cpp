@@ -67,7 +67,7 @@ void configSetDefaults() {
     appConfig.relay.pin      = RELAY_PIN;
     appConfig.relay.inverted = false;
 
-    // GPIO  -  IO1–IO3 (generisch, Default-Modus immer OUTPUT)
+    // GPIO  -  IO1–IO3 (generic, default mode always OUTPUT)
     appConfig.io[0].pin      = IO1_PIN;
     appConfig.io[0].mode     = IO_OUTPUT;
     strlcpy(appConfig.io[0].altFunction, "I2C_SDA", sizeof(appConfig.io[0].altFunction));
@@ -103,6 +103,9 @@ void configSetDefaults() {
     strlcpy(appConfig.webUser, "admin", sizeof(appConfig.webUser));
     strlcpy(appConfig.webPass, "",      sizeof(appConfig.webPass));
     appConfig.webPort = WEB_DEFAULT_PORT;
+
+    // Web GUI
+    strlcpy(appConfig.uiLang, "en", sizeof(appConfig.uiLang));
 }
 
 // Applies a parsed config JsonDocument onto appConfig, with the same
@@ -121,7 +124,7 @@ static void applyConfigJson(JsonDocument& doc) {
     if (!doc["wifiApFallback"].isNull())
         appConfig.wifiApFallback = doc["wifiApFallback"].as<bool>();
 
-    // WiFi  -  Static IP (nur uebernehmen wenn alle drei Felder gueltige IPs sind)
+    // WiFi  -  Static IP (only apply if all three fields contain valid IPs)
     if (!doc["useStaticIp"].isNull()) {
         const char* ip = doc["staticIp"].is<const char*>() ? doc["staticIp"].as<const char*>() : "";
         const char* sn = doc["subnet"].is<const char*>()   ? doc["subnet"].as<const char*>()   : "";
@@ -226,6 +229,10 @@ static void applyConfigJson(JsonDocument& doc) {
         LOG_W(MOD_CFG, "webAuthEnabled but no password set -  disabling auth");
         appConfig.webAuthEnabled = false;
     }
+
+    // Web GUI  -  defaults already set "en" above; only override for an explicit "de".
+    if (doc["uiLang"].is<const char*>() && strcmp(doc["uiLang"].as<const char*>(), "de") == 0)
+        strlcpy(appConfig.uiLang, "de", sizeof(appConfig.uiLang));
 }
 
 // Loads appConfig from CONFIG_FILE, recovering from a leftover /config.tmp (an interrupted configSave()) if the main file is missing; falls back to configSetDefaults() on any read/parse failure.
@@ -337,6 +344,8 @@ void configSave() {
     doc["webUser"]        = appConfig.webUser;
     doc["webPass"]        = appConfig.webPass;
     doc["webPort"]        = appConfig.webPort;
+
+    doc["uiLang"] = appConfig.uiLang;
 
     // Write to temp file first, then rename  -  protects against config corruption on reset
     static const char* TMP_FILE = "/config.tmp";

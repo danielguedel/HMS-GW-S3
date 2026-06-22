@@ -71,13 +71,13 @@ void taskWiFi(void* pvParameters) {
     LOG_I(MOD_WIFI, "Task started (Core %d)", xPortGetCoreID());
 
     for (;;) {
-        // -- AP-Modus aktiv: kein weiterer Reconnect-Versuch -------------------
+        // -- AP mode active: no further reconnect attempts -------------------
         if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE) {
             vTaskDelay(pdMS_TO_TICKS(MONITOR_INTERVAL_MS));
             continue;
         }
 
-        // -- STA-Verbindungsversuch ---------------------------------------------
+        // -- STA connection attempt ---------------------------------------------
         WiFi.mode(WIFI_STA);
         if (appConfig.useStaticIp) {
             IPAddress ip, gw, sn;
@@ -134,7 +134,7 @@ void taskWiFi(void* pvParameters) {
         uint32_t lastMonitorMs = 0;
         uint32_t lastNtpMs     = millis();
 
-        // -- Verbindungs-Monitor -----------------------------------------------
+        // -- Connection monitor -----------------------------------------------
         while (WiFi.status() == WL_CONNECTED) {
             vTaskDelay(pdMS_TO_TICKS(1000));
             uint32_t now = millis();
@@ -156,7 +156,7 @@ void taskWiFi(void* pvParameters) {
             }
         }
 
-        // -- Verbindung verloren -----------------------------------------------
+        // -- Connection lost -----------------------------------------------
         LOG_W(MOD_WIFI, "Connection lost");
         xEventGroupClearBits(systemStateEvents, EVT_WIFI_CONNECTED);
         updateSystemWifi(false, false);

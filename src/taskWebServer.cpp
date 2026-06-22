@@ -253,8 +253,25 @@ static void handleApiConfigGet(AsyncWebServerRequest* req) {
     doc["webUser"]        = appConfig.webUser;
     // webPass never sent back
     doc["webPort"]        = appConfig.webPort;
+    doc["uiLang"]         = appConfig.uiLang;
     String out; serializeJson(doc, out);
     req->send(200, "application/json", out);
+}
+
+// --- POST /api/config/lang  -  persist the dashboard display language only --
+// Purely cosmetic, never read by firmware logic, so unlike POST /api/config
+// this does NOT trigger a gateway reboot - it just saves and returns.
+static void handleApiConfigLang(AsyncWebServerRequest* req, uint8_t* data,
+                                 size_t len, size_t /*index*/, size_t /*total*/) {
+    JsonDocument doc;
+    if (deserializeJson(doc, (char*)data) != DeserializationError::Ok || !doc["lang"].is<const char*>()) {
+        req->send(400, "application/json", "{\"error\":\"invalid json\"}");
+        return;
+    }
+    strlcpy(appConfig.uiLang, (strcmp(doc["lang"].as<const char*>(), "de") == 0) ? "de" : "en",
+            sizeof(appConfig.uiLang));
+    configSave();
+    req->send(200, "application/json", "{\"ok\":true}");
 }
 
 // --- POST /api/config ---------------------------------------------------------
@@ -369,13 +386,31 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     req->send(200, "application/json", "{\"ok\":true,\"reboot\":true}");
 }
 
-// --- GET /api/config/backup  -  full config.json download (incl. passwords) --
+// --- GET /api/config/backup  -  config.json download, passwords redacted ----
+// Strips wifiPass/mqttPass/webPass before sending: this file is meant to be
+// downloaded and stored by the user, so it must not leak credentials in plain
+// text. Since applyConfigJson() resets to defaults (empty passwords) before
+// applying the uploaded keys, restoring from this backup clears WiFi/MQTT/web
+// passwords -  the user must re-enter them afterwards (see UI hint text).
 static void handleApiConfigBackup(AsyncWebServerRequest* req) {
-    if (!LittleFS.exists(CONFIG_FILE)) {
+    File f = LittleFS.open(CONFIG_FILE, "r");
+    if (!f) {
         req->send(404, "application/json", "{\"error\":\"no config saved yet\"}");
         return;
     }
-    req->send(LittleFS, CONFIG_FILE, "application/json", true);
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    if (err) {
+        req->send(500, "application/json", "{\"error\":\"config.json corrupt\"}");
+        return;
+    }
+    doc.remove("wifiPass");
+    doc.remove("mqttPass");
+    doc.remove("webPass");
+    String out;
+    serializeJson(doc, out);
+    req->send(200, "application/json", out);
 }
 
 // --- POST /api/config/restore  -  upload a previously downloaded backup -----
@@ -720,6 +755,8 @@ static void setupRoutes() {
     // or the broader handler intercepts them first.
     server->on("/api/config/backup",  HTTP_GET,  handleApiConfigBackup);
     server->on("/api/config/restore", HTTP_POST, handleApiConfigRestoreDone, handleApiConfigRestore);
+    server->on("/api/config/lang", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
+        [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiConfigLang(r,d,l,i,t); });
 
     server->on("/api/data.json", HTTP_GET, handleApiData);
     server->on("/api/info.json", HTTP_GET, handleApiInfo);

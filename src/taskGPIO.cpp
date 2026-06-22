@@ -65,7 +65,7 @@ void taskGPIO(void* pvParameters) {
                 if (appConfig.io[i].inverted) gpio.gpio[i] = !gpio.gpio[i];
                 break;
             case IO_RESERVED:
-                // Initialize as high-impedance input  -  siehe altFunction für vorgesehenen Zweck
+                // Initialize as high-impedance input  -  see altFunction for the intended purpose
                 pinMode(appConfig.io[i].pin, INPUT);
                 break;
             default:

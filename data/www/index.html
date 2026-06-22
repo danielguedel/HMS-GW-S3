@@ -10,7 +10,6 @@
   --bg:      #06060a; --surface: #0d0d16; --surface2: #11111c;
   --border:  #232336; --text: #e8e8f0;   --muted: #8a8aa0;
   --cyan:    #2bf0ff; --pink: #ff2bd6;   --purple: #b04bff;
-  --lime:    #c8ff2b; --orange: #ff9d2b;
   color-scheme: dark;
 }
 
@@ -31,16 +30,13 @@ header h1 a { color: #fff; text-decoration: none; display: flex; align-items: ce
 header h1 svg { height: 26px; width: auto; flex-shrink: 0; }
 .hdr-info  { display: flex; align-items: center; gap: 8px; font-size: 12px;
              color: var(--muted); flex-wrap: wrap; }
-.hdr-sep   { color: var(--cyan); text-shadow: 0 0 6px var(--cyan); }
-.hdr-sep.warn  { color: var(--orange); text-shadow: 0 0 6px var(--orange); }
-.hdr-sep.muted { color: var(--muted); text-shadow: none; }
+.hdr-sep   { color: var(--muted); }
 .hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .dots { display: flex; align-items: center; gap: 14px; }
 .dot-wrap   { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
-.dot.ok   { background: var(--cyan);   box-shadow: 0 0 6px var(--cyan),   0 0 14px var(--cyan); }
-.dot.warn { background: var(--orange); box-shadow: 0 0 6px var(--orange), 0 0 14px var(--orange); }
-.dot.err  { background: var(--pink);   box-shadow: 0 0 6px var(--pink),   0 0 14px var(--pink); }
+.dot.ok   { background: var(--cyan); box-shadow: 0 0 6px var(--cyan), 0 0 14px var(--cyan); }
+.dot.err  { background: var(--pink); box-shadow: 0 0 6px var(--pink), 0 0 14px var(--pink); }
 .icon-btn { background: transparent; border: 1px solid var(--border); cursor: pointer; font-size: 11px;
             font-weight: 700; letter-spacing: .5px; color: var(--muted); padding: 3px 10px; border-radius: 999px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -55,7 +51,7 @@ nav button { background: none; border: none; color: var(--muted);
              line-height: 1.2; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 nav button.active { color: var(--cyan); border-bottom-color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
-nav button:hover  { color: var(--text); }
+nav button:hover  { color: var(--cyan); text-shadow: 0 0 6px var(--cyan); }
 
 /* ── Tab content ─────────────────────────────────────────────────────────── */
 .tab { display: none; padding: 24px 20px; max-width: 960px; margin: 0 auto; }
@@ -75,22 +71,19 @@ nav button:hover  { color: var(--text); }
 }
 .card:hover { transform: translateY(-2px); box-shadow: 0 0 24px -6px var(--glow, var(--cyan)); }
 .card.grid-p { --glow: var(--cyan); }
-.card.pv0    { --glow: var(--pink); }
-.card.pv1    { --glow: var(--purple); }
 .card-title { font-size: 11px; font-weight: 700; color: var(--muted);
               text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
 .card-val   { font-size: 30px; font-weight: 700; color: var(--glow, var(--cyan));
               text-shadow: 0 0 10px var(--glow, var(--cyan)); line-height: 1; }
-.card-val.warn  { color: var(--orange); text-shadow: 0 0 10px var(--orange); }
-.card-val.muted { color: var(--muted); text-shadow: none; }
+.card-val.err   { color: var(--pink); text-shadow: 0 0 10px var(--pink); }
 .card-unit  { font-size: 13px; color: var(--muted); margin-left: 3px; }
 .card-sub   { font-size: 11px; color: var(--muted); margin-top: 8px; }
 .bar-wrap   { background: var(--surface2); border-radius: 3px; height: 5px;
               margin-top: 10px; overflow: visible; }
 .bar { height: 100%; border-radius: 3px; background: var(--glow, var(--cyan));
        box-shadow: 0 0 8px var(--glow, var(--cyan)); transition: width .5s; width: 0; }
-.bar.warn  { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
-.bar.muted { background: var(--muted); box-shadow: none; }
+.bar.err     { background: var(--pink);   box-shadow: 0 0 8px var(--pink); }
+.bar.pending { background: var(--pink); box-shadow: 0 0 8px var(--pink); }
 
 /* ── Section title ───────────────────────────────────────────────────────── */
 .sec { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
@@ -104,6 +97,7 @@ nav button:hover  { color: var(--text); }
 .gpio-card:hover { transform: translateY(-2px); box-shadow: 0 0 24px -8px var(--cyan); }
 .gpio-name { font-size: 11px; font-weight: 700; color: var(--muted);
              text-transform: uppercase; letter-spacing: 1.5px; text-align: center; }
+.gpio-card .badge { text-transform: uppercase; }
 .toggle { position: relative; width: 46px; height: 25px; }
 .toggle input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border);
@@ -115,12 +109,10 @@ input:checked + .slider::before       { transform: translateX(21px); background:
 input:disabled + .slider              { opacity: .4; cursor: default; }
 .badge { font-size: 11px; font-weight: 700; letter-spacing: .5px; }
 .badge-lg { font-size: 18px; font-weight: 800; }
-.b-ok   { color: var(--cyan);   text-shadow: 0 0 8px var(--cyan); }
+.b-ok   { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
 .b-off  { color: var(--muted); }
-.b-err  { color: var(--pink);   text-shadow: 0 0 8px var(--pink); }
-.b-warn { color: var(--orange); text-shadow: 0 0 8px var(--orange); }
-.badge-lg.b-ok   { color: var(--lime); text-shadow: 0 0 10px var(--lime); }
-.badge-lg.b-warn { text-shadow: 0 0 10px var(--orange); }
+.b-err  { color: var(--pink); text-shadow: 0 0 8px var(--pink); }
+.badge-lg.b-ok   { color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
 .badge-lg.b-off  { text-shadow: none; }
 .badge-lg.b-err  { text-shadow: 0 0 10px var(--pink); }
 
@@ -137,11 +129,12 @@ label > span:first-child { display: block; white-space: nowrap; overflow: hidden
 input[type=text], input[type=number], input[type=password], select {
   background: var(--surface2); border: 1px solid var(--border); color: var(--purple);
   border-radius: 8px; padding: 9px 12px; width: 100%; font-size: 13px; margin-top: 6px; font: inherit; }
+input::placeholder { color: var(--muted); opacity: 1; }
 input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(43,240,255,.2); }
 .cfg-box input:focus, .cfg-box select:focus { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(176,75,255,.25); }
 .chk-row { display: flex; flex-wrap: wrap; gap: 18px; margin: 12px 0; }
 .cfg-box h3 + .chk-row { margin-top: 0; }
-.chk-row label { display: flex; align-items: center; gap: 8px; margin-top: 0; font-weight: 600; cursor: pointer; }
+.chk-row label { display: flex; align-items: center; gap: 8px; margin-top: 0; cursor: pointer; }
 .chk-row input[type=checkbox] {
   appearance: none; -webkit-appearance: none;
   width: 17px; height: 17px; flex-shrink: 0;
@@ -174,8 +167,6 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
 .btn-muted:hover, .btn-muted.text-ok:hover {
   background: rgba(43,240,255,.08); box-shadow: 0 0 16px -2px var(--cyan), 0 0 40px -10px var(--cyan);
 }
-.btn-muted.text-warn    { color: var(--orange); border-color: var(--orange); box-shadow: 0 0 8px -2px var(--orange); }
-.btn-muted.text-warn:hover   { background: rgba(255,157,43,.08); box-shadow: 0 0 16px -2px var(--orange), 0 0 40px -10px var(--orange); }
 .btn-muted.text-danger  { color: var(--pink);   border-color: var(--pink); box-shadow: 0 0 8px -2px var(--pink); }
 .btn-muted.text-danger:hover { background: rgba(255,43,214,.08); box-shadow: 0 0 16px -2px var(--pink),   0 0 40px -10px var(--pink); }
 
@@ -188,14 +179,14 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
 .flex-row    { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .range-val   { color: var(--cyan); font-weight: 700; text-shadow: 0 0 8px var(--cyan); }
-.range-val.warn { color: var(--orange); text-shadow: 0 0 8px var(--orange); }
+.range-val.pending { color: var(--pink); text-shadow: 0 0 8px var(--pink); }
 .hint        { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
 .hint-trailing { margin-top: 12px; margin-bottom: 0; }
 .hidden-input { display: none; }
 .file-lbl    { color: var(--muted); font-size: 12px; flex: 1; }
 
 /* ── Range slider (custom glow track, reuses .bar-wrap/.bar) ────────────────── */
-.range-wrap { position: relative; height: 18px; margin: 10px 0; }
+.range-wrap { position: relative; height: 18px; margin: 10px 0; --glow: var(--cyan); }
 .range-wrap .bar-wrap { position: absolute; top: 50%; left: 0; right: 0; margin: 0; transform: translateY(-50%); }
 .range-wrap input[type=range] {
   position: absolute; inset: 0; width: 100%; margin: 0;
@@ -219,8 +210,8 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
   width: 16px; height: 16px; border-radius: 50%; border: none; background: var(--cyan); cursor: pointer;
   box-shadow: 0 0 8px var(--cyan), 0 0 16px var(--cyan);
 }
-.range-wrap input[type=range].warn::-webkit-slider-thumb { background: var(--orange); box-shadow: 0 0 8px var(--orange), 0 0 16px var(--orange); }
-.range-wrap input[type=range].warn::-moz-range-thumb { background: var(--orange); box-shadow: 0 0 8px var(--orange), 0 0 16px var(--orange); }
+.range-wrap input[type=range].pending::-webkit-slider-thumb { background: var(--pink); box-shadow: 0 0 8px var(--pink), 0 0 16px var(--pink); }
+.range-wrap input[type=range].pending::-moz-range-thumb { background: var(--pink); box-shadow: 0 0 8px var(--pink), 0 0 16px var(--pink); }
 
 /* ── Stat table ──────────────────────────────────────────────────────────── */
 .stat-row { display: flex; justify-content: space-between; padding: 6px 0;
@@ -234,7 +225,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
 .ota-status   { font-size: 11px; color: var(--muted); margin-top: 6px; }
 
 /* ── Internet Update card ────────────────────────────────────────────────── */
-.ota-avail { border-color: var(--orange) !important; box-shadow: 0 0 24px -8px var(--orange); }
+.ota-avail { border-color: var(--purple) !important; box-shadow: 0 0 24px -8px var(--purple); }
 .ota-info  { font-size: 12px; color: var(--muted); margin-bottom: 12px; min-height: 18px; }
 
 /* ── Toast ───────────────────────────────────────────────────────────────── */
@@ -324,7 +315,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
 
   <!-- Power cards -->
   <div class="grid">
-    <div class="card grid-p">
+    <div class="card grid-p" id="card-grid">
       <div class="card-title">Grid</div>
       <div><span class="card-val" id="grid-p">–</span><span class="card-unit">W</span></div>
       <div class="bar-wrap"><div class="bar" id="bar-grid"></div></div>
@@ -350,7 +341,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
     <div class="sec" data-i18n="secStatus">Status</div>
     <div id="s-active"><span class="badge badge-lg b-off">–</span></div>
   </div>
-  <div class="card">
+  <div class="card" id="card-limit">
     <div class="sec" data-i18n="secPowerLimit">Power Limit</div>
     <div class="range-wrap">
       <div class="bar-wrap"><div class="bar" id="bar-limit" style="width:100%"></div></div>
@@ -358,7 +349,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
     </div>
     <div class="flex-between">
       <span id="range-val" class="range-val">100%</span>
-      <button class="btn btn-muted text-ok" onclick="setLimit()" data-i18n="btnSet">Set</button>
+      <button class="btn btn-muted text-ok" id="btn-limit-set" onclick="setLimit()" data-i18n="btnSet">Set</button>
     </div>
   </div>
   </div>
@@ -430,7 +421,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
       <label><span data-i18n="lblPort">Port</span><input type="number" id="c-dtu-port"></label>
     </div>
     <div class="row2">
-      <label><span data-i18n="lblPollInterval">Poll interval (s, min 31)</span><input type="number" id="c-dtu-iv" min="31"></label>
+      <label><span data-i18n="lblPollInterval">Poll interval (s, min 1)</span><input type="number" id="c-dtu-iv" min="1"></label>
       <label><span data-i18n="lblCloudPause">Cloud pause (s)</span><input type="number" id="c-dtu-cp" min="0"></label>
     </div>
     <label><span data-i18n="lblRebootAfterFails">Reboot after fails</span><input type="number" id="c-dtu-rf" min="0"></label>
@@ -443,7 +434,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
     </div>
     <div class="row2">
       <label><span data-i18n="lblUsername">Username</span><input type="text" id="c-mqtt-user"></label>
-      <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-mqtt-pass" data-i18n-ph="phUnchangedShort" placeholder="(unchanged)"></label>
+      <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-mqtt-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
     </div>
     <label><span data-i18n="lblTopic">Topic</span><input type="text" id="c-mqtt-topic"></label>
     <div class="chk-row">
@@ -567,7 +558,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
     <h3 data-i18n="hDangerZone">Danger Zone</h3>
     <div class="dz-row">
       <p data-i18n="lblRebootDevice">The device will restart. Current configuration is preserved.</p>
-      <button class="btn btn-muted text-warn" onclick="doReboot()" data-i18n="btnRebootGw">Reboot</button>
+      <button class="btn btn-muted text-ok" onclick="doReboot()" data-i18n="btnRebootGw">Reboot</button>
     </div>
     <div class="dz-row">
       <p data-i18n="lblFactoryResetRow">Current configuration will be erased. The device restarts with factory settings.</p>
@@ -607,21 +598,21 @@ const I18N = {
     lblSsid: 'SSID', lblPassword: 'Password', lblApFallback: 'AP fallback if no STA',
     lblStaticIp: 'Static IP address (instead of DHCP)', lblIpAddress: 'IP Address', lblSubnet: 'Subnet Mask',
     lblGateway: 'Gateway (also used as DNS)', lblHostIp: 'Host / IP', lblPort: 'Port',
-    lblPollInterval: 'Poll interval (s, min 31)', lblCloudPause: 'Cloud pause (s)',
+    lblPollInterval: 'Poll interval (s, min 1)', lblCloudPause: 'Cloud pause (s)',
     lblRebootAfterFails: 'Reboot after fails', lblBrokerHost: 'Broker Host', lblUsername: 'Username',
     lblTopic: 'Topic', lblHaDiscovery: 'HA Auto-Discovery', lblOpenDtu: 'OpenDTU mode', lblRetain: 'Retain',
     lblDefaultLimit: 'Default limit (%)', lblPlimTimeout: 'Timeout (s, 0=disabled)',
     lblNtpServer: 'NTP Server', lblTzOffset: 'Timezone Offset (s)', lblWebAuth: 'Username/password protection',
     lblLedBrightness: 'LED Brightness (0–255)', lblLogLevel: 'Log Level',
     lblManifestUrl: 'Manifest URL (empty = disabled)',
-    phUnchanged: '(leave unchanged)', phUnchangedShort: '(unchanged)',
+    phUnchanged: '(leave unchanged)',
     pWebServerHint: 'Port and auth changes only take effect after the automatic restart. With protection enabled, the browser will prompt for credentials on the next request.',
     btnReset: 'Reset', btnSave: 'Save',
     pFirmwareOta: 'Upload a compiled .bin file. Gateway restarts after a successful update.',
     pFilesystemOta: 'Upload a LittleFS .bin (data/www).',
     btnFlash: 'Flash', otaUploading: 'Uploading…',
     btnCheck: 'Check', btnInstallNow: 'Install now',
-    pBackupHint: 'Backup contains all settings incl. WiFi/MQTT/web passwords in plain text — keep the file safe.',
+    pBackupHint: 'Backup contains all settings except WiFi/MQTT/web passwords (re-enter them after a restore).',
     btnDownloadBackup: 'Download backup', btnRestore: 'Restore',
     btnRebootGw: 'Reboot', btnFactoryReset: 'Factory reset', hDangerZone: 'Danger Zone',
     lblRebootDevice: 'The device will restart. Current configuration is preserved.',
@@ -659,21 +650,21 @@ const I18N = {
     lblSsid: 'SSID', lblPassword: 'Passwort', lblApFallback: 'AP-Fallback wenn kein STA',
     lblStaticIp: 'Feste IP-Adresse (statt DHCP)', lblIpAddress: 'IP-Adresse', lblSubnet: 'Subnetzmaske',
     lblGateway: 'Gateway (wird auch als DNS verwendet)', lblHostIp: 'Host / IP', lblPort: 'Port',
-    lblPollInterval: 'Poll-Intervall (s, min 31)', lblCloudPause: 'Cloud-Pause (s)',
+    lblPollInterval: 'Poll-Intervall (s, min 1)', lblCloudPause: 'Cloud-Pause (s)',
     lblRebootAfterFails: 'Reboot nach Fails', lblBrokerHost: 'Broker Host', lblUsername: 'Benutzername',
     lblTopic: 'Topic', lblHaDiscovery: 'HA Auto-Discovery', lblOpenDtu: 'OpenDTU-Modus', lblRetain: 'Retain',
     lblDefaultLimit: 'Standard-Limit (%)', lblPlimTimeout: 'Timeout (s, 0=deaktiviert)',
     lblNtpServer: 'NTP Server', lblTzOffset: 'Zeitzone-Offset (s)', lblWebAuth: 'Benutzername/Passwort-Schutz',
     lblLedBrightness: 'LED Helligkeit (0–255)', lblLogLevel: 'Log-Level',
     lblManifestUrl: 'Manifest URL (leer = deaktiviert)',
-    phUnchanged: '(unverändert lassen)', phUnchangedShort: '(unverändert)',
+    phUnchanged: '(unverändert lassen)',
     pWebServerHint: 'Port- und Auth-Änderungen werden erst nach dem automatischen Neustart aktiv. Bei aktivem Schutz fragt der Browser beim nächsten Zugriff nach den Zugangsdaten.',
     btnReset: 'Zurücksetzen', btnSave: 'Speichern',
     pFirmwareOta: 'Kompilierte .bin-Datei hochladen. Gateway startet nach erfolgreichem Update neu.',
     pFilesystemOta: 'LittleFS .bin (data/www) hochladen.',
     btnFlash: 'Flash', otaUploading: 'Hochladen…',
     btnCheck: 'Prüfen', btnInstallNow: 'Jetzt installieren',
-    pBackupHint: 'Backup enthält alle Einstellungen inkl. WLAN-/MQTT-/Web-Passwörter im Klartext — Datei sicher aufbewahren.',
+    pBackupHint: 'Backup enthält alle Einstellungen ausser WLAN-/MQTT-/Web-Passwörter (nach einer Wiederherstellung erneut eingeben).',
     btnDownloadBackup: 'Backup herunterladen', btnRestore: 'Wiederherstellen',
     btnRebootGw: 'Neustart', btnFactoryReset: 'Werkseinstellungen', hDangerZone: 'Gefahrenzone',
     lblRebootDevice: 'Das Gerät wird neu gestartet. Die aktuelle Konfiguration bleibt erhalten.',
@@ -702,7 +693,9 @@ const I18N = {
   },
 };
 
-function currentLang() { return localStorage.getItem('lang') || 'en'; }
+// Persisted on the device (appConfig.uiLang), not per-browser -  default "en" until /api/config responds.
+let _uiLang = 'en';
+function currentLang() { return _uiLang; }
 function tr(key, ...args) {
   const dict = I18N[currentLang()] || I18N.en;
   const v = dict[key] ?? I18N.en[key] ?? key;
@@ -715,14 +708,22 @@ function applyI18n() {
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
 }
 
-function initLang() {
-  $('lang-btn').textContent = currentLang() === 'en' ? 'DE' : 'EN';
+async function loadLang() {
+  try {
+    const d = await fetch('/api/config').then(r => r.json());
+    _uiLang = (d.uiLang === 'de') ? 'de' : 'en';
+  } catch (e) { /* keep default "en" */ }
+  $('lang-btn').textContent = _uiLang === 'en' ? 'DE' : 'EN';
   applyI18n();
 }
 
-function toggleLang() {
-  const next = currentLang() === 'en' ? 'de' : 'en';
-  localStorage.setItem('lang', next);
+async function toggleLang() {
+  const next = _uiLang === 'en' ? 'de' : 'en';
+  try {
+    await fetch('/api/config/lang', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                       body: JSON.stringify({ lang: next }) });
+  } catch (e) { /* best effort -  UI still switches below */ }
+  _uiLang = next;
   $('lang-btn').textContent = next === 'en' ? 'DE' : 'EN';
   applyI18n();
   // Re-render anything currently showing dynamically-built/translated text
@@ -761,18 +762,43 @@ function setDot(id, ok) {
 }
 
 // ─── Dashboard data ───────────────────────────────────────────────────────
-// ─── Combined status badge (DTU online/offline + inverter active/standby) ──
-let _dtuOnline = null, _invActive = null;
+// Grid-card border/glow scales with power draw rather than a fixed color.
+function gridGlow(p) {
+  if (p < 200) return 'var(--cyan)';
+  if (p < 400) return 'var(--purple)';
+  return 'var(--pink)';
+}
+
+// ─── Combined status badge (WiFi/DTU/MQTT connectivity + inverter active/standby) ──
+let _dtuOnline = null, _invActive = null, _gridP = 0, _wifiOnline = null, _mqttOnline = null, _limitWasPending = false;
 function updateStatusBadge() {
-  let cls, bcls, key;
-  if (_dtuOnline === false)      { cls = 'warn';  bcls = 'b-warn'; key = 'statOffline'; }
-  else if (_invActive === true)  { cls = '';      bcls = 'b-ok';   key = 'statActive'; }
-  else if (_invActive === false) { cls = 'muted'; bcls = 'b-off';  key = 'statStandby'; }
-  else                            { cls = 'muted'; bcls = 'b-off';  key = 'statNoData'; }
+  const connected = _wifiOnline !== false && _dtuOnline !== false && _mqttOnline !== false;
+  const active = connected && _invActive === true;
+  let key;
+  if (!connected)                key = 'statOffline';
+  else if (_invActive === true)  key = 'statActive';
+  else if (_invActive === false) key = 'statStandby';
+  else                            key = 'statNoData';
+  const bcls = active ? 'b-ok' : 'b-err';
   $('s-active').innerHTML = '<span class="badge badge-lg ' + bcls + '">' + tr(key) + '</span>';
-  document.querySelectorAll('.hdr-sep').forEach(el => el.className = 'hdr-sep ' + cls);
+  const cls = active ? '' : 'err';
   ['grid-p', 'pv0-p', 'pv1-p', 's-temp', 's-limit', 's-de', 's-te'].forEach(id => $(id).className = 'card-val ' + cls);
   ['bar-grid', 'bar-pv0', 'bar-pv1'].forEach(id => $(id).className = 'bar ' + cls);
+
+  // Card border/glow: cyan while active, pink for standby/no-data/offline; Grid is additionally power-tiered while active.
+  // Power Limit is excluded here -  it's a setpoint that can always be sent regardless of connectivity,
+  // so its glow tracks pending/confirmed instead (see updateLimitGlow()).
+  const statusGlow = active ? 'var(--cyan)' : 'var(--pink)';
+  document.querySelectorAll('#tab-dashboard .card:not(#card-limit)').forEach(c => c.style.setProperty('--glow', statusGlow));
+  $('card-grid').style.setProperty('--glow', active ? gridGlow(_gridP) : 'var(--pink)');
+}
+
+// Power Limit card glow: pink while the sent setpoint hasn't been confirmed by the DTU yet, cyan once it has -
+// independent of WiFi/DTU/MQTT connectivity, since the command is queued and sent whenever the DTU is reachable.
+function updateLimitGlow(pending) {
+  $('card-limit').style.setProperty('--glow', pending ? 'var(--pink)' : 'var(--cyan)');
+  $('btn-limit-set').classList.toggle('text-danger', pending);
+  $('btn-limit-set').classList.toggle('text-ok', !pending);
 }
 
 async function refreshData() {
@@ -788,6 +814,7 @@ async function refreshData() {
     txt('grid-p',  d.grid.p.toFixed(0));
     txt('grid-ui', d.grid.v.toFixed(1) + ' V / ' + d.grid.i.toFixed(2) + ' A');
     $('bar-grid').style.width = pct(d.grid.p, 900);
+    _gridP = d.grid.p;
 
     txt('pv0-p',  d.pv0.p.toFixed(0));
     txt('pv0-ui', d.pv0.v.toFixed(1) + ' V / ' + d.pv0.i.toFixed(2) + ' A');
@@ -811,9 +838,12 @@ async function refreshData() {
       lr.value = target;
       txt('range-val', target + '%');
       $('bar-limit').style.width = rangePct(target);
-      $('range-val').classList.toggle('warn', pending);
-      lr.classList.toggle('warn', pending);
-      $('bar-limit').classList.toggle('warn', pending);
+      $('range-val').classList.toggle('pending', pending);
+      lr.classList.toggle('pending', pending);
+      $('bar-limit').classList.toggle('pending', pending);
+      updateLimitGlow(pending);
+      if (_limitWasPending && !pending) toast('Limit → ' + target + '%');
+      _limitWasPending = pending;
     }
   } catch (e) { /* silent — shown by dot color */ }
 }
@@ -827,11 +857,15 @@ async function refreshInfo() {
     setDot('d-mqtt', d.mqtt);
     txt('hi-mac', d.mac);
     txt('hi-fw',  tr('fmtFirmware', d.fw, d.build));
+    _wifiOnline = d.wifi;
     _dtuOnline = d.dtu;
+    _mqttOnline = d.mqtt;
     updateStatusBadge();
   } catch (e) {
     setDot('d-wifi', false); setDot('d-dtu', false); setDot('d-mqtt', false);
+    _wifiOnline = false;
     _dtuOnline = false;
+    _mqttOnline = false;
     updateStatusBadge();
   }
 }
@@ -868,13 +902,14 @@ async function refreshGpio() {
   } catch (e) {}
 }
 
+const gpioLabelKey = { relay: 'lblRelay', io1: 'lblIo1', io2: 'lblIo2', io3: 'lblIo3' };
 async function setGpio(key, state) {
   const body = {}; body[key] = state ? 1 : 0;
   try {
     await fetch('/api/gpio', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                body: JSON.stringify(body) });
     applyGpio(key, state);
-    toast(key + ' → ' + (state ? tr('lblOn') : tr('lblOff')));
+    toast(tr(gpioLabelKey[key]).toUpperCase() + ' → ' + (state ? tr('lblOn') : tr('lblOff')));
   } catch (e) { toast(tr('errGeneric'), false); }
 }
 
@@ -886,10 +921,11 @@ async function setLimit() {
                               body: JSON.stringify({ powerLimit: val }) });
     txt('range-val', val + '%');
     $('bar-limit').style.width = rangePct(val);
-    $('range-val').classList.add('warn');
-    $('limit-range').classList.add('warn');
-    $('bar-limit').classList.add('warn');
-    toast('Limit → ' + val + '%');
+    $('range-val').classList.add('pending');
+    $('limit-range').classList.add('pending');
+    $('bar-limit').classList.add('pending');
+    updateLimitGlow(true);
+    toast('Limit → ' + val + '%', false);
   } catch (e) { toast(tr('errGeneric'), false); }
 }
 
@@ -1178,7 +1214,7 @@ async function doFactory() {
 }
 
 // ─── Init / Polling ────────────────────────────────────────────────────────
-initLang();
+loadLang();
 tickClock();
 refreshData();
 refreshInfo();

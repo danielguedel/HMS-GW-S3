@@ -74,6 +74,9 @@ struct AppConfig {
     char     webUser[33];       // username, default: "admin"
     char     webPass[65];       // password
     uint16_t webPort;           // web GUI port, default: 80
+
+    // Web GUI  -  purely cosmetic, never read by firmware logic
+    char uiLang[3];             // dashboard display language, "en" or "de", default: "en"
 };
 
 extern AppConfig appConfig;
