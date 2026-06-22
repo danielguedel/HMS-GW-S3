@@ -1,9 +1,9 @@
 {
-  "version": "0.3.0",
-  "buildNumber": 300,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-300/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-300/littlefs.bin",
-  "md5": "f69c0e08431bb5d85fb5816d9df8bb93",
-  "fs_md5": "2271a5fb314a4136b9c3d0532f6cb096",
-  "notes": "Web-GUI im Neon-Flow-Dark-Glow-Design neu gestaltet: neue Farbpalette mit klarer Bedeutung pro Farbe, durchgaengiger Glow-Effekt, neues SVG-Logo, ueberarbeitete Buttons/Badges/Checkboxen. Light/Dark-Theme-Umschalter entfernt (Neon-Look ist bewusst dark-only)."
+  "version": "0.3.1",
+  "buildNumber": 320,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-320/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-320/littlefs.bin",
+  "md5": "72fc8735b3483fbf77f4d0e46db6b521",
+  "fs_md5": "c486d4fec7334099d12d6b5011e0e303",
+  "notes": "Dashboard-Statusfarben vereinheitlicht (Cyan/Pink), Power-Limit-Karte faerbt sich unabhaengig vom Verbindungsstatus nach Pending/Bestaetigt, Passwoerter aus Config-Backup entfernt, UI-Sprache jetzt geraeteseitig gespeichert, DTU-Poll-Minimum auf 1s gesenkt, FW_VERSION-Mismatch behoben."
 }
