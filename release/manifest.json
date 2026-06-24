@@ -1,9 +1,9 @@
 {
-  "version": "0.3.1",
-  "buildNumber": 320,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-320/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-320/littlefs.bin",
-  "md5": "72fc8735b3483fbf77f4d0e46db6b521",
-  "fs_md5": "c486d4fec7334099d12d6b5011e0e303",
-  "notes": "Dashboard-Statusfarben vereinheitlicht (Cyan/Pink), Power-Limit-Karte faerbt sich unabhaengig vom Verbindungsstatus nach Pending/Bestaetigt, Passwoerter aus Config-Backup entfernt, UI-Sprache jetzt geraeteseitig gespeichert, DTU-Poll-Minimum auf 1s gesenkt, FW_VERSION-Mismatch behoben."
+  "version": "0.3.2",
+  "buildNumber": 324,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-324/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-324/littlefs.bin",
+  "md5": "e43067e3ed435b3c8cd7451123cb9fff",
+  "fs_md5": "eabd7c5bcb35402eb9e2e3e6a7574043",
+  "notes": "Grid-Leistungsstufen-Schwellenwerte angepasst: Cyan < 250 W, Violett < 500 W, Pink >= 500 W (vorher 200/400 W)."
 }
