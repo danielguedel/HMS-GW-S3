@@ -764,8 +764,8 @@ function setDot(id, ok) {
 // ─── Dashboard data ───────────────────────────────────────────────────────
 // Grid-card border/glow scales with power draw rather than a fixed color.
 function gridGlow(p) {
-  if (p < 200) return 'var(--cyan)';
-  if (p < 400) return 'var(--purple)';
+  if (p < 250) return 'var(--cyan)';
+  if (p < 500) return 'var(--purple)';
   return 'var(--pink)';
 }
 

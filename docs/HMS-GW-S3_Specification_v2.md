@@ -676,7 +676,7 @@ The cards are updated every 10s via `GET /api/data.json` (`pv0`/`pv1`/`grid` →
 
 Only **Active** is cyan; the other three labels are textually distinct (so the user still knows *why* it isn't active) but render in the same pink, per the two-color simplification in §9.1. The status renders as plain glowing text (`.badge-lg` with a `.b-ok`/`.b-err` color class) — no pill background, no dot indicator; pill shapes are reserved for buttons. The same `active` boolean additionally drives, via `--glow` on each `.card`:
 - Grid/PV1/PV2/Temp/Limit/Yield/Total card borders and `.card-val`/`.bar` text+fill colors — cyan when active, pink otherwise. PV1 and PV2 no longer have a distinct color from Grid (removed 2026-06-22); all three default to cyan when active.
-- The **Grid** card is additionally power-tiered while active — `gridGlow(p)`: cyan below 200 W, violet 200–400 W, pink above 400 W (text/border/bar all follow this tier instead of the plain "active" cyan).
+- The **Grid** card is additionally power-tiered while active — `gridGlow(p)`: cyan below 250 W, violet 250–500 W, pink at/above 500 W (text/border/bar all follow this tier instead of the plain "active" cyan).
 - The **Power Limit** card is explicitly *excluded* from this connectivity-driven glow (`#tab-dashboard .card:not(#card-limit)` in `updateStatusBadge()`) — see the dedicated paragraph below for why.
 - Header separator dashes (`.hdr-sep`) are **not** status-driven — always plain gray (`var(--muted)`), changed 2026-06-22 after user feedback that a status-reactive header didn't fit the rest of the "calm chrome, lively data" concept.
 - Temp/Limit/daily-yield/Total values (`s-temp`/`s-limit`/`s-de`/`s-te`) follow the same cyan/pink `active` rule as the cards above.
