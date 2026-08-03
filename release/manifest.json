@@ -1,9 +1,9 @@
 {
-  "version": "0.3.2",
-  "buildNumber": 324,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-324/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-324/littlefs.bin",
-  "md5": "e43067e3ed435b3c8cd7451123cb9fff",
-  "fs_md5": "eabd7c5bcb35402eb9e2e3e6a7574043",
-  "notes": "Grid-Leistungsstufen-Schwellenwerte angepasst: Cyan < 250 W, Violett < 500 W, Pink >= 500 W (vorher 200/400 W)."
+  "version": "0.3.3",
+  "buildNumber": 325,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-325/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-325/littlefs.bin",
+  "md5": "0ff6b4c4efcd7f23e3d21c2a3f28b079",
+  "fs_md5": "ef4b5330be06a4d81a1fd5b85bfb9152",
+  "notes": "Added setup script for Cloud MQTT broker (Mosquitto/Docker/TLS)"
 }
