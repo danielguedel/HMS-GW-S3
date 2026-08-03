@@ -1,9 +1,9 @@
 {
-  "version": "0.3.3",
-  "buildNumber": 325,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-325/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-325/littlefs.bin",
-  "md5": "0ff6b4c4efcd7f23e3d21c2a3f28b079",
-  "fs_md5": "ef4b5330be06a4d81a1fd5b85bfb9152",
-  "notes": "Added setup script for Cloud MQTT broker (Mosquitto/Docker/TLS)"
+  "version": "0.3.4",
+  "buildNumber": 326,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-326/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-326/littlefs.bin",
+  "md5": "d446b97ba0113131adc3cbd4e610ecc5",
+  "fs_md5": "717babf10a1b98f62f0c5056a512e807",
+  "notes": "FW_VERSION display corrected"
 }
