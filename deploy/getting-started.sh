@@ -143,6 +143,9 @@ persistence_location /mosquitto/data/
 log_dest file /mosquitto/log/mosquitto.log
 EOF
 
+# mosquitto_passwd -c refuses to overwrite an existing file (O_CREAT|O_EXCL), so drop
+# it first - this script always (re)creates a fresh single-user password file.
+rm -f mosquitto/config/passwd
 docker run --rm -v "${INSTALL_DIR}/mosquitto/config:/mosquitto/config" \
   eclipse-mosquitto:2 mosquitto_passwd -b -c /mosquitto/config/passwd "${MQTT_USER}" "${MQTT_PASSWORD}"
 
