@@ -33,6 +33,11 @@ jobs:
       - name: Install PlatformIO
         run: pip install platformio
 
+      - name: Set FW_VERSION / FW_DATE in platformio.ini
+        run: |
+          sed -i "s/-D FW_VERSION='\"[^\"]*\"'/-D FW_VERSION='\"${{ github.event.inputs.version }}\"'/" platformio.ini
+          sed -i "s/-D FW_DATE='\"[^\"]*\"'/-D FW_DATE='\"$(date -u +%F)\"'/" platformio.ini
+
       - name: Build firmware
         run: pio run -e esp32-s3-devkitc-1
 
@@ -83,7 +88,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add release/manifest.json include/buildnumber.txt
+          git add release/manifest.json include/buildnumber.txt platformio.ini
           git commit -m "release: v${{ steps.meta.outputs.version }} build ${{ steps.meta.outputs.build }}" || echo "nothing to commit"
           git pull --rebase origin main
           git push origin HEAD:main
