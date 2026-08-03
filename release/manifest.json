@@ -1,9 +1,9 @@
 {
-  "version": "0.3.7",
-  "buildNumber": 329,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-329/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-329/littlefs.bin",
-  "md5": "d78f048c8d117af8f631bb666f3bc06f",
-  "fs_md5": "ec5881ebbb32beee488fb3c97db85ba4",
-  "notes": "Fix deploy/getting-started.sh: automatically stop and restart whatever systemd service is bound to port 80 during Let's Encrypt certificate issuance, instead of aborting. No firmware changes."
+  "version": "0.3.8",
+  "buildNumber": 330,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-330/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-330/littlefs.bin",
+  "md5": "54f986aaa0ca035061ac5c8c2a58aa5b",
+  "fs_md5": "234cf6211f75940630baf47c2d4a74f6",
+  "notes": "Fix deploy/getting-started.sh: when port 80 is published by a Docker container (e.g. Netbird's dashboard), stop only that specific container instead of the whole docker.service, which previously took down every container on the host without freeing the port (due to live-restore)."
 }
