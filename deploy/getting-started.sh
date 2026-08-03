@@ -77,25 +77,48 @@ cd "${INSTALL_DIR}"
 # --- TLS certificate ---
 if [ ! -d "/etc/letsencrypt/live/${MQTT_DOMAIN}" ]; then
   PORT80_UNIT=""
+  PORT80_CONTAINER=""
   if ss -ltnp "( sport = :80 )" 2>/dev/null | grep -q LISTEN; then
     PORT80_PID="$(ss -ltnp "( sport = :80 )" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1)"
-    PORT80_UNIT="$(systemctl status "${PORT80_PID}" 2>/dev/null | grep -oP '^\W+\K\S+\.service' | head -1)"
-    if [ -z "${PORT80_UNIT}" ]; then
-      err "Port 80 is in use by PID ${PORT80_PID:-unknown}, but it isn't a systemd service I can stop automatically"
-      err "(e.g. a raw Docker container publishing port 80). Stop it manually and re-run this script."
-      exit 1
+    PROC_NAME="$(ps -p "${PORT80_PID}" -o comm= 2>/dev/null || true)"
+
+    if [ "${PROC_NAME}" = "docker-proxy" ] && command -v docker >/dev/null 2>&1; then
+      # Port 80 is published by a container, not by the Docker daemon itself - stop only
+      # that container. Never stop docker.service for this: that would take down every
+      # other container on the host, not just the one on port 80.
+      PORT80_CONTAINER="$(docker ps --filter "publish=80" --format '{{.ID}}' | head -1)"
+      if [ -z "${PORT80_CONTAINER}" ]; then
+        err "Port 80 is held by docker-proxy but no container with a published port 80 was found. Aborting."
+        exit 1
+      fi
+      CONTAINER_NAME="$(docker ps --filter "id=${PORT80_CONTAINER}" --format '{{.Names}}')"
+      log "Port 80 is published by Docker container '${CONTAINER_NAME}' - stopping just that container temporarily..."
+      docker stop "${PORT80_CONTAINER}" >/dev/null
+      # Restore it no matter what happens next, even if certbot fails and `set -e` exits the script.
+      trap 'docker start "${PORT80_CONTAINER}" >/dev/null 2>&1 || true' EXIT
+    else
+      PORT80_UNIT="$(systemctl status "${PORT80_PID}" 2>/dev/null | grep -oP '^\W+\K\S+\.service' | head -1)"
+      if [ -z "${PORT80_UNIT}" ] || [ "${PORT80_UNIT}" = "docker.service" ]; then
+        err "Port 80 is in use by PID ${PORT80_PID:-unknown} (process: ${PROC_NAME:-unknown}), which isn't a single"
+        err "service I can safely stop automatically (stopping docker.service would affect ALL containers on this"
+        err "host). Stop the specific container/process manually and re-run this script."
+        exit 1
+      fi
+      log "Port 80 is used by ${PORT80_UNIT} - stopping it temporarily to issue the certificate..."
+      systemctl stop "${PORT80_UNIT}"
+      trap 'systemctl start "${PORT80_UNIT}" 2>/dev/null || true' EXIT
     fi
-    log "Port 80 is used by ${PORT80_UNIT} - stopping it temporarily to issue the certificate..."
-    systemctl stop "${PORT80_UNIT}"
-    # Restore it no matter what happens next, even if certbot fails and `set -e` exits the script.
-    trap 'systemctl start "${PORT80_UNIT}" 2>/dev/null || true' EXIT
   fi
 
   log "Requesting Let's Encrypt certificate for ${MQTT_DOMAIN}..."
   certbot certonly --standalone --non-interactive --agree-tos \
     -m "admin@${MQTT_DOMAIN}" -d "${MQTT_DOMAIN}"
 
-  if [ -n "${PORT80_UNIT}" ]; then
+  if [ -n "${PORT80_CONTAINER}" ]; then
+    log "Restarting Docker container '${CONTAINER_NAME}'..."
+    docker start "${PORT80_CONTAINER}" >/dev/null
+    trap - EXIT
+  elif [ -n "${PORT80_UNIT}" ]; then
     log "Restarting ${PORT80_UNIT}..."
     systemctl start "${PORT80_UNIT}"
     trap - EXIT
