@@ -1,9 +1,9 @@
 {
-  "version": "0.3.6",
-  "buildNumber": 328,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-328/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-328/littlefs.bin",
-  "md5": "7118ea5e43ab70d5e6e9384c4e0f7e52",
-  "fs_md5": "8cb935adb6348c3ec313a0e03ed1efd1",
-  "notes": "Fix version display: FW_VERSION was hardcoded and never updated by the release workflow, so the dashboard kept showing v0.3.1 despite the build number incrementing correctly. FW_VERSION and FW_DATE are now set automatically from the release inputs before compiling. No functional changes otherwise."
+  "version": "0.3.7",
+  "buildNumber": 329,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-329/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-329/littlefs.bin",
+  "md5": "d78f048c8d117af8f631bb666f3bc06f",
+  "fs_md5": "ec5881ebbb32beee488fb3c97db85ba4",
+  "notes": "Fix deploy/getting-started.sh: automatically stop and restart whatever systemd service is bound to port 80 during Let's Encrypt certificate issuance, instead of aborting. No firmware changes."
 }
