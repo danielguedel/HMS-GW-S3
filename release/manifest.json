@@ -1,9 +1,9 @@
 {
-  "version": "0.3.8",
-  "buildNumber": 330,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-330/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-330/littlefs.bin",
-  "md5": "54f986aaa0ca035061ac5c8c2a58aa5b",
-  "fs_md5": "234cf6211f75940630baf47c2d4a74f6",
-  "notes": "Fix deploy/getting-started.sh: when port 80 is published by a Docker container (e.g. Netbird's dashboard), stop only that specific container instead of the whole docker.service, which previously took down every container on the host without freeing the port (due to live-restore)."
+  "version": "0.3.9",
+  "buildNumber": 331,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-331/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-331/littlefs.bin",
+  "md5": "c2c0fb9e3ed132cf3a60884b6a64d635",
+  "fs_md5": "45cf97239ca6cad7cc1800cd482c1e10",
+  "notes": "Fix deploy/getting-started.sh: remove the existing Mosquitto password file before recreating it, since mosquitto_passwd -c refuses to overwrite an existing file (fails with "File exists" on any second run, e.g. after correcting MQTT_USER/MQTT_PASSWORD)."
 }
