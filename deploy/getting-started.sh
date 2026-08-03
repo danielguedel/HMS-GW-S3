@@ -76,14 +76,30 @@ cd "${INSTALL_DIR}"
 
 # --- TLS certificate ---
 if [ ! -d "/etc/letsencrypt/live/${MQTT_DOMAIN}" ]; then
-  if ss -ltn "( sport = :80 )" 2>/dev/null | grep -q LISTEN; then
-    err "Port 80 is already in use - certbot --standalone needs it free to issue a certificate."
-    err "Stop whatever is using port 80 (or issue the certificate yourself, e.g. via --webroot) and re-run."
-    exit 1
+  PORT80_UNIT=""
+  if ss -ltnp "( sport = :80 )" 2>/dev/null | grep -q LISTEN; then
+    PORT80_PID="$(ss -ltnp "( sport = :80 )" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1)"
+    PORT80_UNIT="$(systemctl status "${PORT80_PID}" 2>/dev/null | grep -oP '^\W+\K\S+\.service' | head -1)"
+    if [ -z "${PORT80_UNIT}" ]; then
+      err "Port 80 is in use by PID ${PORT80_PID:-unknown}, but it isn't a systemd service I can stop automatically"
+      err "(e.g. a raw Docker container publishing port 80). Stop it manually and re-run this script."
+      exit 1
+    fi
+    log "Port 80 is used by ${PORT80_UNIT} - stopping it temporarily to issue the certificate..."
+    systemctl stop "${PORT80_UNIT}"
+    # Restore it no matter what happens next, even if certbot fails and `set -e` exits the script.
+    trap 'systemctl start "${PORT80_UNIT}" 2>/dev/null || true' EXIT
   fi
+
   log "Requesting Let's Encrypt certificate for ${MQTT_DOMAIN}..."
   certbot certonly --standalone --non-interactive --agree-tos \
     -m "admin@${MQTT_DOMAIN}" -d "${MQTT_DOMAIN}"
+
+  if [ -n "${PORT80_UNIT}" ]; then
+    log "Restarting ${PORT80_UNIT}..."
+    systemctl start "${PORT80_UNIT}"
+    trap - EXIT
+  fi
 else
   log "Certificate for ${MQTT_DOMAIN} already exists, skipping issuance."
 fi
