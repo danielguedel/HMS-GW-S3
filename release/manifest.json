@@ -1,9 +1,9 @@
 {
-  "version": "0.3.4",
-  "buildNumber": 326,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-326/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-326/littlefs.bin",
-  "md5": "d446b97ba0113131adc3cbd4e610ecc5",
-  "fs_md5": "717babf10a1b98f62f0c5056a512e807",
-  "notes": "FW_VERSION display corrected"
+  "version": "0.3.5",
+  "buildNumber": 327,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-327/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-327/littlefs.bin",
+  "md5": "c2954f7e4494d09e424ed9c8c3ee8167",
+  "fs_md5": "6c31326b87dde0c8a64c8f5cb1a68804",
+  "notes": "Version display corrected: FW_VERSION was not previously set automatically by the release workflow and remained frozen at v0.3.1, even though the build number was incrementing correctly. No functional changes compared to Build 326."
 }
