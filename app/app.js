@@ -19,10 +19,10 @@ function loadCfg() {
 // Persists the broker connection settings to localStorage (never sent anywhere else).
 function saveCfg(c) { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); }
 
-// Opens the settings overlay, pre-filled from `prefill` if given, otherwise from
-// the currently active cfg, or blank on first run (no cfg yet).
-function openSettings(prefill) {
-  const c = prefill || cfg || {};
+// Opens the settings overlay, pre-filled from the currently active cfg, or blank
+// on first run (no cfg yet).
+function openSettings() {
+  const c = cfg || {};
   $('cf-host').value  = c.host  || '';
   $('cf-port').value  = c.port  || 9001;
   $('cf-user').value  = c.user  || '';
@@ -33,7 +33,7 @@ function openSettings(prefill) {
 function closeSettings() { $('settings').classList.remove('open'); }
 
 // Validates and stores the settings form, then (re)connects with the new values.
-$('btn-settings').addEventListener('click', () => openSettings());
+$('btn-settings').addEventListener('click', openSettings);
 $('btn-cancel').addEventListener('click', closeSettings);
 $('btn-save').addEventListener('click', () => {
   const next = {

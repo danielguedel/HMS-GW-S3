@@ -88,13 +88,6 @@ input[type="range"] { width: 100%; accent-color: var(--cyan); }
 .switch input:checked + .slider::before { transform: translateX(20px); background: var(--cyan);
                                            box-shadow: 0 0 8px var(--cyan); }
 
-button.primary {
-  background: linear-gradient(135deg, var(--pink), var(--purple)); color: #fff; border: none;
-  border-radius: 10px; padding: 10px 16px; font-weight: 700; font-size: 13px; cursor: pointer;
-  width: 100%; margin-top: 4px;
-}
-button.primary:active { opacity: .85; }
-
 /* Settings overlay */
 #settings { position: fixed; inset: 0; background: rgba(6,6,10,.85); backdrop-filter: blur(4px);
             display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }

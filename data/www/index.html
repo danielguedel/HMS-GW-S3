@@ -1216,6 +1216,16 @@ async function doFactory() {
   } catch (e) {}
 }
 
+// TLS brokers virtually never listen on the plaintext default port (1883) - if
+// the user enables TLS while the port is still at that default (or empty),
+// switch it to the conventional TLS port so they don't end up with a broker URI
+// nothing is listening on (mqtts://host:1883 would just time out with no clue why).
+$('c-mqtt-tls').addEventListener('change', () => {
+  if ($('c-mqtt-tls').checked && (+$('c-mqtt-port').value === 1883 || !$('c-mqtt-port').value)) {
+    $('c-mqtt-port').value = 8883;
+  }
+});
+
 // ─── Init / Polling ────────────────────────────────────────────────────────
 loadLang();
 tickClock();

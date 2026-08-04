@@ -1,6 +1,6 @@
 // Cache-first for the app shell only - live data always comes fresh over MQTT,
 // never through this cache.
-const CACHE = 'hms-gw-s3-remote-v1';
+const CACHE = 'hms-gw-s3-remote-v2';
 const SHELL = [
   './',
   './index.html',
@@ -8,7 +8,7 @@ const SHELL = [
   './app.js',
   './manifest.json',
   './icon.svg',
-  'https://unpkg.com/mqtt/dist/mqtt.min.js',
+  'https://unpkg.com/mqtt@5.15.2/dist/mqtt.min.js',
 ];
 
 self.addEventListener('install', (event) => {
