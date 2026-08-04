@@ -1,9 +1,9 @@
 {
-  "version": "0.4.0",
-  "buildNumber": 333,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-333/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-333/littlefs.bin",
-  "md5": "c74616b8ebe51b9fef4658a76a18941c",
-  "fs_md5": "e9658950d7ed86e5ae0a98827a6cbd98",
-  "notes": "Add mqttTls support to the gateway firmware (dashboard TLS toggle, mqtts:// support in taskMQTT) and a second MQTT-over-WebSocket listener (port 9001) in deploy/getting-started.sh for the new PWA (app/) to connect to the broker directly from browsers."
+  "version": "0.4.1",
+  "buildNumber": 334,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-334/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-334/littlefs.bin",
+  "md5": "4127cdaa2859f42d90700ed05809dd66",
+  "fs_md5": "c0b867f88169ac48f209f12721c28075",
+  "notes": "Fix dashboard: enabling the MQTT TLS toggle now auto-switches the port from the plaintext default (1883) to 8883 if left unchanged, since a TLS listener is never on 1883 - previously this silently produced a broker URI nothing was listening on. No firmware logic changes otherwise."
 }
