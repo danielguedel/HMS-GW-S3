@@ -1,9 +1,9 @@
 {
-  "version": "0.3.10",
-  "buildNumber": 332,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-332/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-332/littlefs.bin",
-  "md5": "06a901b37882653402e9ff939c4827ca",
-  "fs_md5": "6f62482fbb5f5991769fbcdb36226f9a",
-  "notes": "Fix deploy/getting-started.sh reliability issues found while getting the Hetzner MQTT broker fully working: (1) copy Let's Encrypt cert files instead of bind-mounting the live/ symlinks, which dangled inside the container; (2) fix a Docker VOLUME-shadowing bug where chown against /mosquitto/log silently no-op'd because only the parent directory was bind-mounted, leaving the broker unable to open its own log file and stuck in a permanent restart loop; (3) mount the host CA bundle for the printed Docker test command; (4) drop the unreliable docker-run mosquitto_sub/pub fallback test command in favor of pointing users at MQTT Explorer or a mobile MQTT app. No firmware changes."
+  "version": "0.4.0",
+  "buildNumber": 333,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-333/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-333/littlefs.bin",
+  "md5": "c74616b8ebe51b9fef4658a76a18941c",
+  "fs_md5": "e9658950d7ed86e5ae0a98827a6cbd98",
+  "notes": "Add mqttTls support to the gateway firmware (dashboard TLS toggle, mqtts:// support in taskMQTT) and a second MQTT-over-WebSocket listener (port 9001) in deploy/getting-started.sh for the new PWA (app/) to connect to the broker directly from browsers."
 }
