@@ -59,6 +59,7 @@ void configSetDefaults() {
         snprintf(appConfig.mqttTopic, sizeof(appConfig.mqttTopic),
                  "hmsgws3_%02X%02X%02X", mac[3], mac[4], mac[5]);
     }
+    appConfig.mqttTls         = false;
     appConfig.mqttRetain      = false;
     appConfig.mqttHaDiscovery = true;
     appConfig.mqttOpenDtu     = false;
@@ -169,6 +170,7 @@ static void applyConfigJson(JsonDocument& doc) {
         strlcpy(appConfig.mqttPass,  doc["mqttPass"].as<const char*>(),  sizeof(appConfig.mqttPass));
     if (doc["mqttTopic"].is<const char*>())
         strlcpy(appConfig.mqttTopic, doc["mqttTopic"].as<const char*>(), sizeof(appConfig.mqttTopic));
+    if (!doc["mqttTls"].isNull())         appConfig.mqttTls         = doc["mqttTls"].as<bool>();
     if (!doc["mqttRetain"].isNull())      appConfig.mqttRetain      = doc["mqttRetain"].as<bool>();
     if (!doc["mqttHaDiscovery"].isNull()) appConfig.mqttHaDiscovery = doc["mqttHaDiscovery"].as<bool>();
     if (!doc["mqttOpenDtu"].isNull())     appConfig.mqttOpenDtu     = doc["mqttOpenDtu"].as<bool>();
@@ -316,6 +318,7 @@ void configSave() {
     doc["mqttUser"]        = appConfig.mqttUser;
     doc["mqttPass"]        = appConfig.mqttPass;
     doc["mqttTopic"]       = appConfig.mqttTopic;
+    doc["mqttTls"]         = appConfig.mqttTls;
     doc["mqttRetain"]      = appConfig.mqttRetain;
     doc["mqttHaDiscovery"] = appConfig.mqttHaDiscovery;
     doc["mqttOpenDtu"]     = appConfig.mqttOpenDtu;

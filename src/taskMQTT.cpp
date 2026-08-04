@@ -322,7 +322,8 @@ void taskMQTT(void* pvParameters) {
 
     // Build persistent config strings
     snprintf(_uri,      sizeof(_uri),
-             "mqtt://%s:%d", appConfig.mqttHost, appConfig.mqttPort);
+             "%s://%s:%d", appConfig.mqttTls ? "mqtts" : "mqtt",
+             appConfig.mqttHost, appConfig.mqttPort);
     {
         uint8_t mac[6];
         esp_read_mac(mac, ESP_MAC_WIFI_STA);
@@ -335,6 +336,9 @@ void taskMQTT(void* pvParameters) {
     LOG_I(MOD_MQTT, "Starting  -  broker: %s  client: %s", _uri, _clientId);
 
     // Flat struct API (ESP-IDF 4.x / Arduino-ESP32 2.x bundled SDK)
+    // cfg.cert_pem stays NULL (zero-init below): for mqtts:// this means the
+    // connection is encrypted but the broker's certificate is not verified,
+    // same trust model as WiFiClientSecure::setInsecure() used for OTA.
     esp_mqtt_client_config_t cfg = {};
     cfg.uri         = _uri;
     cfg.client_id   = _clientId;

@@ -39,6 +39,7 @@ struct AppConfig {
     char     mqttUser[33];
     char     mqttPass[65];
     char     mqttTopic[33];     // default: "hmsgws3"
+    bool     mqttTls;           // connect via mqtts:// (TLS, no certificate validation)
     bool     mqttRetain;
     bool     mqttHaDiscovery;   // enable HA auto-discovery
     bool     mqttOpenDtu;       // OpenDTU-compatible topics
