@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="40" fill="#06060a"/>
+  <g transform="translate(38,48) scale(1.35)">
+    <defs>
+      <filter id="logoGlowPink" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="h"/><feMerge><feMergeNode in="h"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="logoGlowCyan" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="h"/><feMerge><feMergeNode in="h"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <g transform="translate(-5,0)">
+      <path d="M55 6 L24 50 L44 50 L34 94 L80 40 L56 40 Z" fill="none" stroke="#ff2bd6" stroke-width="9" stroke-linejoin="round" stroke-linecap="round" filter="url(#logoGlowPink)"/>
+      <path d="M55 6 L24 50 L44 50 L34 94 L80 40 L56 40 Z" fill="none" stroke="#fff" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
+    </g>
+    <g transform="translate(0,-5)">
+      <path d="M75 18 a32 32 0 0 1 0 64" stroke="#2bf0ff" stroke-width="7" stroke-linecap="round" fill="none" filter="url(#logoGlowCyan)"/>
+      <path d="M75 30 a20 20 0 0 1 0 40" stroke="#2bf0ff" stroke-width="7" stroke-linecap="round" fill="none" filter="url(#logoGlowCyan)"/>
+      <path d="M75 18 a32 32 0 0 1 0 64" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+      <path d="M75 30 a20 20 0 0 1 0 40" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+    </g>
+  </g>
+</svg>

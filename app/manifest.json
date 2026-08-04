@@ -1,0 +1,13 @@
+{
+  "name": "HMS-GW-S3 Remote",
+  "short_name": "HMS-GW-S3",
+  "description": "Remote live view and control for the HMS-GW-S3 solar gateway",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#06060a",
+  "theme_color": "#06060a",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

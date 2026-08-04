@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HMS-GW-S3 Remote</title>
+<meta name="theme-color" content="#06060a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>
+    <svg viewBox="0 0 115 100" aria-hidden="true" width="24" height="21">
+      <defs>
+        <filter id="logoGlowPink" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="h"/><feMerge><feMergeNode in="h"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="logoGlowCyan" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="h"/><feMerge><feMergeNode in="h"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <g transform="translate(-5,0)">
+        <path d="M55 6 L24 50 L44 50 L34 94 L80 40 L56 40 Z" fill="none" stroke="#ff2bd6" stroke-width="9" stroke-linejoin="round" stroke-linecap="round" filter="url(#logoGlowPink)"/>
+        <path d="M55 6 L24 50 L44 50 L34 94 L80 40 L56 40 Z" fill="none" stroke="#fff" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      <g transform="translate(0,-5)">
+        <path d="M75 18 a32 32 0 0 1 0 64" stroke="#2bf0ff" stroke-width="7" stroke-linecap="round" fill="none" filter="url(#logoGlowCyan)"/>
+        <path d="M75 30 a20 20 0 0 1 0 40" stroke="#2bf0ff" stroke-width="7" stroke-linecap="round" fill="none" filter="url(#logoGlowCyan)"/>
+        <path d="M75 18 a32 32 0 0 1 0 64" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+        <path d="M75 30 a20 20 0 0 1 0 40" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+      </g>
+    </svg>
+    HMS-GW-S3
+  </h1>
+  <div style="display:flex; align-items:center; gap:14px;">
+    <div class="dot-wrap"><span class="dot" id="dot-conn"></span><span id="conn-label">Disconnected</span></div>
+    <button class="icon-btn" id="btn-settings">Settings</button>
+  </div>
+</header>
+
+<main>
+  <div class="sec">Live</div>
+  <div class="grid">
+    <div class="card grid-p">
+      <div class="card-title">Grid</div>
+      <div><span class="card-val" id="grid-p">–</span><span class="card-unit">W</span></div>
+      <div class="card-sub" id="grid-ui">– V / – A</div>
+      <div class="bar-wrap"><div class="bar" id="bar-grid"></div></div>
+    </div>
+    <div class="card pv0">
+      <div class="card-title">PV 1</div>
+      <div><span class="card-val" id="pv0-p">–</span><span class="card-unit">W</span></div>
+      <div class="card-sub" id="pv0-ui">– V / – A</div>
+      <div class="bar-wrap"><div class="bar" id="bar-pv0"></div></div>
+    </div>
+    <div class="card pv1">
+      <div class="card-title">PV 2</div>
+      <div><span class="card-val" id="pv1-p">–</span><span class="card-unit">W</span></div>
+      <div class="card-sub" id="pv1-ui">– V / – A</div>
+      <div class="bar-wrap"><div class="bar" id="bar-pv1"></div></div>
+    </div>
+  </div>
+
+  <div class="sec">System</div>
+  <div class="grid">
+    <div class="card"><div class="card-title">Temperature</div><div><span class="card-val" id="s-temp">–</span><span class="card-unit">°C</span></div></div>
+    <div class="card"><div class="card-title">Power Limit</div><div><span class="card-val" id="s-limit">–</span><span class="card-unit">%</span></div></div>
+    <div class="card"><div class="card-title">Daily Energy</div><div><span class="card-val" id="s-de">–</span><span class="card-unit">kWh</span></div></div>
+    <div class="card"><div class="card-title">Total Energy</div><div><span class="card-val" id="s-te">–</span><span class="card-unit">kWh</span></div></div>
+  </div>
+
+  <div class="sec">Control</div>
+  <div class="ctrl-box">
+    <div class="ctrl-row">
+      <span class="ctrl-label">Power Limit Target</span>
+      <span class="range-val" id="range-val">– %</span>
+    </div>
+    <input type="range" id="limit-range" min="0" max="100" step="1" value="100">
+  </div>
+  <div class="ctrl-box">
+    <div class="ctrl-row">
+      <span class="ctrl-label">Relay</span>
+      <label class="switch"><input type="checkbox" id="sw-relay"><span class="slider"></span></label>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">IO 1</span>
+      <label class="switch"><input type="checkbox" id="sw-io1"><span class="slider"></span></label>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">IO 2</span>
+      <label class="switch"><input type="checkbox" id="sw-io2"><span class="slider"></span></label>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">IO 3</span>
+      <label class="switch"><input type="checkbox" id="sw-io3"><span class="slider"></span></label>
+    </div>
+  </div>
+</main>
+
+<div id="settings">
+  <div class="panel">
+    <h2>Broker Connection</h2>
+    <label for="cf-host">Broker Host</label>
+    <input type="text" id="cf-host" placeholder="mqtt.example.com">
+    <label for="cf-port">Port (WebSocket)</label>
+    <input type="number" id="cf-port" placeholder="9001" value="9001">
+    <label for="cf-user">Username</label>
+    <input type="text" id="cf-user">
+    <label for="cf-pass">Password</label>
+    <input type="password" id="cf-pass">
+    <label for="cf-topic">Topic prefix</label>
+    <input type="text" id="cf-topic" placeholder="hmsgws3_xxxxxx">
+    <div class="btn-row">
+      <button class="icon-btn" id="btn-cancel">Cancel</button>
+      <button class="icon-btn" id="btn-save" style="border-color:var(--cyan); color:var(--cyan);">Save &amp; Connect</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

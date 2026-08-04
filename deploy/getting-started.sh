@@ -139,9 +139,18 @@ cp -L "/etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem" \
       mosquitto/certs/
 
 # --- mosquitto config ---
+# Two listeners on the same certs: 8883 for the gateway (raw MQTT-over-TLS, what
+# ESP32's esp-mqtt supports) and 9001 for browsers (MQTT-over-WebSockets - browsers
+# can't open raw TCP sockets, only ws/wss), used by the PWA in app/.
 cat > mosquitto/config/mosquitto.conf << EOF
 listener 8883
 protocol mqtt
+cafile /mosquitto/certs/chain.pem
+certfile /mosquitto/certs/cert.pem
+keyfile /mosquitto/certs/privkey.pem
+
+listener 9001
+protocol websockets
 cafile /mosquitto/certs/chain.pem
 certfile /mosquitto/certs/cert.pem
 keyfile /mosquitto/certs/privkey.pem
@@ -184,6 +193,7 @@ services:
     restart: unless-stopped
     ports:
       - "8883:8883"
+      - "9001:9001"
     volumes:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
@@ -212,13 +222,15 @@ chmod +x /etc/letsencrypt/renewal-hooks/deploy/hms-gw-mqtt-restart.sh
 
 # --- firewall (only touch it if ufw is already active) ---
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
-  log "Opening port 8883/tcp in ufw..."
+  log "Opening ports 8883/tcp and 9001/tcp in ufw..."
   ufw allow 8883/tcp >/dev/null
+  ufw allow 9001/tcp >/dev/null
 fi
 
 echo
 log "Done."
-log "Broker:   mqtts://${MQTT_DOMAIN}:8883"
+log "Broker:      mqtts://${MQTT_DOMAIN}:8883  (gateway / native MQTT clients)"
+log "Broker (WS): wss://${MQTT_DOMAIN}:9001    (browsers / the PWA in app/)"
 log "User:     ${MQTT_USER}"
 if [ "${GENERATED_PASSWORD}" -eq 1 ]; then
   log "Password: ${MQTT_PASSWORD}  (generated - save it now, it is not stored in plaintext anywhere)"
