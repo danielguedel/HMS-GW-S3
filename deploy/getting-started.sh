@@ -228,9 +228,10 @@ fi
 echo
 log "Point the HMS-GW-S3 gateway's MQTT settings at this broker (TLS enabled, port 8883)."
 echo
-log "Test it from any machine with mosquitto-clients installed:"
+log "Test it with an MQTT client such as MQTT Explorer (https://mqtt-explorer.com) or"
+log "an iOS/Android MQTT test app, using:"
+log "  Host: ${MQTT_DOMAIN}   Port: 8883   TLS: on   User: ${MQTT_USER}   Password: (as above)"
+log ""
+log "Or from the command line (apt-get install -y mosquitto-clients first):"
 log "  mosquitto_sub -h ${MQTT_DOMAIN} -p 8883 --capath /etc/ssl/certs -u '${MQTT_USER}' -P '${MQTT_PASSWORD}' -t 'hms-gw/#' -v"
 log "  mosquitto_pub -h ${MQTT_DOMAIN} -p 8883 --capath /etc/ssl/certs -u '${MQTT_USER}' -P '${MQTT_PASSWORD}' -t 'hms-gw/test' -m 'hello'"
-log "No mosquitto-clients installed? Run the subscriber via Docker instead (mounting the host's"
-log "CA bundle, since the eclipse-mosquitto image doesn't ship its own):"
-log "  docker run --rm -v /etc/ssl/certs:/etc/ssl/certs:ro eclipse-mosquitto:2 mosquitto_sub -h ${MQTT_DOMAIN} -p 8883 --capath /etc/ssl/certs -u '${MQTT_USER}' -P '${MQTT_PASSWORD}' -t 'hms-gw/#' -v"
