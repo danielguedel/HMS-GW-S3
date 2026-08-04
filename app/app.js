@@ -10,12 +10,17 @@ const $ = id => document.getElementById(id);
 let client = null;
 let cfg = null;
 
+// Reads the saved broker connection settings from localStorage; returns null if
+// none are stored yet or the JSON is corrupt (never throws).
 function loadCfg() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
   catch { return null; }
 }
+// Persists the broker connection settings to localStorage (never sent anywhere else).
 function saveCfg(c) { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); }
 
+// Opens the settings overlay, pre-filled from `prefill` if given, otherwise from
+// the currently active cfg, or blank on first run (no cfg yet).
 function openSettings(prefill) {
   const c = prefill || cfg || {};
   $('cf-host').value  = c.host  || '';
@@ -27,6 +32,7 @@ function openSettings(prefill) {
 }
 function closeSettings() { $('settings').classList.remove('open'); }
 
+// Validates and stores the settings form, then (re)connects with the new values.
 $('btn-settings').addEventListener('click', () => openSettings());
 $('btn-cancel').addEventListener('click', closeSettings);
 $('btn-save').addEventListener('click', () => {
@@ -44,6 +50,8 @@ $('btn-save').addEventListener('click', () => {
   connect();
 });
 
+// Shows a transient toast notification, auto-hiding after 2.5s; re-triggering
+// before that resets the timer instead of stacking hides.
 function toast(msg) {
   const t = $('toast');
   t.textContent = msg;
@@ -52,12 +60,14 @@ function toast(msg) {
   toast._h = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// Updates the header status dot + label to reflect the current MQTT connection state.
 function setConn(ok, label) {
   $('dot-conn').classList.toggle('ok', ok);
   $('dot-conn').classList.toggle('err', !ok);
   $('conn-label').textContent = label;
 }
 
+// Converts a power value to a clamped 0-100% CSS width string for the bar gauges.
 function pct(val, max) {
   const v = Math.max(0, Math.min(100, (val / max) * 100));
   return v + '%';
@@ -66,6 +76,8 @@ function pct(val, max) {
 // --- Live data state (assembled incrementally, one MQTT message at a time) ----
 const live = { grid: {}, pv0: {}, pv1: {}, inverter: {} };
 
+// Re-renders the Grid card from the current `live` state; fields that haven't
+// arrived over MQTT yet are left at their previous (or initial "–") value.
 function updateGridCard() {
   if (live.grid.P !== undefined) {
     $('grid-p').textContent = Number(live.grid.P).toFixed(0);
@@ -74,6 +86,7 @@ function updateGridCard() {
   if (live.grid.U !== undefined && live.grid.I !== undefined)
     $('grid-ui').textContent = `${Number(live.grid.U).toFixed(1)} V / ${Number(live.grid.I).toFixed(2)} A`;
 }
+// Re-renders the PV1 (n=0) or PV2 (n=1) card, same partial-update behavior as updateGridCard().
 function updatePvCard(n) {
   const d = live['pv' + n];
   if (d.P !== undefined) {
@@ -83,6 +96,7 @@ function updatePvCard(n) {
   if (d.U !== undefined && d.I !== undefined)
     $(`pv${n}-ui`).textContent = `${Number(d.U).toFixed(1)} V / ${Number(d.I).toFixed(2)} A`;
 }
+// Re-renders the temperature/power-limit/energy cards from the current `live` state.
 function updateSystemCards() {
   const inv = live.inverter;
   if (inv.Temp !== undefined)       $('s-temp').textContent  = Number(inv.Temp).toFixed(1);
@@ -95,6 +109,8 @@ function updateSystemCards() {
 // state back from the broker (would otherwise loop set -> state -> set -> ...).
 let suppressPublish = false;
 
+// Syncs the power-limit slider to the broker's PowerLimitTarget, unless the user
+// is actively dragging it (checked via document.activeElement).
 function updateLimitRange() {
   const target = live.inverter.PowerLimitTarget;
   if (target === undefined) return;
@@ -104,6 +120,8 @@ function updateLimitRange() {
   $('range-val').textContent = target + ' %';
   suppressPublish = false;
 }
+// Syncs a toggle switch's checked state to its retained MQTT state topic without
+// re-triggering the switch's own 'change' publish handler (see suppressPublish above).
 function updateSwitch(id, val) {
   if (val === undefined) return;
   suppressPublish = true;
@@ -111,6 +129,10 @@ function updateSwitch(id, val) {
   suppressPublish = false;
 }
 
+// Routes one incoming MQTT message to the matching `live` field and re-render,
+// based on taskMQTT.cpp's non-OpenDTU topic layout (see file header). Messages
+// outside cfg.topic are ignored - shouldn't happen given the subscribed filter
+// is `<topic>/#`, but defensive since the broker could carry other topics too.
 function onMqttMessage(topic, payloadBuf) {
   const prefix = cfg.topic + '/';
   if (!topic.startsWith(prefix)) return;
@@ -143,6 +165,8 @@ function onMqttMessage(topic, payloadBuf) {
 }
 
 // --- Controls -> publish -------------------------------------------------------
+// Publishes a control command under `<topic>/<suffix>`; toasts instead of
+// throwing if there's currently no live connection to publish on.
 function pub(suffix, value) {
   if (!client || !client.connected) { toast('Not connected'); return; }
   client.publish(`${cfg.topic}/${suffix}`, String(value));
@@ -165,6 +189,9 @@ $('limit-range').addEventListener('change', () => {
   });
 
 // --- Connection ------------------------------------------------------------
+// (Re)connects to the broker over WSS, tearing down any existing client first;
+// subscribes to the full `<topic>/#` tree on connect. Reconnection after a drop
+// is handled by mqtt.js itself (reconnectPeriod below), not re-implemented here.
 function connect() {
   if (client) { client.end(true); client = null; }
   setConn(false, 'Connecting…');
@@ -189,6 +216,8 @@ function connect() {
 }
 
 // --- Boot --------------------------------------------------------------------
+// Auto-connects if valid settings are already stored; otherwise opens the
+// settings overlay so first-run users are prompted immediately.
 cfg = loadCfg();
 if (cfg && cfg.host && cfg.topic) {
   connect();
