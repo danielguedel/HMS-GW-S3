@@ -149,6 +149,13 @@ rm -f mosquitto/config/passwd
 docker run --rm -v "${INSTALL_DIR}/mosquitto/config:/mosquitto/config" \
   eclipse-mosquitto:2 mosquitto_passwd -b -c /mosquitto/config/passwd "${MQTT_USER}" "${MQTT_PASSWORD}"
 
+# mosquitto/{config,data,log} were created by mkdir (as root) and the passwd file above
+# runs as root too, but the broker itself drops privileges to the image's unprivileged
+# "mosquitto" user - which then can't read the passwd file or write the log without this.
+log "Fixing ownership for the container's mosquitto user..."
+docker run --rm --user root -v "${INSTALL_DIR}/mosquitto:/mosquitto" \
+  eclipse-mosquitto:2 chown -R mosquitto:mosquitto /mosquitto/config /mosquitto/data /mosquitto/log
+
 # --- docker compose stack ---
 cat > docker-compose.yml << EOF
 services:
