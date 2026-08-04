@@ -71,7 +71,7 @@ if ! command -v certbot >/dev/null 2>&1; then
   apt-get install -y -qq certbot
 fi
 
-mkdir -p "${INSTALL_DIR}"/mosquitto/{config,data,log}
+mkdir -p "${INSTALL_DIR}"/mosquitto/{config,data,log,certs}
 cd "${INSTALL_DIR}"
 
 # --- TLS certificate ---
@@ -127,6 +127,17 @@ else
   log "Certificate for ${MQTT_DOMAIN} already exists, skipping issuance."
 fi
 
+# certbot's live/<domain>/*.pem files are symlinks to ../../archive/<domain>/*N.pem.
+# Bind-mounting only live/<domain> into the container leaves those symlinks dangling
+# (the archive/ target isn't in the mount), so mosquitto fails to load the cert with a
+# cryptic OpenSSL "No such file or directory". Copy the real files instead - cp
+# dereferences symlinks by default - into a directory we fully control the ownership of.
+log "Copying TLS certificate files (dereferencing certbot's live/ symlinks)..."
+cp -L "/etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem" \
+      "/etc/letsencrypt/live/${MQTT_DOMAIN}/cert.pem" \
+      "/etc/letsencrypt/live/${MQTT_DOMAIN}/privkey.pem" \
+      mosquitto/certs/
+
 # --- mosquitto config ---
 cat > mosquitto/config/mosquitto.conf << EOF
 listener 8883
@@ -149,12 +160,20 @@ rm -f mosquitto/config/passwd
 docker run --rm -v "${INSTALL_DIR}/mosquitto/config:/mosquitto/config" \
   eclipse-mosquitto:2 mosquitto_passwd -b -c /mosquitto/config/passwd "${MQTT_USER}" "${MQTT_PASSWORD}"
 
-# mosquitto/{config,data,log} were created by mkdir (as root) and the passwd file above
-# runs as root too, but the broker itself drops privileges to the image's unprivileged
-# "mosquitto" user - which then can't read the passwd file or write the log without this.
+# mosquitto/{config,data,log,certs} were created by mkdir (as root) and the passwd file
+# above runs as root too, but the broker itself drops privileges to the image's
+# unprivileged "mosquitto" user - which then can't read the passwd file or write the log
+# without this. Mount each subdirectory individually (not just the ./mosquitto parent):
+# the image declares /mosquitto/log as a VOLUME, so a parent-only bind mount lets Docker
+# shadow it with a hidden anonymous volume - chown would silently "succeed" against that
+# throwaway volume instead of the real host directory, leaving it root-owned.
 log "Fixing ownership for the container's mosquitto user..."
-docker run --rm --user root -v "${INSTALL_DIR}/mosquitto:/mosquitto" \
-  eclipse-mosquitto:2 chown -R mosquitto:mosquitto /mosquitto/config /mosquitto/data /mosquitto/log
+docker run --rm --user root \
+  -v "${INSTALL_DIR}/mosquitto/config:/mosquitto/config" \
+  -v "${INSTALL_DIR}/mosquitto/data:/mosquitto/data" \
+  -v "${INSTALL_DIR}/mosquitto/log:/mosquitto/log" \
+  -v "${INSTALL_DIR}/mosquitto/certs:/mosquitto/certs" \
+  eclipse-mosquitto:2 chown -R mosquitto:mosquitto /mosquitto/config /mosquitto/data /mosquitto/log /mosquitto/certs
 
 # --- docker compose stack ---
 cat > docker-compose.yml << EOF
@@ -169,16 +188,24 @@ services:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
-      - /etc/letsencrypt/live/${MQTT_DOMAIN}:/mosquitto/certs:ro
+      - ./mosquitto/certs:/mosquitto/certs:ro
 EOF
 
 log "Starting Mosquitto..."
 docker compose up -d
 
 # --- keep the broker in sync with certificate renewals ---
+# Renewal replaces the archive/*N.pem files certbot's live/ symlinks point to, so the
+# copies in mosquitto/certs need refreshing too, not just a container restart.
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 cat > /etc/letsencrypt/renewal-hooks/deploy/hms-gw-mqtt-restart.sh << EOF
 #!/bin/sh
+cp -L /etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem \\
+      /etc/letsencrypt/live/${MQTT_DOMAIN}/cert.pem \\
+      /etc/letsencrypt/live/${MQTT_DOMAIN}/privkey.pem \\
+      ${INSTALL_DIR}/mosquitto/certs/
+docker run --rm --user root -v "${INSTALL_DIR}/mosquitto/certs:/mosquitto/certs" \\
+  eclipse-mosquitto:2 chown -R mosquitto:mosquitto /mosquitto/certs
 cd ${INSTALL_DIR} && docker compose restart mosquitto
 EOF
 chmod +x /etc/letsencrypt/renewal-hooks/deploy/hms-gw-mqtt-restart.sh
