@@ -1,9 +1,9 @@
 {
-  "version": "0.4.3",
-  "buildNumber": 336,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-336/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-336/littlefs.bin",
-  "md5": "9fcc184d27d140081118d207b01f6df7",
-  "fs_md5": "6f6052b0a7a449349e9176fd9f902b02",
-  "notes": "Fix: OTA update check now compares version strings (semver) instead of build numbers only, so locally-flashed debug builds with a higher build number no longer block correct updates to newer releases."
+  "version": "0.4.4",
+  "buildNumber": 337,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-337/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-337/littlefs.bin",
+  "md5": "f92c11da2d658dc7b0df596d2647b390",
+  "fs_md5": "c595d8afdb0e6b6aefad1ea7b7054dea",
+  "notes": "Add uninstall.sh: reverses getting-started.sh (stops container, removes install directory and renewal hook, closes ufw ports 8883/9001; optionally deletes the Let's Encrypt certificate via DELETE_CERT=1)."
 }
