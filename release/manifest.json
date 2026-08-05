@@ -1,9 +1,9 @@
 {
-  "version": "0.4.1",
-  "buildNumber": 334,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-334/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-334/littlefs.bin",
-  "md5": "4127cdaa2859f42d90700ed05809dd66",
-  "fs_md5": "c0b867f88169ac48f209f12721c28075",
-  "notes": "Fix dashboard: enabling the MQTT TLS toggle now auto-switches the port from the plaintext default (1883) to 8883 if left unchanged, since a TLS listener is never on 1883 - previously this silently produced a broker URI nothing was listening on. No firmware logic changes otherwise."
+  "version": "0.4.2",
+  "buildNumber": 335,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-335/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-335/littlefs.bin",
+  "md5": "3bde70ccc499d5eb1f05d30a2d918c57",
+  "fs_md5": "a6e6c6efa61201c50af2412248391426",
+  "notes": "MQTT TLS: Root-CA (ISRG X1) aus LittleFS, Port-Toggle 1883<->8883, getting-started.sh fullchain.pem fix"
 }
