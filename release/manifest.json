@@ -5,5 +5,5 @@
   "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-336/littlefs.bin",
   "md5": "9fcc184d27d140081118d207b01f6df7",
   "fs_md5": "6f6052b0a7a449349e9176fd9f902b02",
-  "notes": "Fix: OTA-Versionsvergleich per Semver - lokale Debug-Builds (hoehere Build-Nummer) blockieren nicht mehr korrekte Updates auf neuere Versionen"
+  "notes": "Fix: OTA update check now compares version strings (semver) instead of build numbers only, so locally-flashed debug builds with a higher build number no longer block correct updates to newer releases."
 }
