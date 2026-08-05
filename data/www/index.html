@@ -1223,6 +1223,8 @@ async function doFactory() {
 $('c-mqtt-tls').addEventListener('change', () => {
   if ($('c-mqtt-tls').checked && (+$('c-mqtt-port').value === 1883 || !$('c-mqtt-port').value)) {
     $('c-mqtt-port').value = 8883;
+  } else if (!$('c-mqtt-tls').checked && +$('c-mqtt-port').value === 8883) {
+    $('c-mqtt-port').value = 1883;
   }
 });
 

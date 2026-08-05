@@ -133,8 +133,11 @@ fi
 # cryptic OpenSSL "No such file or directory". Copy the real files instead - cp
 # dereferences symlinks by default - into a directory we fully control the ownership of.
 log "Copying TLS certificate files (dereferencing certbot's live/ symlinks)..."
-cp -L "/etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem" \
-      "/etc/letsencrypt/live/${MQTT_DOMAIN}/cert.pem" \
+# fullchain.pem (leaf + intermediates) is used as certfile so Mosquitto sends the
+# complete certificate chain to connecting clients. Without the intermediates the
+# client can't build the path to the root CA and the TLS handshake fails.
+cp -L "/etc/letsencrypt/live/${MQTT_DOMAIN}/fullchain.pem" \
+      "/etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem" \
       "/etc/letsencrypt/live/${MQTT_DOMAIN}/privkey.pem" \
       mosquitto/certs/
 
@@ -146,13 +149,13 @@ cat > mosquitto/config/mosquitto.conf << EOF
 listener 8883
 protocol mqtt
 cafile /mosquitto/certs/chain.pem
-certfile /mosquitto/certs/cert.pem
+certfile /mosquitto/certs/fullchain.pem
 keyfile /mosquitto/certs/privkey.pem
 
 listener 9001
 protocol websockets
 cafile /mosquitto/certs/chain.pem
-certfile /mosquitto/certs/cert.pem
+certfile /mosquitto/certs/fullchain.pem
 keyfile /mosquitto/certs/privkey.pem
 
 allow_anonymous false
@@ -210,8 +213,8 @@ docker compose up -d
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 cat > /etc/letsencrypt/renewal-hooks/deploy/hms-gw-mqtt-restart.sh << EOF
 #!/bin/sh
-cp -L /etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem \\
-      /etc/letsencrypt/live/${MQTT_DOMAIN}/cert.pem \\
+cp -L /etc/letsencrypt/live/${MQTT_DOMAIN}/fullchain.pem \\
+      /etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem \\
       /etc/letsencrypt/live/${MQTT_DOMAIN}/privkey.pem \\
       ${INSTALL_DIR}/mosquitto/certs/
 docker run --rm --user root -v "${INSTALL_DIR}/mosquitto/certs:/mosquitto/certs" \\

@@ -10,6 +10,7 @@
 #include "logger.h"
 #include <Arduino.h>
 #include <esp_mac.h>
+#include <LittleFS.h>
 #include "mqtt_client.h"
 #include <ArduinoJson.h>
 
@@ -19,6 +20,7 @@ static esp_mqtt_client_handle_t _client = nullptr;
 static char _uri[80];
 static char _clientId[32];
 static char _lwtTopic[80];
+static char _caCertPem[2048]; // loaded from /mqtt_ca.pem when TLS is enabled
 
 // --- Topic helpers ------------------------------------------------------------
 // Builds a full topic string by prefixing suffix with the configured mqttTopic ("<mqttTopic>/<suffix>").
@@ -295,8 +297,13 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
         }
 
         case MQTT_EVENT_ERROR:
-            if (ev->error_handle)
-                LOG_E(MOD_MQTT, "Error type=%d", ev->error_handle->error_type);
+            if (ev->error_handle) {
+                LOG_E(MOD_MQTT, "Error type=%d  esp_tls_err=0x%x  tls_stack_err=0x%x  cert_verify_flags=0x%x",
+                      ev->error_handle->error_type,
+                      ev->error_handle->esp_tls_last_esp_err,
+                      ev->error_handle->esp_tls_stack_err,
+                      ev->error_handle->esp_tls_cert_verify_flags);
+            }
             break;
 
         default:
@@ -335,10 +342,7 @@ void taskMQTT(void* pvParameters) {
 
     LOG_I(MOD_MQTT, "Starting  -  broker: %s  client: %s", _uri, _clientId);
 
-    // Flat struct API (ESP-IDF 4.x / Arduino-ESP32 2.x bundled SDK)
-    // cfg.cert_pem stays NULL (zero-init below): for mqtts:// this means the
-    // connection is encrypted but the broker's certificate is not verified,
-    // same trust model as WiFiClientSecure::setInsecure() used for OTA.
+    // Flat struct API (still supported in ESP-IDF 5.x for backward compatibility).
     esp_mqtt_client_config_t cfg = {};
     cfg.uri         = _uri;
     cfg.client_id   = _clientId;
@@ -350,6 +354,20 @@ void taskMQTT(void* pvParameters) {
     if (strlen(appConfig.mqttUser) > 0) {
         cfg.username = appConfig.mqttUser;
         cfg.password = appConfig.mqttPass;
+    }
+    if (appConfig.mqttTls) {
+        // Load the broker CA certificate from LittleFS so it can be updated
+        // independently of the firmware (via /updatefs).
+        File f = LittleFS.open("/mqtt_ca.pem", "r");
+        if (f) {
+            size_t n = f.readBytes(_caCertPem, sizeof(_caCertPem) - 1);
+            _caCertPem[n] = '\0';
+            f.close();
+            cfg.cert_pem = _caCertPem;
+            LOG_I(MOD_MQTT, "TLS: CA cert loaded from /mqtt_ca.pem (%d bytes)", (int)n);
+        } else {
+            LOG_W(MOD_MQTT, "TLS: /mqtt_ca.pem not found  -  broker cert not verified");
+        }
     }
 
     _client = esp_mqtt_client_init(&cfg);
