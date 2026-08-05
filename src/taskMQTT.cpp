@@ -20,7 +20,7 @@ static esp_mqtt_client_handle_t _client = nullptr;
 static char _uri[80];
 static char _clientId[32];
 static char _lwtTopic[80];
-static char _caCertPem[2048]; // loaded from /mqtt_ca.pem when TLS is enabled
+static char _caCertPem[4096]; // loaded from /mqtt_ca.pem when TLS is enabled
 
 // --- Topic helpers ------------------------------------------------------------
 // Builds a full topic string by prefixing suffix with the configured mqttTopic ("<mqttTopic>/<suffix>").
@@ -217,7 +217,11 @@ static void onMessage(const char* topic, const char* data) {
         dsSetDtuCommand(cmd);
     } else if (t == base + "inverter/RebootGw/set" && atoi(data) == 1) {
         LOG_W(MOD_MQTT, "Gateway reboot via MQTT");
-        vTaskDelay(pdMS_TO_TICKS(200)); ESP.restart();
+        // Defer via EVT_REBOOT so an in-progress OTA is not interrupted mid-write.
+        if (xEventGroupGetBits(systemStateEvents) & EVT_OTA_RUNNING)
+            LOG_W(MOD_MQTT, "OTA in progress - reboot deferred until OTA completes");
+        else
+            xEventGroupSetBits(systemStateEvents, EVT_REBOOT);
     } else if (t == base + "relay/set") {
         dsSetGpioCommand(0, atoi(data) == 1);
     } else {
@@ -363,6 +367,8 @@ void taskMQTT(void* pvParameters) {
             size_t n = f.readBytes(_caCertPem, sizeof(_caCertPem) - 1);
             _caCertPem[n] = '\0';
             f.close();
+            if (n == sizeof(_caCertPem) - 1)
+                LOG_W(MOD_MQTT, "TLS: /mqtt_ca.pem truncated at %d B (buffer full) - use root CA only, not fullchain", (int)n);
             cfg.cert_pem = _caCertPem;
             LOG_I(MOD_MQTT, "TLS: CA cert loaded from /mqtt_ca.pem (%d bytes)", (int)n);
         } else {

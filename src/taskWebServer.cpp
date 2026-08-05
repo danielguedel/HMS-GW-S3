@@ -329,12 +329,18 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     if (!doc["dtuCloudPause"].isNull())       appConfig.dtuCloudPause       = doc["dtuCloudPause"].as<int>();
     if (!doc["dtuRebootAfterFails"].isNull()) appConfig.dtuRebootAfterFails = doc["dtuRebootAfterFails"].as<int>();
 
-    if (!doc["powerLimitDefault"].isNull()) appConfig.powerLimitDefault = doc["powerLimitDefault"].as<int>();
+    if (!doc["powerLimitDefault"].isNull()) {
+        int pl = doc["powerLimitDefault"].as<int>();
+        appConfig.powerLimitDefault = (pl >= 0 && pl <= 100) ? pl : appConfig.powerLimitDefault;
+    }
     if (!doc["powerLimitTimeout"].isNull()) appConfig.powerLimitTimeout = doc["powerLimitTimeout"].as<int>();
 
     if (doc["mqttHost"].is<const char*>())
         strlcpy(appConfig.mqttHost,  doc["mqttHost"].as<const char*>(),  sizeof(appConfig.mqttHost));
-    if (!doc["mqttPort"].isNull())  appConfig.mqttPort = doc["mqttPort"].as<int>();
+    if (!doc["mqttPort"].isNull()) {
+        int mp = doc["mqttPort"].as<int>();
+        appConfig.mqttPort = (mp >= 1 && mp <= 65535) ? (uint16_t)mp : MQTT_DEFAULT_PORT;
+    }
     if (doc["mqttUser"].is<const char*>())
         strlcpy(appConfig.mqttUser,  doc["mqttUser"].as<const char*>(),  sizeof(appConfig.mqttUser));
     if (doc["mqttPass"].is<const char*>())
@@ -346,12 +352,18 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
     if (!doc["mqttHaDiscovery"].isNull()) appConfig.mqttHaDiscovery = doc["mqttHaDiscovery"].as<bool>();
     if (!doc["mqttOpenDtu"].isNull())     appConfig.mqttOpenDtu     = doc["mqttOpenDtu"].as<bool>();
 
-    if (!doc["relayPin"].isNull())      appConfig.relay.pin      = doc["relayPin"].as<int>();
+    if (!doc["relayPin"].isNull()) {
+        int p = doc["relayPin"].as<int>();
+        appConfig.relay.pin = (p >= 0 && p <= 48) ? (uint8_t)p : appConfig.relay.pin;
+    }
     if (!doc["relayInverted"].isNull()) appConfig.relay.inverted = doc["relayInverted"].as<bool>();
 
     const char* ioKeys[] = {"io1","io2","io3"};
     for (int i = 0; i < 3; i++) {
-        if (!doc[ioKeys[i]]["pin"].isNull())      appConfig.io[i].pin      = doc[ioKeys[i]]["pin"].as<int>();
+        if (!doc[ioKeys[i]]["pin"].isNull()) {
+            int p = doc[ioKeys[i]]["pin"].as<int>();
+            appConfig.io[i].pin = (p >= 0 && p <= 48) ? (uint8_t)p : appConfig.io[i].pin;
+        }
         if (!doc[ioKeys[i]]["mode"].isNull())     appConfig.io[i].mode     = (IoMode)doc[ioKeys[i]]["mode"].as<int>();
         if (doc[ioKeys[i]]["altFunction"].is<const char*>())
             strlcpy(appConfig.io[i].altFunction, doc[ioKeys[i]]["altFunction"].as<const char*>(), sizeof(appConfig.io[i].altFunction));
@@ -359,8 +371,14 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
         if (!doc[ioKeys[i]]["pullup"].isNull())   appConfig.io[i].pullup   = doc[ioKeys[i]]["pullup"].as<bool>();
     }
 
-    if (!doc["ledPin"].isNull())        appConfig.ledPin        = doc["ledPin"].as<int>();
-    if (!doc["ledBrightness"].isNull()) appConfig.ledBrightness = doc["ledBrightness"].as<int>();
+    if (!doc["ledPin"].isNull()) {
+        int p = doc["ledPin"].as<int>();
+        appConfig.ledPin = (p >= 0 && p <= 48) ? (uint8_t)p : appConfig.ledPin;
+    }
+    if (!doc["ledBrightness"].isNull()) {
+        int b = doc["ledBrightness"].as<int>();
+        appConfig.ledBrightness = (b >= 0 && b <= 255) ? (uint8_t)b : appConfig.ledBrightness;
+    }
 
     if (!doc["tzOffset"].isNull()) appConfig.tzOffset = doc["tzOffset"].as<int>();
     if (doc["ntpServer"].is<const char*>())

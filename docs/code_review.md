@@ -1,6 +1,65 @@
 # Code Review — HMS-GW-S3
 
-**Date:** 2026-06-17
+---
+
+## Review 2026-08-05
+
+**Based on:** Commit `7a87351`, cross-checked against `docs/HMS-GW-S3_Specification_v2.md`
+**Reviewer:** Claude Sonnet 4.6
+
+### Scope
+
+Full re-review of all source files. Primary focus on code added since the 2026-06-17 review: MQTT TLS support (`taskMQTT.cpp`), semver OTA check (`taskWebServer.cpp`), deploy scripts (`getting-started.sh`, `uninstall.sh`). All P1–P4 findings from the previous review are confirmed fixed; none are re-reported.
+
+### Findings — Fixed in this review
+
+**P2-A — `inverter/RebootGw/set` bypassed OTA guard** — `src/taskMQTT.cpp`
+
+The MQTT `RebootGw` handler called `vTaskDelay(200) + ESP.restart()` directly, bypassing the `EVT_OTA_RUNNING` / `EVT_REBOOT` deferred-restart pattern used everywhere else. An MQTT reboot command arriving during a URL-based filesystem OTA would have interrupted the write mid-partition, potentially wiping LittleFS or leaving the device in a state where `backupConfigBeforeFsOta()` ran but `restoreConfigAfterFsOta()` never did.
+
+**Fix:** Handler now sets `EVT_REBOOT` via `xEventGroupSetBits()` and emits a warning log if `EVT_OTA_RUNNING` is active. `taskWebServer`'s loop picks up `EVT_REBOOT` only after any in-progress OTA completes.
+
+**P2-B — Silent truncation of `_caCertPem` buffer** — `src/taskMQTT.cpp`
+
+`f.readBytes(_caCertPem, sizeof(_caCertPem) - 1)` silently truncated the CA PEM at 2047 bytes with no warning. A common user mistake (placing `fullchain.pem` instead of the root CA) produces a 3 500+ byte file that exceeds this limit; the truncated PEM is not a valid certificate and causes TLS handshake failures that are hard to diagnose from the log.
+
+**Fix:** Buffer enlarged to 4096 bytes (accommodates any single-CA file; BSS, zero-cost when not used). Truncation is now detected and logged as `LOG_W` with a hint to use the root CA only.
+
+**P3-A — `handleApiConfigPost` missing input validation** — `src/taskWebServer.cpp`
+
+`POST /api/config` applied pin numbers, port, and brightness values directly to `appConfig` without range checks, while `applyConfigJson()` in `appConfig.cpp` applies the same checks on config load. Between a POST and the next reboot, `appConfig` could hold an invalid pin (e.g. pin 300 → truncated to uint8 44 = GPIO44 / USB D-), causing `taskGPIO` to toggle the wrong hardware pin.
+
+**Fix:** Inline bounds checks added matching `appConfig.cpp`'s logic: pins clamped to 0–48, `mqttPort` to 1–65535 (falls back to `MQTT_DEFAULT_PORT`), `powerLimitDefault` to 0–100, `ledBrightness` to 0–255. Values outside range are silently kept at their current value (no reject, no crash).
+
+**P3-B — Incorrect `mqttTls` comment** — `include/appConfig.h`
+
+Comment read `// connect via mqtts:// (TLS, no certificate validation)` — wrong when `/mqtt_ca.pem` is present on LittleFS, in which case mbedTLS verifies the broker certificate against that CA.
+
+**Fix:** Comment updated to `// CA-verified if /mqtt_ca.pem present, unverified otherwise`.
+
+**P3-C — Renewal hook heredoc: unquoted `${INSTALL_DIR}`** — `deploy/getting-started.sh`
+
+The certbot renewal hook was written via a heredoc that expanded `${INSTALL_DIR}` without quoting. A path containing a space (non-default but valid) produced a broken generated script (`cd /opt/my mqtt` instead of `cd "/opt/my mqtt"`), causing silent renewal failures and expiry of the TLS certificate after 90 days.
+
+**Fix:** All path expansions in the heredoc body are now double-quoted: `cp -L "..."`, `cd "${INSTALL_DIR}"`.
+
+---
+
+### Open items (Info, no action required)
+
+| Area | Note |
+|---|---|
+| Project | `include/buildnumber.txt` intentionally tracked (release workflow) — appears as `modified` after every local build |
+| MQTT | `mqttOpenDtu` mode does not publish GPIO/system in the OpenDTU schema — only relevant for OpenDTU-compatible HA GPIO control |
+| FreeRTOS | Theoretical deadlock chain DataStore mutex + log mutex — currently unreachable; keep in mind: no logging from DataStore functions, no DataStore access from `logMsg()` |
+| FreeRTOS | `waitFor()` uses 50 ms polling instead of a FreeRTOS notification — functionally correct, minor CPU waste |
+| Error handling | `taskDTU` does not explicitly wait for `EVT_WIFI_CONNECTED` after WiFi loss — up to ~90 s recovery time after reconnect |
+| Memory | `T(suffix)` in `taskMQTT.cpp`: temporary `String` allocation per `pub()` call, 20+ per poll cycle; PSRAM not used |
+
+---
+
+## Review 2026-06-17
+
 **Based on:** Commit `07ffd0d` (fix: race condition FW+FS OTA), cross-checked against the synchronized specification v2 (`docs/HMS-GW-S3_Specification_v2.md`)
 **Reviewer:** Claude Sonnet 4.6
 

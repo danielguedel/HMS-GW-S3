@@ -213,13 +213,13 @@ docker compose up -d
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 cat > /etc/letsencrypt/renewal-hooks/deploy/hms-gw-mqtt-restart.sh << EOF
 #!/bin/sh
-cp -L /etc/letsencrypt/live/${MQTT_DOMAIN}/fullchain.pem \\
-      /etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem \\
-      /etc/letsencrypt/live/${MQTT_DOMAIN}/privkey.pem \\
-      ${INSTALL_DIR}/mosquitto/certs/
+cp -L "/etc/letsencrypt/live/${MQTT_DOMAIN}/fullchain.pem" \\
+      "/etc/letsencrypt/live/${MQTT_DOMAIN}/chain.pem" \\
+      "/etc/letsencrypt/live/${MQTT_DOMAIN}/privkey.pem" \\
+      "${INSTALL_DIR}/mosquitto/certs/"
 docker run --rm --user root -v "${INSTALL_DIR}/mosquitto/certs:/mosquitto/certs" \\
   eclipse-mosquitto:2 chown -R mosquitto:mosquitto /mosquitto/certs
-cd ${INSTALL_DIR} && docker compose restart mosquitto
+cd "${INSTALL_DIR}" && docker compose restart mosquitto
 EOF
 chmod +x /etc/letsencrypt/renewal-hooks/deploy/hms-gw-mqtt-restart.sh
 
