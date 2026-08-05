@@ -4,8 +4,8 @@
 **Hardware:** ESP32-S3-DevKitC-1-N8R8 (8MB Flash, 8MB PSRAM)
 **Framework:** Arduino / FreeRTOS (PlatformIO)
 **Repository:** https://github.com/danielguedel/HMS-GW-S3
-**Date:** 2026-06-18 (Web auth, web port, static IP added)
-**Status:** Implemented and in production (v0.2.0, build number is incremented automatically on every build — see `include/buildnumber.txt`)
+**Date:** 2026-08-05 (MQTT TLS, cloud broker, PWA remote app, semver OTA check added)
+**Status:** Implemented and in production (v0.4.3, build number is incremented automatically on every build — see `include/buildnumber.txt`)
 
 ---
 
@@ -356,7 +356,7 @@ if (appConfig.powerLimitTimeout > 0 && _powerLimitSetAt > 0) {
 
 PubSubClient is synchronous and blocking. `connect()` blocks the thread for >1 second and trips the WiFi task watchdog on Core 0. For the reimplementation, **esp-mqtt** (native ESP-IDF, non-blocking) or a custom solution is therefore used.
 
-### 5.2 Proposed Solution: esp_mqtt
+### 5.2 Client: esp_mqtt
 
 ```cpp
 // Non-blocking MQTT client (native ESP-IDF, flat 4.x API)
@@ -365,19 +365,52 @@ PubSubClient is synchronous and blocking. `connect()` blocks the thread for >1 s
 #include "mqtt_client.h"
 
 esp_mqtt_client_config_t cfg = {};
-cfg.uri         = "mqtt://10.1.1.41:1883";
-cfg.client_id   = "hmsgws3_406194";        // last 3 bytes of the WiFi MAC, see esp_read_mac()
+cfg.uri         = "mqtt://10.1.1.41:1883";   // or "mqtts://..." when mqttTls=true
+cfg.client_id   = "hmsgws3_406194";           // last 3 bytes of the WiFi MAC, see esp_read_mac()
 cfg.keepalive   = 60;
 cfg.lwt_topic   = "hmsgws3_406194/system/status";  // "<mqttTopic>/system/status"
 cfg.lwt_msg     = "offline";
 cfg.lwt_msg_len = 7;
 cfg.lwt_retain  = 1;
+// TLS (optional): load CA cert from LittleFS and set cfg.cert_pem
 esp_mqtt_client_handle_t client = esp_mqtt_client_init(&cfg);
 esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqttEventHandler, NULL);
 esp_mqtt_client_start(client);
 ```
 
 All callbacks run asynchronously — no blocking, no watchdog.
+
+### 5.2a TLS Support (mqtts://)
+
+When `appConfig.mqttTls` is `true`, the URI is built as `mqtts://host:port` and the client connects via an encrypted channel. The broker CA certificate is loaded at startup from `/mqtt_ca.pem` on LittleFS:
+
+```cpp
+if (appConfig.mqttTls) {
+    File f = LittleFS.open("/mqtt_ca.pem", "r");
+    if (f) {
+        size_t n = f.readBytes(_caCertPem, sizeof(_caCertPem) - 1);
+        _caCertPem[n] = '\0';
+        f.close();
+        cfg.cert_pem = _caCertPem;  // enables certificate verification
+    }
+    // Without /mqtt_ca.pem: TLS is still active but broker cert is not verified
+}
+```
+
+**Configuration fields:**
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `mqttTls` | bool | false | Enable TLS (`mqtts://`) |
+| `mqttPort` | uint16 | 1883 | Port — web UI auto-switches to 8883 when TLS is enabled |
+
+The CA certificate file (`/mqtt_ca.pem`) must be placed on the device separately — it is not included in the firmware or the standard LittleFS image. The recommended method is to build a custom LittleFS image that includes the file alongside `data/www/index.html`. Only one CA certificate is supported (the root CA of the broker).
+
+**Default ports:**
+- Plain MQTT (no TLS): 1883
+- MQTT over TLS: 8883
+
+The web UI's port field auto-populates with the appropriate default when the TLS toggle is switched, but the value can always be overridden manually.
 
 ### 5.3 Topics
 
@@ -540,6 +573,7 @@ struct AppConfig {
     char mqttUser[33];
     char mqttPass[65];
     char mqttTopic[33];         // default: "hmsgws3_XXXXXX" (last 3 bytes of the WiFi MAC, e.g. "hmsgws3_406194")
+    bool mqttTls;               // connect via mqtts:// (TLS); CA cert from /mqtt_ca.pem on LittleFS
     bool mqttRetain;
     bool mqttHaDiscovery;       // enable HA auto-discovery
     bool mqttOpenDtu;           // OpenDTU-compatible topics
@@ -731,6 +765,114 @@ In the web GUI under System → OTA:
 - The web GUI's "Internet Update" tile shows the result and offers "Install now" (triggers `POST /api/ota/url` with the manifest URLs)
 - GitHub Actions release workflow (`workflow_dispatch` with `version` + `notes`) creates a release + updates `manifest.json`
 
+**Version comparison logic (`semverGt()` in `taskWebServer.cpp`):**
+
+An update is considered available when:
+1. The manifest's `version` field (semver `X.Y.Z`) is **greater** than the running firmware's `FW_VERSION` — this always takes precedence over the build number, so a device that was flashed with a local debug build of v0.4.0 will still see v0.4.1 as available even if its local build number is higher than the manifest's.
+2. If both semver strings are **equal**, fall back to build number comparison: `manifest.buildNumber > BUILD_NUMBER`.
+
+```cpp
+info.available = semverGt(ver, FW_VERSION) ||
+                 (!semverGt(FW_VERSION, ver) && info.buildNumber > BUILD_NUMBER);
+```
+
+This prevents a local debug flash from permanently suppressing future release notifications.
+
+---
+
+## 10a. PWA Remote Access App
+
+A standalone Progressive Web App lives at `app/` in the repository root. It is not served by the gateway's web server — it is a separate, independently hosted application.
+
+### Purpose
+
+The PWA connects to the **MQTT broker** (not to the gateway directly) over **WebSocket (default port 9001)**. This makes it possible to view live solar data from outside the local network, as long as the broker is accessible from the internet.
+
+### Files
+
+| File | Description |
+|---|---|
+| `app/index.html` | Main HTML shell |
+| `app/app.js` | Application logic (MQTT/WebSocket connection, data display) |
+| `app/style.css` | Styles |
+| `app/manifest.json` | PWA manifest (name, icons, display mode) |
+| `app/service-worker.js` | Offline caching (installable on Android/iOS home screens) |
+
+### Data Flow
+
+```
+MQTT broker (cloud or LAN)
+    ↑ publish (TLS, port 8883)
+HMS-GW-S3 gateway (firmware)
+    ↓
+MQTT broker
+    ↓ WebSocket (port 9001)
+PWA (app/ — browser on any device)
+```
+
+### Connection Settings (configured in the PWA)
+
+| Setting | Description |
+|---|---|
+| Broker host | Domain or IP of the MQTT broker |
+| Port | WebSocket port (default: 9001) |
+| Username / password | MQTT credentials |
+| Topic prefix | Must match the gateway's `mqttTopic` (default: `hmsgws3_XXXXXX`) |
+
+The PWA subscribes to the read-only data topics (grid power, PV1/PV2 power, daily energy, temperature, power limit). It does not publish to any control topics.
+
+---
+
+## 10b. Cloud MQTT Broker Setup
+
+`deploy/getting-started.sh` automates the setup of Eclipse Mosquitto in Docker on a Debian/Ubuntu VPS, secured via TLS and Let's Encrypt certificates. This is the recommended path for making the MQTT broker (and therefore the PWA) reachable from outside the home network.
+
+### Usage
+
+```bash
+# Interactive — prompts for domain name
+curl -fsSL https://github.com/danielguedel/HMS-GW-S3/releases/latest/download/getting-started.sh | sudo bash
+
+# Non-interactive
+MQTT_DOMAIN=mqtt.example.com sudo bash getting-started.sh
+```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `MQTT_DOMAIN` | yes | — | Domain pointing at the server (for Let's Encrypt TLS cert) |
+| `MQTT_USER` | no | `hmsgw` | MQTT username |
+| `MQTT_PASSWORD` | no | random | MQTT password (printed once on first setup) |
+| `INSTALL_DIR` | no | `/opt/hms-gw-mqtt` | Installation directory |
+
+### What it sets up
+
+- Docker + Docker Compose (if not already installed)
+- Eclipse Mosquitto container with:
+  - Port 8883 (MQTT over TLS) for gateway and other clients
+  - Port 9001 (MQTT over WebSocket/TLS) for the PWA
+  - Let's Encrypt certificate via Certbot (auto-renewed via cron)
+  - Password file authentication
+
+### Uninstall
+
+```bash
+sudo bash deploy/uninstall.sh
+```
+
+Removes the Docker containers, volumes, Let's Encrypt certificates, and the install directory.
+
+### Gateway Configuration after Setup
+
+After deploying the broker, configure the gateway:
+1. Set `mqttHost` to the broker's domain name
+2. Set `mqttPort` to `8883`
+3. Enable `mqttTls`
+4. Set `mqttUser` / `mqttPass` to the credentials from the setup output
+
+The root CA certificate of the Let's Encrypt chain should be placed at `/mqtt_ca.pem` on the gateway's LittleFS filesystem to enable full certificate verification (see §5.2a).
+
 ---
 
 ## 11. Console (Serial + Web Terminal)
@@ -806,6 +948,15 @@ HMS-GW-S3/
 ├── data/
 │   └── www/
 │       └── index.html          (dashboard SPA — "Neon Flow" dark-glow design)
+├── app/
+│   ├── index.html              (PWA remote access app — MQTT over WebSocket)
+│   ├── app.js
+│   ├── style.css
+│   ├── manifest.json
+│   └── service-worker.js
+├── deploy/
+│   ├── getting-started.sh      (cloud MQTT broker setup: Mosquitto on Docker + Let's Encrypt)
+│   └── uninstall.sh            (remove the broker installation)
 ├── include/
 │   ├── config.h                (build constants, stack sizes, pin defaults)
 │   ├── appConfig.h             (AppConfig struct)
@@ -820,8 +971,8 @@ HMS-GW-S3/
     ├── logger.cpp              (formatted output HH:MM:SS.mmm)
     ├── taskWiFi.cpp            (WiFi + NTP as its own task)
     ├── taskDTU.cpp             (TCP + manual Protobuf, no Nanopb)
-    ├── taskMQTT.cpp            (esp-mqtt non-blocking, ESP-IDF 4.x flat API)
-    ├── taskWebServer.cpp       (HTTP API, OTA file+URL, static files)
+    ├── taskMQTT.cpp            (esp-mqtt non-blocking, TLS, ESP-IDF 4.x flat API)
+    ├── taskWebServer.cpp       (HTTP API, OTA file+URL, static files, semver check)
     ├── taskGPIO.cpp            (relay GPIO1, IO1-3)
     ├── taskNeoPixel.cpp        (WS2812B GPIO38, state auto-derivation)
     ├── taskSerial.cpp          (console with commands)

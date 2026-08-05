@@ -11,9 +11,9 @@
 static const uint32_t CONNECT_TIMEOUT_MS   = 15000;
 static const uint32_t MONITOR_INTERVAL_MS  = 5000;
 static const uint32_t NTP_SYNC_TIMEOUT_MS  = 10000;
-static const uint32_t NTP_REFRESH_MS       = 3600000UL;  // 1 Stunde
+static const uint32_t NTP_REFRESH_MS       = 3600000UL;  // 1 hour
 
-// --- Hilfsfunktionen ----------------------------------------------------------
+// --- Helper functions ---------------------------------------------------------
 
 // Writes the current WiFi state into DataStore; which IP/RSSI/SSID source is read depends on whether connected (STA) or apMode (the device's own AP) is set — both false just clears the connected fields.
 static void updateSystemWifi(bool connected, bool apMode) {
@@ -112,7 +112,7 @@ void taskWiFi(void* pvParameters) {
             continue;
         }
 
-        // -- Verbunden ---------------------------------------------------------
+        // -- Connected ---------------------------------------------------------
         LOG_I(MOD_WIFI, "Connected  -  IP: %s  RSSI: %d dBm",
               WiFi.localIP().toString().c_str(), WiFi.RSSI());
 

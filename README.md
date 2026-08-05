@@ -18,7 +18,7 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 |---|---|
 | ⚡ Solar data | PV1/PV2 power, voltage, current · Grid feed-in · Daily & total energy · Temperature |
 | 🌐 Web dashboard | Live data, GPIO controls, config tabs — responsive "Neon Flow" dark-glow SPA at `http://<ip>`, English/German UI toggle (preference saved on the device) |
-| 📡 MQTT | Full publish/subscribe · Home Assistant auto-discovery · OpenDTU-compatible mode |
+| 📡 MQTT | Full publish/subscribe · TLS (`mqtts://`, port 8883) · Home Assistant auto-discovery · OpenDTU-compatible mode |
 | 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/dtu`, `/api/config`, `/api/ota/*` |
 | 🌈 NeoPixel LED | Onboard WS2812B (GPIO38) — 11 states via colour & animation |
 | 🔀 Relay + 3 IO | Switchable via Web GUI, REST API and MQTT · IO1/IO2 (GPIO2/3) suited for future I2C per datasheet |
@@ -26,7 +26,9 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | 🔒 Web GUI protection | Optional username/password (HTTP Basic Auth, covers every route) and a configurable port (default 80) |
 | 💾 Config backup/restore | Download `config.json` from the System tab (WiFi/MQTT/web passwords stripped), restore it later in one upload — restoring re-applies everything except those passwords, which must be re-entered |
 | 🔄 OTA updates | Firmware/filesystem via web file upload, or by URL (downloads + flashes directly from the gateway) |
-| 🆕 Internet update check | Polls a JSON manifest (e.g. GitHub Releases) for newer versions — one-click install from the web GUI, plus a GitHub Actions workflow to publish releases |
+| 🆕 Internet update check | Polls a JSON manifest for newer versions (semver comparison wins over build number) — one-click install from the web GUI, plus a GitHub Actions workflow to publish releases |
+| 📱 PWA remote app | Progressive Web App (`app/`) — read-only dashboard over MQTT/WebSocket (port 9001), works from outside the local network via a cloud MQTT broker |
+| ☁️ Cloud MQTT setup | `deploy/getting-started.sh` — one-command setup of Eclipse Mosquitto on Docker (TLS + Let's Encrypt) for remote access; `deploy/uninstall.sh` to remove it |
 | 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 20 commands at 115200 baud |
 | 🧵 FreeRTOS | 8 independent tasks on Core 1 — Core 0 reserved for WiFi stack |
 | 🗄️ DataStore | Central in-memory data store — no direct task-to-task dependencies |
@@ -210,6 +212,10 @@ All topics under `<mqttTopic>/` (default: `hmsgws3_XXXXXX`).
 | `relay/set` | 0 or 1 | Switch relay |
 | `io1/set` … `io3/set` | 0 or 1 | Set GPIO output |
 
+### TLS (encrypted connection)
+
+Enable `mqttTls` in the Config tab. The gateway then connects via `mqtts://host:port` (default port switches to 8883 automatically when TLS is toggled on in the web UI). To verify the broker certificate, place the root CA's PEM file on the device's LittleFS filesystem as `/mqtt_ca.pem` (e.g. upload it with `POST /updatefs` as part of a custom filesystem image). Without this file the connection still works but the broker certificate is not verified.
+
 ### Home Assistant Auto-Discovery
 
 Enable `mqttHaDiscovery` in config. Entities are published automatically 5 seconds after MQTT connect, one per 500 ms. All sensors and switches appear under the `HMS-800W-2T` device in HA.
@@ -225,7 +231,7 @@ If `powerLimitTimeout > 0` (seconds), any power limit set via MQTT or web GUI wi
 Configure a manifest URL (`otaManifestUrl` in System config — defaults to this repo's `release/manifest.json` on GitHub) and the gateway will:
 
 - Check it automatically once after each WiFi connect, and on demand via `POST /api/ota/check`
-- Compare the manifest's build number against the running firmware
+- Compare the manifest's `version` field (semver `X.Y.Z`) against the running firmware version — a higher semver always means "update available", regardless of build number. Build number is used as a tiebreaker only when both semver strings are identical (e.g. a local debug flash with the same version label)
 - Show the result in the web GUI's "Internet Update" tile, with a one-click **Install** button
 - Download and flash firmware and/or filesystem directly from the URLs in the manifest (`POST /api/ota/url`) — no local file needed
 
@@ -247,6 +253,43 @@ release/manifest.json
 > `md5`/`fs_md5` are optional but recommended: if present, the gateway calls `Update.setMD5()` before flashing, so a corrupted download (right byte count, wrong content) is rejected with a clear error instead of silently producing an unbootable image that the ESP32 bootloader rejects on its own — falling back to the previous firmware without any visible error.
 
 `.github/workflows/release.yml` (manually triggered, `version` + `notes` inputs) builds firmware and filesystem, publishes a GitHub Release, and updates `release/manifest.json` — so tagging a release is enough to make it discoverable by every deployed gateway.
+
+---
+
+## PWA Remote Access App
+
+A standalone Progressive Web App lives in the `app/` directory. It connects to the MQTT broker over **WebSocket (port 9001)** — not to the gateway directly — so it works from any network as long as the broker is reachable.
+
+**Features:**
+- Read-only dashboard (live grid power, PV1/PV2 power, daily energy, inverter temperature, power limit)
+- Installable as a home screen app on Android and iOS (PWA, `manifest.json` + service worker)
+- No server required — open the `app/index.html` locally or host it statically anywhere
+
+**Setup:** configure the broker host, port (9001), username and password in the app settings. For remote access from outside the local network, deploy a cloud MQTT broker first (see below).
+
+---
+
+## Cloud MQTT Broker Setup
+
+`deploy/getting-started.sh` automates the setup of **Eclipse Mosquitto on Docker** (TLS + password auth via Let's Encrypt) on a Debian/Ubuntu VPS. This makes the MQTT broker reachable from the internet, which the PWA and any remote MQTT client need.
+
+```bash
+# Interactive (prompts for domain)
+curl -fsSL https://github.com/danielguedel/HMS-GW-S3/releases/latest/download/getting-started.sh | sudo bash
+
+# Non-interactive
+MQTT_DOMAIN=mqtt.example.com sudo bash getting-started.sh
+```
+
+Required environment variables: `MQTT_DOMAIN` (the domain pointing at your VPS, used for the TLS certificate). Optional: `MQTT_USER` (default `hmsgw`), `MQTT_PASSWORD` (randomly generated if omitted), `INSTALL_DIR` (default `/opt/hms-gw-mqtt`).
+
+To remove the broker installation completely:
+
+```bash
+sudo bash deploy/uninstall.sh
+```
+
+After setup, configure the gateway's MQTT settings to use the broker's domain, port 8883, and enable TLS (`mqttTls = true`) in the Config tab.
 
 ---
 
@@ -308,7 +351,7 @@ HMS-GW-S3/
 │   ├── logger.cpp            # Structured serial logger [HH:MM:SS.mmm]
 │   ├── taskWiFi.cpp          # WiFi + NTP
 │   ├── taskDTU.cpp           # Hoymiles TCP/Protobuf communication
-│   ├── taskMQTT.cpp          # MQTT (esp-mqtt, non-blocking)
+│   ├── taskMQTT.cpp          # MQTT (esp-mqtt, non-blocking, TLS)
 │   ├── taskWebServer.cpp     # Async HTTP server, REST API, OTA, captive portal
 │   ├── taskNeoPixel.cpp      # WS2812B LED state machine
 │   ├── taskGPIO.cpp          # Relay & GPIO, debounce, factory reset
@@ -323,6 +366,15 @@ HMS-GW-S3/
 │   └── proto/                # Hoymiles Protobuf definitions
 ├── data/www/
 │   └── index.html            # Web dashboard SPA (LittleFS)
+├── app/
+│   ├── index.html            # PWA remote access app (MQTT/WebSocket)
+│   ├── app.js                # App logic
+│   ├── style.css             # App styles
+│   ├── manifest.json         # PWA manifest
+│   └── service-worker.js     # Offline support
+├── deploy/
+│   ├── getting-started.sh    # Cloud MQTT broker setup (Mosquitto on Docker + Let's Encrypt)
+│   └── uninstall.sh          # Remove the broker installation
 ├── docs/
 │   ├── HMS-GW-S3_Specification_v2.md  # Full architecture specification
 │   └── code_review.md        # Latest code review findings
