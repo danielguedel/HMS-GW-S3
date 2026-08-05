@@ -510,6 +510,16 @@ static void handleFsUpload(AsyncWebServerRequest* /*req*/, String filename,
     }
 }
 
+// Semver "X.Y.Z" comparison: returns true if a > b.
+static bool semverGt(const char* a, const char* b) {
+    int ma=0,na=0,pa=0, mb=0,nb=0,pb=0;
+    sscanf(a, "%d.%d.%d", &ma, &na, &pa);
+    sscanf(b, "%d.%d.%d", &mb, &nb, &pb);
+    if (ma != mb) return ma > mb;
+    if (na != nb) return na > nb;
+    return pa > pb;
+}
+
 // --- Internet OTA: Manifest-Check -------------------------------------------
 static void doOtaCheck() {
     if (!strlen(appConfig.otaManifestUrl)) return;
@@ -542,8 +552,12 @@ static void doOtaCheck() {
     info.checking     = false;
     info.lastCheckMs  = millis();
     info.buildNumber  = doc["buildNumber"].as<int>();
-    info.available    = (info.buildNumber > BUILD_NUMBER);
     const char* ver   = doc["version"].as<const char*>();
+    // Version string wins over build number: a new X.Y.Z always means "available"
+    // even if the local build number is higher (e.g. from a local debug flash).
+    // Build number is only used as a tiebreaker when versions are identical.
+    info.available    = semverGt(ver ? ver : "", FW_VERSION) ||
+                        (!semverGt(FW_VERSION, ver ? ver : "") && info.buildNumber > BUILD_NUMBER);
     const char* url   = doc["url"].as<const char*>();
     const char* fsUrl = doc["fs_url"].as<const char*>();
     const char* md5   = doc["md5"].as<const char*>();
