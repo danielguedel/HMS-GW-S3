@@ -103,4 +103,5 @@ jobs:
             .pio/build/esp32-s3-devkitc-1/firmware.bin
             .pio/build/esp32-s3-devkitc-1/littlefs.bin
             deploy/getting-started.sh
+            deploy/uninstall.sh
           make_latest: true
