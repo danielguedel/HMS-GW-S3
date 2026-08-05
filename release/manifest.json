@@ -1,9 +1,9 @@
 {
-  "version": "0.4.4",
-  "buildNumber": 337,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-337/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-337/littlefs.bin",
-  "md5": "f92c11da2d658dc7b0df596d2647b390",
-  "fs_md5": "c595d8afdb0e6b6aefad1ea7b7054dea",
-  "notes": "Add uninstall.sh: reverses getting-started.sh (stops container, removes install directory and renewal hook, closes ufw ports 8883/9001; optionally deletes the Let's Encrypt certificate via DELETE_CERT=1)."
+  "version": "0.4.5",
+  "buildNumber": 338,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-338/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-338/littlefs.bin",
+  "md5": "a65b76fd70db8ee46230602abc36e63d",
+  "fs_md5": "d80a128000a83a9218551b1824e1d06b",
+  "notes": "Fix code review findings: RebootGw/set now defers restart via EVT_REBOOT to avoid interrupting an in-progress OTA; CA cert buffer enlarged to 4096 B with truncation warning; handleApiConfigPost now validates pin/port/range inputs; renewal hook in getting-started.sh correctly quotes paths."
 }
