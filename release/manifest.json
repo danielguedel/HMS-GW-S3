@@ -1,9 +1,9 @@
 {
-  "version": "0.4.7",
-  "buildNumber": 340,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-340/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-340/littlefs.bin",
-  "md5": "538841d5c159b971075271a6b3cf438a",
-  "fs_md5": "fb7e26fdea81f76644b8809dbe891eb0",
-  "notes": "Fix LED brightness: use FastLED.setBrightness() as the sole brightness control instead of manual RGB scaling; ledBrightness changes now take effect immediately without reboot."
+  "version": "0.4.8",
+  "buildNumber": 341,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-341/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-341/littlefs.bin",
+  "md5": "fc343a61dc70e73ed847eb9774af48d5",
+  "fs_md5": "4d38732e5e9f095a33748561386873b9",
+  "notes": "Fix: setting LED brightness to 0 now turns the LED off instead of falling back to the default brightness (80)."
 }
