@@ -1,9 +1,9 @@
 {
-  "version": "0.4.6",
-  "buildNumber": 339,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-339/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-339/littlefs.bin",
-  "md5": "fd846a129c7b432e6f4bddb9c6aeecf3",
-  "fs_md5": "2f4e35f894530a7f7d2edd22954bf181",
-  "notes": "Fix LED: remove double-brightness scaling (FastLED global + setColor both applied ledBrightness); shorten OPERATIONAL heartbeat to 2.5s, STANDBY pulse to 5s at 20% brightness, NO_MQTT pulse to 3s — eliminates long dark pauses where LED appeared off."
+  "version": "0.4.7",
+  "buildNumber": 340,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-340/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-340/littlefs.bin",
+  "md5": "538841d5c159b971075271a6b3cf438a",
+  "fs_md5": "fb7e26fdea81f76644b8809dbe891eb0",
+  "notes": "Fix LED brightness: use FastLED.setBrightness() as the sole brightness control instead of manual RGB scaling; ledBrightness changes now take effect immediately without reboot."
 }
