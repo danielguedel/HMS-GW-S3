@@ -161,7 +161,9 @@ static bool heartbeat(CRGB c, uint32_t periodMs, LedState_t s) {
 // --- Task ---------------------------------------------------------------------
 void taskLED(void* pvParameters) {
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
-    FastLED.setBrightness(LED_BRIGHTNESS_DEFAULT);
+    // Global brightness stays at 255 — all scaling is done in setColor() /
+    // pulse() using appConfig.ledBrightness so there is no double-scaling.
+    FastLED.setBrightness(255);
     ledOff();
     LOG_I(MOD_LED, "LED task started on GPIO%d  brightness=%d",
           LED_PIN, appConfig.ledBrightness);
@@ -216,19 +218,19 @@ void taskLED(void* pvParameters) {
                 break;
 
             case LED_NO_MQTT:
-                // Cyan  -  slow pulse 4s (non-critical, keeps running)
-                pulse(COL_CYAN, 4000, _currentState);
+                // Cyan  -  slow pulse 3s (non-critical, keeps running)
+                pulse(COL_CYAN, 3000, _currentState);
                 break;
 
             case LED_OPERATIONAL:
-                // Green  -  heartbeat 5s (all good, calm)
-                heartbeat(COL_GREEN, 5000, _currentState);
+                // Green  -  heartbeat 2.5s (all good, calm)
+                heartbeat(COL_GREEN, 2500, _currentState);
                 break;
 
             case LED_STANDBY:
-                // Green  -  very long pulse 10s, 10% brightness (night, barely visible)
-                pulse(COL_GREEN, 10000, _currentState,
-                      (uint8_t)(appConfig.ledBrightness * 10 / 100 + 1));
+                // Green  -  slow pulse 5s, 20% brightness (night, unobtrusive)
+                pulse(COL_GREEN, 5000, _currentState,
+                      (uint8_t)(appConfig.ledBrightness * 20 / 100 + 1));
                 break;
 
             case LED_DATA_FLASH:
