@@ -64,18 +64,20 @@ static bool shouldAbort(LedState_t runningFor) {
 }
 
 // --- Colour output ------------------------------------------------------------
+// FastLED.setBrightness() is the sole brightness control — called before every
+// show() so appConfig.ledBrightness changes take effect without a reboot.
+static uint8_t activeBrightness() {
+    return appConfig.ledBrightness > 0 ? appConfig.ledBrightness : LED_BRIGHTNESS_DEFAULT;
+}
+
 static void setColor(CRGB c, uint8_t brightnessOverride = 0) {
-    uint8_t b = brightnessOverride > 0
-        ? brightnessOverride
-        : (appConfig.ledBrightness > 0 ? appConfig.ledBrightness : LED_BRIGHTNESS_DEFAULT);
-    leds[0] = CRGB((uint16_t)c.r * b / 255,
-                   (uint16_t)c.g * b / 255,
-                   (uint16_t)c.b * b / 255);
+    FastLED.setBrightness(brightnessOverride > 0 ? brightnessOverride : activeBrightness());
+    leds[0] = c;
     FastLED.show();
 }
 
 static void ledOff() {
-    leds[0] = CRGB::Black;
+    FastLED.setBrightness(0);
     FastLED.show();
 }
 
@@ -117,28 +119,25 @@ static bool doubleBlink(CRGB c, uint32_t pulseMs, uint32_t pauseMs, LedState_t s
     return false;
 }
 
-// Smooth pulse: 0 → max → 0 over periodMs, optional brightness cap
+// Smooth pulse: 0 → max → 0 over periodMs, optional brightness cap.
+// Uses FastLED.setBrightness() for dimming so the colour stays true
+// and appConfig.ledBrightness is always the ceiling.
 static bool pulse(CRGB base, uint32_t periodMs, LedState_t s, uint8_t brightnessCap = 0) {
     const uint32_t steps  = 40;
     const uint32_t stepMs = periodMs / (2 * steps);
     uint8_t maxB = brightnessCap > 0
-        ? brightnessCap
-        : (appConfig.ledBrightness > 0 ? appConfig.ledBrightness : LED_BRIGHTNESS_DEFAULT);
+        ? min(brightnessCap, activeBrightness())
+        : activeBrightness();
+    leds[0] = base;
     for (uint32_t i = 0; i < steps; i++) {
         if (shouldAbort(s)) return true;
-        uint8_t scale = (uint8_t)((uint32_t)maxB * i / steps);
-        leds[0] = CRGB((uint16_t)base.r * scale / 255,
-                       (uint16_t)base.g * scale / 255,
-                       (uint16_t)base.b * scale / 255);
+        FastLED.setBrightness((uint8_t)((uint32_t)maxB * i / steps));
         FastLED.show();
         vTaskDelay(pdMS_TO_TICKS(stepMs));
     }
     for (uint32_t i = steps; i > 0; i--) {
         if (shouldAbort(s)) return true;
-        uint8_t scale = (uint8_t)((uint32_t)maxB * i / steps);
-        leds[0] = CRGB((uint16_t)base.r * scale / 255,
-                       (uint16_t)base.g * scale / 255,
-                       (uint16_t)base.b * scale / 255);
+        FastLED.setBrightness((uint8_t)((uint32_t)maxB * i / steps));
         FastLED.show();
         vTaskDelay(pdMS_TO_TICKS(stepMs));
     }
@@ -161,9 +160,6 @@ static bool heartbeat(CRGB c, uint32_t periodMs, LedState_t s) {
 // --- Task ---------------------------------------------------------------------
 void taskLED(void* pvParameters) {
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
-    // Global brightness stays at 255 — all scaling is done in setColor() /
-    // pulse() using appConfig.ledBrightness so there is no double-scaling.
-    FastLED.setBrightness(255);
     ledOff();
     LOG_I(MOD_LED, "LED task started on GPIO%d  brightness=%d",
           LED_PIN, appConfig.ledBrightness);
