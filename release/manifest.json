@@ -1,9 +1,9 @@
 {
-  "version": "0.4.5",
-  "buildNumber": 338,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-338/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-338/littlefs.bin",
-  "md5": "a65b76fd70db8ee46230602abc36e63d",
-  "fs_md5": "d80a128000a83a9218551b1824e1d06b",
-  "notes": "Fix code review findings: RebootGw/set now defers restart via EVT_REBOOT to avoid interrupting an in-progress OTA; CA cert buffer enlarged to 4096 B with truncation warning; handleApiConfigPost now validates pin/port/range inputs; renewal hook in getting-started.sh correctly quotes paths."
+  "version": "0.4.6",
+  "buildNumber": 339,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-339/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-339/littlefs.bin",
+  "md5": "fd846a129c7b432e6f4bddb9c6aeecf3",
+  "fs_md5": "2f4e35f894530a7f7d2edd22954bf181",
+  "notes": "Fix LED: remove double-brightness scaling (FastLED global + setColor both applied ledBrightness); shorten OPERATIONAL heartbeat to 2.5s, STANDBY pulse to 5s at 20% brightness, NO_MQTT pulse to 3s — eliminates long dark pauses where LED appeared off."
 }
