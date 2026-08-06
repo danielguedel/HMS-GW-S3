@@ -67,7 +67,7 @@ static bool shouldAbort(LedState_t runningFor) {
 // FastLED.setBrightness() is the sole brightness control — called before every
 // show() so appConfig.ledBrightness changes take effect without a reboot.
 static uint8_t activeBrightness() {
-    return appConfig.ledBrightness > 0 ? appConfig.ledBrightness : LED_BRIGHTNESS_DEFAULT;
+    return appConfig.ledBrightness; // 0 = LED off (user intent respected)
 }
 
 static void setColor(CRGB c, uint8_t brightnessOverride = 0) {
