@@ -89,6 +89,7 @@ struct DataStore {
         char     fsMd5[33];          // expected MD5 hash of the filesystem image (empty = no check)
         char     notes[128];         // release notes
         uint32_t lastCheckMs;        // millis() of the last check (0 = never)
+        char     lastError[64];      // reason the last check failed (empty = last check succeeded)
     } otaInfo;
 };
 

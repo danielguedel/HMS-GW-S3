@@ -640,7 +640,7 @@ const I18N = {
     msgOtaComplete: 'OTA complete', msgOtaError: 'OTA error',
     msgRestored: 'Restored — gateway restarting…',
     msgCheckingManifest: 'Checking manifest…', msgNoManifestConfigured: 'No manifest configured (Config tab)',
-    msgNoCheckYet: 'No check performed yet', msgUpdateAvailable: (v,b,n) => `Update available: v${v} (Build ${b})${n}`,
+    msgNoCheckYet: 'No check performed yet', msgCheckFailed: (e) => `Check failed: ${e}`, msgUpdateAvailable: (v,b,n) => `Update available: v${v} (Build ${b})${n}`,
     msgUpToDate: (v,b) => `Up to date — v${v} (Build ${b})`,
     btnInstallFwFs: 'Install firmware + FS', msgChecking: 'Checking…',
     msgUpdateStarted: 'Update started — gateway restarts after flashing', msgLoading: 'Loading…',
@@ -692,7 +692,7 @@ const I18N = {
     msgOtaComplete: 'OTA abgeschlossen', msgOtaError: 'OTA Fehler',
     msgRestored: 'Wiederhergestellt — Gateway startet neu…',
     msgCheckingManifest: 'Prüfe Manifest…', msgNoManifestConfigured: 'Kein Manifest konfiguriert (Config-Tab)',
-    msgNoCheckYet: 'Noch kein Check durchgeführt', msgUpdateAvailable: (v,b,n) => `Update verfügbar: v${v} (Build ${b})${n}`,
+    msgNoCheckYet: 'Noch kein Check durchgeführt', msgCheckFailed: (e) => `Prüfung fehlgeschlagen: ${e}`, msgUpdateAvailable: (v,b,n) => `Update verfügbar: v${v} (Build ${b})${n}`,
     msgUpToDate: (v,b) => `Aktuell — v${v} (Build ${b})`,
     btnInstallFwFs: 'Firmware + FS installieren', msgChecking: 'Prüfe…',
     msgUpdateStarted: 'Update gestartet — Gateway startet nach dem Flash neu', msgLoading: 'Lädt…',
@@ -1138,6 +1138,12 @@ function updateOtaCard(d) {
   }
   if (!d.lastCheckMs) {
     txt('ota-check-info', tr('msgNoCheckYet'));
+    btn.style.display = 'none';
+    box.classList.remove('ota-avail');
+    return;
+  }
+  if (d.lastError) {
+    txt('ota-check-info', tr('msgCheckFailed', d.lastError));
     btn.style.display = 'none';
     box.classList.remove('ota-avail');
     return;

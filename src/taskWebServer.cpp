@@ -551,12 +551,16 @@ static void doOtaCheck() {
     http.setTimeout(10000);
     if (!http.begin(appConfig.otaManifestUrl)) {
         LOG_E(MOD_OTA, "OTA check: http.begin failed");
-        info.checking = false; dsSetOtaInfo(info); return;
+        info.checking = false; info.lastCheckMs = millis();
+        strlcpy(info.lastError, "Could not open connection (invalid URL?)", sizeof(info.lastError));
+        dsSetOtaInfo(info); return;
     }
     int code = http.GET();
     if (code != HTTP_CODE_OK) {
         LOG_E(MOD_OTA, "OTA check: HTTP %d", code);
-        http.end(); info.checking = false; dsSetOtaInfo(info); return;
+        http.end(); info.checking = false; info.lastCheckMs = millis();
+        snprintf(info.lastError, sizeof(info.lastError), "HTTP error %d", code);
+        dsSetOtaInfo(info); return;
     }
     String body = http.getString();
     http.end();
@@ -564,7 +568,9 @@ static void doOtaCheck() {
     JsonDocument doc;
     if (deserializeJson(doc, body) != DeserializationError::Ok) {
         LOG_E(MOD_OTA, "OTA check: JSON parse error");
-        info.checking = false; dsSetOtaInfo(info); return;
+        info.checking = false; info.lastCheckMs = millis();
+        strlcpy(info.lastError, "Invalid manifest (JSON parse error)", sizeof(info.lastError));
+        dsSetOtaInfo(info); return;
     }
 
     info.checking     = false;
@@ -611,6 +617,7 @@ static void handleApiOtaCheckGet(AsyncWebServerRequest* req) {
     doc["fsMd5"]          = info.fsMd5;
     doc["notes"]          = info.notes;
     doc["lastCheckMs"]    = info.lastCheckMs;
+    doc["lastError"]      = info.lastError;
     doc["currentVersion"] = FW_VERSION;
     doc["currentBuild"]   = BUILD_NUMBER;
     doc["manifestUrl"]    = appConfig.otaManifestUrl;
