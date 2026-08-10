@@ -190,9 +190,11 @@ All topics under `<mqttTopic>/` (default: `hmsgws3_XXXXXX`).
 | Topic | Value | Trigger |
 |---|---|---|
 | `grid/P`, `grid/U`, `grid/I` | float | Every DTU update |
-| `grid/dailyEnergy`, `grid/totalEnergy` | float kWh | Every DTU update |
-| `pv0/P`, `pv0/U`, `pv0/I`, `pv0/dailyEnergy`, `pv0/totalEnergy` | float | Every DTU update |
-| `pv1/P`, `pv1/U`, `pv1/I`, `pv1/dailyEnergy`, `pv1/totalEnergy` | float | Every DTU update |
+| `grid/dailyEnergy`, `grid/totalEnergy` | float kWh | Every DTU update — **always retained**, regardless of the `mqttRetain` setting |
+| `pv0/P`, `pv0/U`, `pv0/I` | float | Every DTU update |
+| `pv0/dailyEnergy`, `pv0/totalEnergy` | float | Every DTU update — **always retained** |
+| `pv1/P`, `pv1/U`, `pv1/I` | float | Every DTU update |
+| `pv1/dailyEnergy`, `pv1/totalEnergy` | float | Every DTU update — **always retained** |
 | `inverter/Temp` | float °C | Every DTU update |
 | `inverter/PowerLimit` | int % | Every DTU update |
 | `inverter/PowerLimitTarget` | int % | Every DTU update — last requested value, may briefly differ from `PowerLimit` until the DTU confirms it |

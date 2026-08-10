@@ -46,24 +46,29 @@ static void pubInt(const char* suffix, int val, bool retain = false) {
 
 // --- Publish PV data (Spec §5.3) ---------------------------------------------
 // Publishes the latest PV/grid measurement; uses the OpenDTU-compatible topic layout when appConfig.mqttOpenDtu is set, otherwise the gateway's own schema.
+// Daily/total yield are always retained regardless of appConfig.mqttRetain (the
+// "Retain" setting only governs live power/voltage/current): the gateway only
+// publishes on a new DTU reading, so a client that reconnects while the inverter
+// is offline (e.g. overnight) would otherwise see nothing at all instead of the
+// last known yield - retained yield is exactly what should still be visible then.
 static void publishPvData(const DataStore::PvData& pv) {
     bool r = appConfig.mqttRetain;
 
     if (appConfig.mqttOpenDtu) {
         String base = String(appConfig.mqttTopic) + "/";
-        auto opub = [&](const char* path, float val, int dec) {
+        auto opub = [&](const char* path, float val, int dec, bool retain) {
             char buf[24]; dtostrf(val, 1, dec, buf);
-            esp_mqtt_client_publish(_client, (base + path).c_str(), buf, 0, 0, r ? 1 : 0);
+            esp_mqtt_client_publish(_client, (base + path).c_str(), buf, 0, 0, retain ? 1 : 0);
         };
-        opub("0/power",      pv.grid_p, 1); opub("0/voltage",    pv.grid_v, 1);
-        opub("0/current",    pv.grid_i, 2); opub("0/yieldday",   pv.grid_dE,3);
-        opub("0/yieldtotal", pv.grid_tE,3); opub("0/temperatur", pv.temp,   1);
-        opub("1/power",      pv.pv0_p,  1); opub("1/voltage",    pv.pv0_v,  1);
-        opub("1/current",    pv.pv0_i,  2); opub("1/yieldday",   pv.pv0_dE, 3);
-        opub("1/yieldtotal", pv.pv0_tE, 3);
-        opub("2/power",      pv.pv1_p,  1); opub("2/voltage",    pv.pv1_v,  1);
-        opub("2/current",    pv.pv1_i,  2); opub("2/yieldday",   pv.pv1_dE, 3);
-        opub("2/yieldtotal", pv.pv1_tE, 3);
+        opub("0/power",      pv.grid_p, 1, r);    opub("0/voltage",    pv.grid_v, 1, r);
+        opub("0/current",    pv.grid_i, 2, r);    opub("0/yieldday",   pv.grid_dE,3, true);
+        opub("0/yieldtotal", pv.grid_tE,3, true); opub("0/temperatur", pv.temp,   1, r);
+        opub("1/power",      pv.pv0_p,  1, r);    opub("1/voltage",    pv.pv0_v,  1, r);
+        opub("1/current",    pv.pv0_i,  2, r);    opub("1/yieldday",   pv.pv0_dE, 3, true);
+        opub("1/yieldtotal", pv.pv0_tE, 3, true);
+        opub("2/power",      pv.pv1_p,  1, r);    opub("2/voltage",    pv.pv1_v,  1, r);
+        opub("2/current",    pv.pv1_i,  2, r);    opub("2/yieldday",   pv.pv1_dE, 3, true);
+        opub("2/yieldtotal", pv.pv1_tE, 3, true);
         char buf[16];
         snprintf(buf, sizeof(buf), "%d", pv.powerLimit);
         esp_mqtt_client_publish(_client, (base+"status/limit_relative").c_str(), buf, 0, 0, r?1:0);
@@ -76,18 +81,18 @@ static void publishPvData(const DataStore::PvData& pv) {
         pubFloat("grid/U",           pv.grid_v,  1, r);
         pubFloat("grid/I",           pv.grid_i,  2, r);
         pubFloat("grid/P",           pv.grid_p,  1, r);
-        pubFloat("grid/dailyEnergy", pv.grid_dE, 3, r);
-        pubFloat("grid/totalEnergy", pv.grid_tE, 3, r);
+        pubFloat("grid/dailyEnergy", pv.grid_dE, 3, true);
+        pubFloat("grid/totalEnergy", pv.grid_tE, 3, true);
         pubFloat("pv0/U",            pv.pv0_v,   1, r);
         pubFloat("pv0/I",            pv.pv0_i,   2, r);
         pubFloat("pv0/P",            pv.pv0_p,   1, r);
-        pubFloat("pv0/dailyEnergy",  pv.pv0_dE,  3, r);
-        pubFloat("pv0/totalEnergy",  pv.pv0_tE,  3, r);
+        pubFloat("pv0/dailyEnergy",  pv.pv0_dE,  3, true);
+        pubFloat("pv0/totalEnergy",  pv.pv0_tE,  3, true);
         pubFloat("pv1/U",            pv.pv1_v,   1, r);
         pubFloat("pv1/I",            pv.pv1_i,   2, r);
         pubFloat("pv1/P",            pv.pv1_p,   1, r);
-        pubFloat("pv1/dailyEnergy",  pv.pv1_dE,  3, r);
-        pubFloat("pv1/totalEnergy",  pv.pv1_tE,  3, r);
+        pubFloat("pv1/dailyEnergy",  pv.pv1_dE,  3, true);
+        pubFloat("pv1/totalEnergy",  pv.pv1_tE,  3, true);
         pubFloat("inverter/Temp",    pv.temp,     1, r);
         pubInt  ("inverter/PowerLimit",       pv.powerLimit,    r);
         pubInt  ("inverter/PowerLimitTarget",  pv.powerLimitSet, r);

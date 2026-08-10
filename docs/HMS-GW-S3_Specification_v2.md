@@ -418,10 +418,11 @@ The web UI's port field auto-populates with the appropriate default when the TLS
 {mqttTopic}/grid/U                 Grid voltage [V]
 {mqttTopic}/grid/I                 Grid current [A]
 {mqttTopic}/grid/P                 Grid power [W]
-{mqttTopic}/grid/dailyEnergy       Daily yield [kWh]
-{mqttTopic}/grid/totalEnergy       Total yield [kWh]
+{mqttTopic}/grid/dailyEnergy       Daily yield [kWh] (always retained, independent of mqttRetain)
+{mqttTopic}/grid/totalEnergy       Total yield [kWh] (always retained, independent of mqttRetain)
 {mqttTopic}/pv0/U, /pv0/I, /pv0/P PV1
 {mqttTopic}/pv1/U, /pv1/I, /pv1/P PV2
+{mqttTopic}/pv{0,1}/dailyEnergy, /totalEnergy  Per-string yield [kWh] (always retained, independent of mqttRetain)
 {mqttTopic}/inverter/Temp          Temperature [°C]
 {mqttTopic}/inverter/PowerLimit    Power limit [%] (confirmed by the DTU)
 {mqttTopic}/inverter/PowerLimitTarget  Target power limit [%] — last requested value, may briefly differ from PowerLimit until the DTU confirms it
