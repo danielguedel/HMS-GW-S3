@@ -56,8 +56,8 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
   -webkit-mask-composite: xor; mask-composite: exclude; opacity: .8;
   pointer-events: none;
 }
-.card.pv0 { --glow: var(--pink); }
-.card.pv1 { --glow: var(--purple); }
+/* Grid/PV1/PV2 --glow is set dynamically in app.js (power-tiered, matching
+   data/www/index.html's powerGlow()) - no fixed per-card identity color. */
 .card-title { font-size: 11px; font-weight: 700; color: var(--muted);
               text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
 .card-val  { font-size: 26px; font-weight: 700; color: var(--glow, var(--cyan));

@@ -60,11 +60,14 @@ function toast(msg) {
   toast._h = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-// Updates the header status dot + label to reflect the current MQTT connection state.
+// Updates the header status dot + label to reflect the current MQTT connection
+// state, then re-applies card glow (see powerGlow()) so Grid/PV1/PV2 flip to/
+// from pink immediately on connect/disconnect rather than waiting for new data.
 function setConn(ok, label) {
   $('dot-conn').classList.toggle('ok', ok);
   $('dot-conn').classList.toggle('err', !ok);
   $('conn-label').textContent = label;
+  updateGridCard(); updatePvCard(0); updatePvCard(1);
 }
 
 // Converts a power value to a clamped 0-100% CSS width string for the bar gauges.
@@ -73,11 +76,23 @@ function pct(val, max) {
   return v + '%';
 }
 
+// Grid/PV1/PV2 card border+text glow scales with power once connected - same
+// thresholds as data/www/index.html's powerGlow(), so both UIs read the same way.
+// Falls back to pink while disconnected, matching that dashboard's convention.
+function powerGlow(p) {
+  if (!client || !client.connected) return 'var(--pink)';
+  if (p < 250) return 'var(--cyan)';
+  if (p < 500) return 'var(--purple)';
+  return 'var(--pink)';
+}
+
 // --- Live data state (assembled incrementally, one MQTT message at a time) ----
 const live = { grid: {}, pv0: {}, pv1: {}, inverter: {} };
 
 // Re-renders the Grid card from the current `live` state; fields that haven't
-// arrived over MQTT yet are left at their previous (or initial "–") value.
+// arrived over MQTT yet are left at their previous (or initial "–") value. Glow
+// is always refreshed (even with no new data) so a connection-status change
+// alone flips the card color without waiting for the next MQTT message.
 function updateGridCard() {
   if (live.grid.P !== undefined) {
     $('grid-p').textContent = Number(live.grid.P).toFixed(0);
@@ -85,8 +100,9 @@ function updateGridCard() {
   }
   if (live.grid.U !== undefined && live.grid.I !== undefined)
     $('grid-ui').textContent = `${Number(live.grid.U).toFixed(1)} V / ${Number(live.grid.I).toFixed(2)} A`;
+  $('card-grid').style.setProperty('--glow', powerGlow(Number(live.grid.P) || 0));
 }
-// Re-renders the PV1 (n=0) or PV2 (n=1) card, same partial-update behavior as updateGridCard().
+// Re-renders the PV1 (n=0) or PV2 (n=1) card, same partial-update + glow-refresh behavior as updateGridCard().
 function updatePvCard(n) {
   const d = live['pv' + n];
   if (d.P !== undefined) {
@@ -95,6 +111,7 @@ function updatePvCard(n) {
   }
   if (d.U !== undefined && d.I !== undefined)
     $(`pv${n}-ui`).textContent = `${Number(d.U).toFixed(1)} V / ${Number(d.I).toFixed(2)} A`;
+  $(`card-pv${n}`).style.setProperty('--glow', powerGlow(Number(d.P) || 0));
 }
 // Re-renders the temperature/power-limit/energy cards from the current `live` state.
 function updateSystemCards() {

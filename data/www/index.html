@@ -330,13 +330,13 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
       <div class="bar-wrap"><div class="bar" id="bar-grid"></div></div>
       <div class="card-sub" id="grid-ui">– V / – A</div>
     </div>
-    <div class="card pv0">
+    <div class="card pv0" id="card-pv0">
       <div class="card-title">PV1</div>
       <div><span class="card-val" id="pv0-p">–</span><span class="card-unit">W</span></div>
       <div class="bar-wrap"><div class="bar" id="bar-pv0"></div></div>
       <div class="card-sub" id="pv0-ui">– V / – A</div>
     </div>
-    <div class="card pv1">
+    <div class="card pv1" id="card-pv1">
       <div class="card-title">PV2</div>
       <div><span class="card-val" id="pv1-p">–</span><span class="card-unit">W</span></div>
       <div class="bar-wrap"><div class="bar" id="bar-pv1"></div></div>
@@ -772,15 +772,18 @@ function setDot(id, ok) {
 }
 
 // ─── Dashboard data ───────────────────────────────────────────────────────
-// Grid-card border/glow scales with power draw rather than a fixed color.
-function gridGlow(p) {
+// Grid/PV1/PV2 card border/glow scales with power rather than a fixed identity
+// color - same thresholds for all three cards (Spec: HMS-800W-2T, ~450 W max per
+// string, so PV1/PV2 realistically sit in the cyan/purple range and only reach
+// the pink tier close to their ceiling).
+function powerGlow(p) {
   if (p < 250) return 'var(--cyan)';
   if (p < 500) return 'var(--purple)';
   return 'var(--pink)';
 }
 
 // ─── Combined status badge (WiFi/DTU/MQTT connectivity + inverter active/standby) ──
-let _dtuOnline = null, _invActive = null, _gridP = 0, _wifiOnline = null, _mqttOnline = null, _limitWasPending = false;
+let _dtuOnline = null, _invActive = null, _gridP = 0, _pv0P = 0, _pv1P = 0, _wifiOnline = null, _mqttOnline = null, _limitWasPending = false;
 function updateStatusBadge() {
   const connected = _wifiOnline !== false && _dtuOnline !== false && _mqttOnline !== false;
   const active = connected && _invActive === true;
@@ -795,12 +798,15 @@ function updateStatusBadge() {
   ['grid-p', 'pv0-p', 'pv1-p', 's-temp', 's-limit', 's-de', 's-te'].forEach(id => $(id).className = 'card-val ' + cls);
   ['bar-grid', 'bar-pv0', 'bar-pv1'].forEach(id => $(id).className = 'bar ' + cls);
 
-  // Card border/glow: cyan while active, pink for standby/no-data/offline; Grid is additionally power-tiered while active.
+  // Card border/glow: cyan while active, pink for standby/no-data/offline; Grid/PV1/PV2
+  // are additionally power-tiered while active (see powerGlow()).
   // Power Limit is excluded here -  it's a setpoint that can always be sent regardless of connectivity,
   // so its glow tracks pending/confirmed instead (see updateLimitGlow()).
   const statusGlow = active ? 'var(--cyan)' : 'var(--pink)';
   document.querySelectorAll('#tab-dashboard .card:not(#card-limit)').forEach(c => c.style.setProperty('--glow', statusGlow));
-  $('card-grid').style.setProperty('--glow', active ? gridGlow(_gridP) : 'var(--pink)');
+  $('card-grid').style.setProperty('--glow', active ? powerGlow(_gridP) : 'var(--pink)');
+  $('card-pv0').style.setProperty('--glow', active ? powerGlow(_pv0P) : 'var(--pink)');
+  $('card-pv1').style.setProperty('--glow', active ? powerGlow(_pv1P) : 'var(--pink)');
 }
 
 // Power Limit card glow: pink while the sent setpoint hasn't been confirmed by the DTU yet, cyan once it has -
@@ -829,10 +835,12 @@ async function refreshData() {
     txt('pv0-p',  d.pv0.p.toFixed(0));
     txt('pv0-ui', d.pv0.v.toFixed(1) + ' V / ' + d.pv0.i.toFixed(2) + ' A');
     $('bar-pv0').style.width = pct(d.pv0.p, 450);
+    _pv0P = d.pv0.p;
 
     txt('pv1-p',  d.pv1.p.toFixed(0));
     txt('pv1-ui', d.pv1.v.toFixed(1) + ' V / ' + d.pv1.i.toFixed(2) + ' A');
     $('bar-pv1').style.width = pct(d.pv1.p, 450);
+    _pv1P = d.pv1.p;
 
     txt('s-temp',  d.inverter.temp.toFixed(1));
     txt('s-limit', d.inverter.powerLimit);
