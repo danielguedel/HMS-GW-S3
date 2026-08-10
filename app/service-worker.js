@@ -1,6 +1,12 @@
 // Cache-first for the app shell only - live data always comes fresh over MQTT,
 // never through this cache.
-const CACHE = 'hms-gw-s3-remote-v2';
+//
+// IMPORTANT: bump this version string on every change to index.html/app.js/
+// style.css/manifest.json (the SHELL list below), not just when SHELL itself
+// changes. Browsers only re-check the app shell when this file's own bytes
+// change - if only e.g. app.js changed, installed PWAs would keep serving the
+// stale cached version indefinitely otherwise.
+const CACHE = 'hms-gw-s3-remote-v3';
 const SHELL = [
   './',
   './index.html',
