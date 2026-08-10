@@ -130,6 +130,15 @@ input[type=text], input[type=number], input[type=password], select {
   background: var(--surface2); border: 1px solid var(--border); color: var(--purple);
   border-radius: 8px; padding: 9px 12px; width: 100%; font-size: 13px; margin-top: 6px; font: inherit; }
 input::placeholder { color: var(--muted); opacity: 1; }
+/* Belt-and-suspenders: browsers normally force their own bg/text color on
+   autofilled fields, overriding the rule above - autocomplete="new-password"
+   on the password inputs should prevent autofill entirely, but keep this so
+   the color stays consistent even if a browser autofills one anyway. */
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--purple);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface2) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
 input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(43,240,255,.2); }
 .cfg-box input:focus, .cfg-box select:focus { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(176,75,255,.25); }
 .chk-row { display: flex; flex-wrap: wrap; gap: 18px; margin: 12px 0; }
@@ -398,7 +407,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
   <div class="cfg-box">
     <h3>WiFi</h3>
     <label><span data-i18n="lblSsid">SSID</span><input type="text" id="c-ssid"></label>
-    <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
+    <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)" autocomplete="new-password"></label>
     <div class="chk-row">
       <label><input type="checkbox" id="c-apfb"> <span data-i18n="lblApFallback">AP fallback if no STA</span></label>
     </div>
@@ -434,7 +443,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
     </div>
     <div class="row2">
       <label><span data-i18n="lblUsername">Username</span><input type="text" id="c-mqtt-user"></label>
-      <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-mqtt-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
+      <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-mqtt-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)" autocomplete="new-password"></label>
     </div>
     <label><span data-i18n="lblTopic">Topic</span><input type="text" id="c-mqtt-topic"></label>
     <div class="chk-row">
@@ -466,7 +475,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
     </div>
     <div class="row2">
       <label><span data-i18n="lblUsername">Username</span><input type="text" id="c-web-user" placeholder="admin"></label>
-      <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-web-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)"></label>
+      <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-web-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)" autocomplete="new-password"></label>
     </div>
     <p class="hint hint-trailing" data-i18n="pWebServerHint">
       Port and auth changes only take effect after the automatic restart. With protection enabled, the browser will prompt for credentials on the next request.</p>
