@@ -77,7 +77,10 @@
       <span class="ctrl-label">Power Limit Target</span>
       <span class="range-val" id="range-val">– %</span>
     </div>
-    <input type="range" id="limit-range" min="0" max="100" step="1" value="100">
+    <div class="range-wrap">
+      <div class="bar-wrap"><div class="bar" id="bar-limit"></div></div>
+      <input type="range" id="limit-range" min="0" max="100" step="1" value="100">
+    </div>
   </div>
   <div class="ctrl-box">
     <div class="ctrl-row">
@@ -109,7 +112,7 @@
     <label for="cf-user">Username</label>
     <input type="text" id="cf-user">
     <label for="cf-pass">Password</label>
-    <input type="password" id="cf-pass">
+    <input type="password" id="cf-pass" autocomplete="new-password">
     <label for="cf-topic">Topic prefix</label>
     <input type="text" id="cf-topic" placeholder="hmsgws3_xxxxxx">
     <div class="btn-row">

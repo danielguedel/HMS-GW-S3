@@ -74,8 +74,34 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
 .ctrl-row + .ctrl-row { border-top: 1px solid var(--border); }
 .ctrl-label { font-size: 13px; color: var(--text); font-weight: 600; }
 
-input[type="range"] { width: 100%; accent-color: var(--cyan); }
 .range-val { font-size: 13px; color: var(--cyan); font-weight: 700; min-width: 42px; text-align: right; }
+.range-val.pending { color: var(--pink); text-shadow: 0 0 8px var(--pink); }
+
+/* Range slider - same custom glow-track pattern as data/www/index.html's
+   .range-wrap: track hidden, .bar-wrap/.bar underneath shows the fill, thumb
+   glows cyan normally / pink while the sent target hasn't been confirmed yet. */
+.range-wrap { position: relative; height: 18px; margin: 10px 0 0; --glow: var(--cyan); }
+.range-wrap .bar-wrap { position: absolute; top: 50%; left: 0; right: 0; margin: 0; transform: translateY(-50%); }
+.range-wrap input[type=range] {
+  position: absolute; inset: 0; width: 100%; margin: 0;
+  appearance: none; -webkit-appearance: none; background: transparent; border: none; outline: none; cursor: pointer;
+}
+.range-wrap input[type=range]:focus,
+.range-wrap input[type=range]:active,
+.range-wrap input[type=range]:focus-visible { outline: none; box-shadow: none; }
+.range-wrap input[type=range]::-webkit-slider-runnable-track { background: transparent; height: 100%; border: none; }
+.range-wrap input[type=range]::-moz-range-track { background: transparent; height: 100%; border: none; }
+.range-wrap input[type=range]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: 16px; height: 16px; border-radius: 50%; background: var(--cyan); cursor: pointer;
+  box-shadow: 0 0 8px var(--cyan), 0 0 16px var(--cyan);
+}
+.range-wrap input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%; border: none; background: var(--cyan); cursor: pointer;
+  box-shadow: 0 0 8px var(--cyan), 0 0 16px var(--cyan);
+}
+.range-wrap input[type=range].pending::-webkit-slider-thumb { background: var(--pink); box-shadow: 0 0 8px var(--pink), 0 0 16px var(--pink); }
+.range-wrap input[type=range].pending::-moz-range-thumb { background: var(--pink); box-shadow: 0 0 8px var(--pink), 0 0 16px var(--pink); }
 
 /* Toggle switch */
 .switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
@@ -98,9 +124,18 @@ input[type="range"] { width: 100%; accent-color: var(--cyan); }
 #settings label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
 #settings input {
   width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-  padding: 9px 10px; color: var(--text); font-size: 14px; font-family: inherit;
+  padding: 9px 10px; color: var(--purple); font-size: 14px; font-family: inherit;
 }
-#settings input:focus { outline: none; border-color: var(--cyan); }
+#settings input::placeholder { color: var(--muted); opacity: 1; }
+#settings input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px rgba(176,75,255,.25); }
+/* Belt-and-suspenders against browser autofill overriding the color above -
+   autocomplete="new-password" on cf-pass should prevent it entirely, but keep
+   this so the color stays consistent even if a browser autofills anyway. */
+#settings input:-webkit-autofill, #settings input:-webkit-autofill:hover, #settings input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--purple);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface2) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
 #settings .btn-row { display: flex; gap: 8px; margin-top: 18px; }
 #settings .btn-row .icon-btn { flex: 1; text-align: center; padding: 10px; }
 

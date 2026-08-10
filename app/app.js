@@ -127,10 +127,16 @@ function updateSystemCards() {
 let suppressPublish = false;
 
 // Syncs the power-limit slider to the broker's PowerLimitTarget, unless the user
-// is actively dragging it (checked via document.activeElement).
+// is actively dragging it (checked via document.activeElement). Slider/label turn
+// pink ("pending") while PowerLimitTarget hasn't been confirmed by PowerLimit yet -
+// same convention as data/www/index.html's updateLimitGlow().
 function updateLimitRange() {
   const target = live.inverter.PowerLimitTarget;
   if (target === undefined) return;
+  const pending = target !== live.inverter.PowerLimit;
+  $('limit-range').classList.toggle('pending', pending);
+  $('range-val').classList.toggle('pending', pending);
+  $('bar-limit').style.width = pct(target, 100);
   if (document.activeElement === $('limit-range')) return; // don't fight the user mid-drag
   suppressPublish = true;
   $('limit-range').value = target;
@@ -171,7 +177,7 @@ function onMqttMessage(topic, payloadBuf) {
     case 'pv1/I': live.pv1.I = val; updatePvCard(1); break;
 
     case 'inverter/Temp':             live.inverter.Temp = val; updateSystemCards(); break;
-    case 'inverter/PowerLimit':       live.inverter.PowerLimit = val; updateSystemCards(); break;
+    case 'inverter/PowerLimit':       live.inverter.PowerLimit = val; updateSystemCards(); updateLimitRange(); break;
     case 'inverter/PowerLimitTarget': live.inverter.PowerLimitTarget = val; updateLimitRange(); break;
 
     case 'relay/state': updateSwitch('sw-relay', val); break;
