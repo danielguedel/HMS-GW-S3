@@ -1,9 +1,9 @@
 {
-  "version": "0.4.9",
-  "buildNumber": 342,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-342/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-342/littlefs.bin",
-  "md5": "d96860fe31ffdb65f3eb2c4491518454",
-  "fs_md5": "71ae471f31827c89055ddc1d644ee6a9",
-  "notes": "Daily/total yield (grid + PV1 + PV2) now always published as retained MQTT messages regardless of the mqttRetain setting, so a reconnecting client (e.g. the PWA) sees last-known yield even if the inverter has been offline a while. Fixed browser autofill incorrectly populating the WiFi/MQTT/web-GUI password fields (autocomplete="new-password" added). Grid/PV1/PV2 dashboard cards now share one power-tiered color scale (<250W cyan, <500W purple, else pink) instead of PV1/PV2 having no dedicated coloring, matching the PWA."
+  "version": "0.5.0",
+  "buildNumber": 343,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-343/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-343/littlefs.bin",
+  "md5": "4e4b59d9c8448b672fd6ac3a6dff1084",
+  "fs_md5": "ba8e3e6abd8f858a421e7052da04c739",
+  "notes": "Expose OTA manifest-check failures in the dashboard instead of silently looking identical to "never checked" - a new OtaInfo.lastError field is set whenever the check fails (network/DNS/TLS/HTTP error, invalid manifest) and shown as "Check failed: <reason>"."
 }
