@@ -255,6 +255,7 @@ function updateLimitRange() {
   const pending = target !== live.inverter.PowerLimit;
   $('limit-range').classList.toggle('pending', pending);
   $('range-val').classList.toggle('pending', pending);
+  $('bar-limit').classList.toggle('pending', pending);
   $('bar-limit').style.width = pct(target, 100);
   updateLimitGlow(pending);
   if (_limitWasPending && !pending) toast('Limit → ' + target + '%');
@@ -270,6 +271,8 @@ function updateLimitRange() {
 // updateStatusBadge()), same convention as data/www/index.html's updateLimitGlow().
 function updateLimitGlow(pending) {
   $('card-limit').style.setProperty('--glow', pending ? 'var(--pink)' : 'var(--cyan)');
+  $('btn-limit-set').classList.toggle('text-danger', pending);
+  $('btn-limit-set').classList.toggle('text-ok', !pending);
 }
 // Syncs a toggle switch + its ON/OFF badge + card border glow to its retained
 // MQTT state topic (key: 'relay'/'io1'/'io2'/'io3', matching the
@@ -348,10 +351,12 @@ function pub(suffix, value) {
   return true;
 }
 
-// Dragging only updates the visible percentage - matches data/www/index.html's
-// onLimitInput(): nothing is sent until "Set" is clicked (see below).
+// Dragging updates the visible percentage and bar fill (but sends nothing until
+// "Set" is clicked) - matches data/www/index.html's onLimitInput().
 $('limit-range').addEventListener('input', () => {
-  $('range-val').textContent = $('limit-range').value + ' %';
+  const v = $('limit-range').value;
+  $('range-val').textContent = v + ' %';
+  $('bar-limit').style.width = pct(v, 100);
 });
 // Optimistically shows the sent value as "pending" (pink) right away, same as
 // data/www/index.html's setLimit() - it's re-confirmed (or corrected) once the
@@ -363,6 +368,7 @@ $('btn-limit-set').addEventListener('click', () => {
   $('bar-limit').style.width = pct(val, 100);
   $('range-val').classList.add('pending');
   $('limit-range').classList.add('pending');
+  $('bar-limit').classList.add('pending');
   updateLimitGlow(true);
   toast('Limit → ' + val + '%', false);
 });
