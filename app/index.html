@@ -36,12 +36,13 @@
   </h1>
   <div style="display:flex; align-items:center; gap:14px;">
     <div class="dot-wrap"><span class="dot" id="dot-conn"></span><span id="conn-label">Disconnected</span></div>
-    <button class="icon-btn" id="btn-settings">Settings</button>
+    <button class="icon-btn" id="lang-btn" title="Language">DE</button>
+    <button class="icon-btn" id="btn-settings" data-i18n="btnSettings">Settings</button>
   </div>
 </header>
 
 <main>
-  <div class="sec">Live</div>
+  <div class="sec" data-i18n="secLive">Live</div>
   <div class="grid">
     <div class="card grid-p" id="card-grid">
       <div class="card-title">Grid</div>
@@ -50,53 +51,61 @@
       <div class="bar-wrap"><div class="bar" id="bar-grid"></div></div>
     </div>
     <div class="card pv0" id="card-pv0">
-      <div class="card-title">PV 1</div>
+      <div class="card-title">PV1</div>
       <div><span class="card-val" id="pv0-p">–</span><span class="card-unit">W</span></div>
       <div class="card-sub" id="pv0-ui">– V / – A</div>
       <div class="bar-wrap"><div class="bar" id="bar-pv0"></div></div>
     </div>
     <div class="card pv1" id="card-pv1">
-      <div class="card-title">PV 2</div>
+      <div class="card-title">PV2</div>
       <div><span class="card-val" id="pv1-p">–</span><span class="card-unit">W</span></div>
       <div class="card-sub" id="pv1-ui">– V / – A</div>
       <div class="bar-wrap"><div class="bar" id="bar-pv1"></div></div>
     </div>
   </div>
 
-  <div class="sec">System</div>
-  <div class="grid">
-    <div class="card"><div class="card-title">Temperature</div><div><span class="card-val" id="s-temp">–</span><span class="card-unit">°C</span></div></div>
-    <div class="card"><div class="card-title">Power Limit</div><div><span class="card-val" id="s-limit">–</span><span class="card-unit">%</span></div></div>
-    <div class="card"><div class="card-title">Daily Energy</div><div><span class="card-val" id="s-de">–</span><span class="card-unit">kWh</span></div></div>
-    <div class="card"><div class="card-title">Total Energy</div><div><span class="card-val" id="s-te">–</span><span class="card-unit">kWh</span></div></div>
+  <div class="sec" data-i18n="secStatus">Status</div>
+  <div class="ctrl-box">
+    <span class="badge badge-lg b-off" id="s-active">–</span>
   </div>
 
-  <div class="sec">Control</div>
+  <div class="sec" data-i18n="secSystem">System</div>
+  <div class="grid">
+    <div class="card"><div class="card-title" data-i18n="statTemp">Temp</div><div><span class="card-val" id="s-temp">–</span><span class="card-unit">°C</span></div></div>
+    <div class="card"><div class="card-title" data-i18n="statLimit">Limit</div><div><span class="card-val" id="s-limit">–</span><span class="card-unit">%</span></div></div>
+    <div class="card"><div class="card-title" data-i18n="statYieldToday">Yield today</div><div><span class="card-val" id="s-de">–</span><span class="card-unit">kWh</span></div></div>
+    <div class="card"><div class="card-title" data-i18n="statTotal">Total</div><div><span class="card-val" id="s-te">–</span><span class="card-unit">kWh</span></div></div>
+  </div>
+
+  <div class="sec" data-i18n="secControl">Control</div>
   <div class="ctrl-box">
     <div class="ctrl-row">
-      <span class="ctrl-label">Power Limit Target</span>
+      <span class="ctrl-label" data-i18n="secPowerLimit">Power Limit</span>
       <span class="range-val" id="range-val">– %</span>
     </div>
     <div class="range-wrap">
       <div class="bar-wrap"><div class="bar" id="bar-limit"></div></div>
       <input type="range" id="limit-range" min="0" max="100" step="1" value="100">
     </div>
+    <div class="ctrl-row" style="justify-content:flex-end; border-top:none; padding-top:12px;">
+      <button class="icon-btn cyan" id="btn-limit-set" data-i18n="btnSet">Set</button>
+    </div>
   </div>
   <div class="ctrl-box">
     <div class="ctrl-row">
-      <span class="ctrl-label">Relay</span>
+      <span class="ctrl-label" data-i18n="lblRelay">Relay</span>
       <label class="switch"><input type="checkbox" id="sw-relay"><span class="slider"></span></label>
     </div>
     <div class="ctrl-row">
-      <span class="ctrl-label">IO 1</span>
+      <span class="ctrl-label" data-i18n="lblIo1">IO1</span>
       <label class="switch"><input type="checkbox" id="sw-io1"><span class="slider"></span></label>
     </div>
     <div class="ctrl-row">
-      <span class="ctrl-label">IO 2</span>
+      <span class="ctrl-label" data-i18n="lblIo2">IO2</span>
       <label class="switch"><input type="checkbox" id="sw-io2"><span class="slider"></span></label>
     </div>
     <div class="ctrl-row">
-      <span class="ctrl-label">IO 3</span>
+      <span class="ctrl-label" data-i18n="lblIo3">IO3</span>
       <label class="switch"><input type="checkbox" id="sw-io3"><span class="slider"></span></label>
     </div>
   </div>
@@ -104,20 +113,20 @@
 
 <div id="settings">
   <div class="panel">
-    <h2>Broker Connection</h2>
-    <label for="cf-host">Broker Host</label>
+    <h2 data-i18n="hBrokerConn">Broker Connection</h2>
+    <label for="cf-host" data-i18n="lblBrokerHost">Broker Host</label>
     <input type="text" id="cf-host" placeholder="mqtt.example.com">
-    <label for="cf-port">Port (WebSocket)</label>
+    <label for="cf-port" data-i18n="lblPortWs">Port (WebSocket)</label>
     <input type="number" id="cf-port" placeholder="9001" value="9001">
-    <label for="cf-user">Username</label>
+    <label for="cf-user" data-i18n="lblUsername">Username</label>
     <input type="text" id="cf-user">
-    <label for="cf-pass">Password</label>
+    <label for="cf-pass" data-i18n="lblPassword">Password</label>
     <input type="password" id="cf-pass" autocomplete="new-password">
-    <label for="cf-topic">Topic prefix</label>
+    <label for="cf-topic" data-i18n="lblTopic">Topic prefix</label>
     <input type="text" id="cf-topic" placeholder="hmsgws3_xxxxxx">
     <div class="btn-row">
-      <button class="icon-btn" id="btn-cancel">Cancel</button>
-      <button class="icon-btn" id="btn-save" style="border-color:var(--cyan); color:var(--cyan);">Save &amp; Connect</button>
+      <button class="icon-btn cyan" id="btn-cancel" data-i18n="btnCancel">Cancel</button>
+      <button class="icon-btn cyan" id="btn-save" data-i18n="btnSaveConnect">Save &amp; Connect</button>
     </div>
   </div>
 </div>

@@ -37,6 +37,11 @@ header h1 svg { height: 24px; width: auto; flex-shrink: 0; }
   font-family: inherit; transition: border-color .2s ease, color .2s ease, box-shadow .2s ease;
 }
 .icon-btn:hover, .icon-btn:active { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px -2px var(--cyan); }
+/* Cyan at rest, not just on hover - matches data/www/index.html's .btn-muted,
+   the form-button convention there has no separate "neutral" variant (Cancel,
+   Save, Reset are all cyan; only destructive actions get .text-danger/pink). */
+.icon-btn.cyan { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px -2px var(--cyan); }
+.icon-btn.cyan:hover, .icon-btn.cyan:active { background: rgba(43,240,255,.08); box-shadow: 0 0 16px -2px var(--cyan); }
 
 main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
 
@@ -72,7 +77,16 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
             padding: 16px; margin-bottom: 12px; }
 .ctrl-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
 .ctrl-row + .ctrl-row { border-top: 1px solid var(--border); }
-.ctrl-label { font-size: 13px; color: var(--text); font-weight: 600; }
+/* Muted/gray, matching data/www/index.html's .card-title/.sec/.gpio-name convention
+   for row labels - not --text (near-white), which was the PWA/web-GUI mismatch. */
+.ctrl-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+
+/* Status badge (Active/Standby/Offline/No data) - same classes as data/www/index.html */
+.badge { font-size: 11px; font-weight: 700; letter-spacing: .5px; }
+.badge-lg { font-size: 18px; font-weight: 800; }
+.b-ok  { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+.b-off { color: var(--muted); }
+.b-err { color: var(--pink); text-shadow: 0 0 8px var(--pink); }
 
 .range-val { font-size: 13px; color: var(--cyan); font-weight: 700; min-width: 42px; text-align: right; }
 .range-val.pending { color: var(--pink); text-shadow: 0 0 8px var(--pink); }
@@ -120,7 +134,8 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
 #settings.open { display: flex; }
 #settings .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
                     padding: 20px; width: 100%; max-width: 380px; max-height: 90vh; overflow-y: auto; }
-#settings h2 { font-size: 15px; margin-bottom: 16px; color: var(--text); }
+#settings h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+               margin-bottom: 16px; color: var(--purple); text-shadow: 0 0 6px var(--purple); }
 #settings label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
 #settings input {
   width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;

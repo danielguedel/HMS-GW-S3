@@ -5,10 +5,71 @@
 // in src/taskMQTT.cpp for the authoritative list.
 
 const STORAGE_KEY = 'hms-gw-s3-remote-cfg';
+const LANG_KEY = 'hms-gw-s3-remote-lang';
 const $ = id => document.getElementById(id);
 
 let client = null;
 let cfg = null;
+
+// --- i18n (EN/DE) --------------------------------------------------------------
+// Same key names/wording as data/www/index.html's I18N object where a shared
+// concept exists (Relay/IO/status labels etc), so both UIs read identically.
+// Persisted via localStorage instead of the gateway's /api/config/lang used by
+// the dashboard, since the PWA has no REST access to the device - only MQTT.
+const I18N = {
+  en: {
+    btnSettings: 'Settings', secLive: 'Live', secStatus: 'Status', secSystem: 'System',
+    secControl: 'Control', secPowerLimit: 'Power Limit',
+    statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Yield today', statTotal: 'Total',
+    statActive: 'Active', statStandby: 'Standby', statNoData: 'No data', statOffline: 'Offline',
+    btnSet: 'Set', lblRelay: 'Relay', lblIo1: 'IO1', lblIo2: 'IO2', lblIo3: 'IO3',
+    hBrokerConn: 'Broker Connection', lblBrokerHost: 'Broker Host', lblPortWs: 'Port (WebSocket)',
+    lblUsername: 'Username', lblPassword: 'Password', lblTopic: 'Topic prefix',
+    btnCancel: 'Cancel', btnSaveConnect: 'Save & Connect',
+    connConnecting: 'Connecting…', connConnected: 'Connected', connReconnecting: 'Reconnecting…',
+    connDisconnected: 'Disconnected', connError: 'Error', connNotConfigured: 'Not configured',
+    toastHostTopicRequired: 'Host and topic are required', toastNotConnected: 'Not connected',
+  },
+  de: {
+    btnSettings: 'Einstellungen', secLive: 'Live', secStatus: 'Status', secSystem: 'System',
+    secControl: 'Steuerung', secPowerLimit: 'Leistungsbegrenzung',
+    statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
+    statActive: 'Aktiv', statStandby: 'Standby', statNoData: 'Keine Daten', statOffline: 'Offline',
+    btnSet: 'Setzen', lblRelay: 'Relais', lblIo1: 'EA1', lblIo2: 'EA2', lblIo3: 'EA3',
+    hBrokerConn: 'Broker-Verbindung', lblBrokerHost: 'Broker Host', lblPortWs: 'Port (WebSocket)',
+    lblUsername: 'Benutzername', lblPassword: 'Passwort', lblTopic: 'Topic-Präfix',
+    btnCancel: 'Abbrechen', btnSaveConnect: 'Speichern & Verbinden',
+    connConnecting: 'Verbinde…', connConnected: 'Verbunden', connReconnecting: 'Verbinde neu…',
+    connDisconnected: 'Getrennt', connError: 'Fehler', connNotConfigured: 'Nicht konfiguriert',
+    toastHostTopicRequired: 'Host und Topic sind erforderlich', toastNotConnected: 'Nicht verbunden',
+  },
+};
+let _lang = (localStorage.getItem(LANG_KEY) === 'de') ? 'de' : 'en';
+
+// Looks up `key` in the active language, falling back to English, then the key
+// itself if truly missing (never throws / never shows "undefined").
+function tr(key) { return I18N[_lang][key] ?? I18N.en[key] ?? key; }
+
+// Applies the active language to every element carrying data-i18n, and updates
+// the lang toggle button to show the language you'd switch *to* (matching
+// data/www/index.html's lang-btn convention: shows the other language's code).
+function applyI18n() {
+  document.documentElement.lang = _lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
+  $('lang-btn').textContent = _lang === 'en' ? 'DE' : 'EN';
+}
+
+// Toggles EN<->DE, persists the choice, and re-renders both the static markup
+// and anything currently showing dynamically-built translated text (connection
+// label, status badge).
+function toggleLang() {
+  _lang = _lang === 'en' ? 'de' : 'en';
+  localStorage.setItem(LANG_KEY, _lang);
+  applyI18n();
+  if (_connLabelKey) $('conn-label').textContent = tr(_connLabelKey);
+  updateStatusBadge();
+}
+$('lang-btn').addEventListener('click', toggleLang);
 
 // Reads the saved broker connection settings from localStorage; returns null if
 // none are stored yet or the JSON is corrupt (never throws).
@@ -43,7 +104,7 @@ $('btn-save').addEventListener('click', () => {
     pass:  $('cf-pass').value,
     topic: $('cf-topic').value.trim(),
   };
-  if (!next.host || !next.topic) { toast('Host and topic are required'); return; }
+  if (!next.host || !next.topic) { toast(tr('toastHostTopicRequired')); return; }
   saveCfg(next);
   cfg = next;
   closeSettings();
@@ -63,10 +124,14 @@ function toast(msg) {
 // Updates the header status dot + label to reflect the current MQTT connection
 // state, then re-applies card glow (see powerGlow()) so Grid/PV1/PV2 flip to/
 // from pink immediately on connect/disconnect rather than waiting for new data.
-function setConn(ok, label) {
+// Takes an I18N key (not literal text) so toggleLang() can re-translate the
+// currently-shown connection state without needing to know what it was.
+let _connLabelKey = null;
+function setConn(ok, labelKey) {
+  _connLabelKey = labelKey;
   $('dot-conn').classList.toggle('ok', ok);
   $('dot-conn').classList.toggle('err', !ok);
-  $('conn-label').textContent = label;
+  $('conn-label').textContent = tr(labelKey);
   updateGridCard(); updatePvCard(0); updatePvCard(1);
 }
 
@@ -101,6 +166,23 @@ function updateGridCard() {
   if (live.grid.U !== undefined && live.grid.I !== undefined)
     $('grid-ui').textContent = `${Number(live.grid.U).toFixed(1)} V / ${Number(live.grid.I).toFixed(2)} A`;
   $('card-grid').style.setProperty('--glow', powerGlow(Number(live.grid.P) || 0));
+  updateStatusBadge();
+}
+
+// Updates the Active/Standby/No data/Offline badge, matching data/www/index.html's
+// updateStatusBadge() states - "active" is derived from grid power > 0, since the
+// PWA has no separate WiFi/DTU signal of its own, only what MQTT carries.
+function updateStatusBadge() {
+  const connected = !!(client && client.connected);
+  const gridP = live.grid.P;
+  let key, cls;
+  if (!connected)               { key = 'statOffline'; cls = 'b-err'; }
+  else if (gridP === undefined) { key = 'statNoData';  cls = 'b-off'; }
+  else if (Number(gridP) > 0)   { key = 'statActive';  cls = 'b-ok';  }
+  else                           { key = 'statStandby'; cls = 'b-off'; }
+  const el = $('s-active');
+  el.textContent = tr(key);
+  el.className = 'badge badge-lg ' + cls;
 }
 // Re-renders the PV1 (n=0) or PV2 (n=1) card, same partial-update + glow-refresh behavior as updateGridCard().
 function updatePvCard(n) {
@@ -191,15 +273,16 @@ function onMqttMessage(topic, payloadBuf) {
 // Publishes a control command under `<topic>/<suffix>`; toasts instead of
 // throwing if there's currently no live connection to publish on.
 function pub(suffix, value) {
-  if (!client || !client.connected) { toast('Not connected'); return; }
+  if (!client || !client.connected) { toast(tr('toastNotConnected')); return; }
   client.publish(`${cfg.topic}/${suffix}`, String(value));
 }
 
+// Dragging only updates the visible percentage - matches data/www/index.html's
+// onLimitInput(): nothing is sent until "Set" is clicked (see below).
 $('limit-range').addEventListener('input', () => {
   $('range-val').textContent = $('limit-range').value + ' %';
 });
-$('limit-range').addEventListener('change', () => {
-  if (suppressPublish) return;
+$('btn-limit-set').addEventListener('click', () => {
   pub('inverter/PowerLimitSet/set', $('limit-range').value);
 });
 
@@ -217,7 +300,7 @@ $('limit-range').addEventListener('change', () => {
 // is handled by mqtt.js itself (reconnectPeriod below), not re-implemented here.
 function connect() {
   if (client) { client.end(true); client = null; }
-  setConn(false, 'Connecting…');
+  setConn(false, 'connConnecting');
 
   const url = `wss://${cfg.host}:${cfg.port}`;
   client = mqtt.connect(url, {
@@ -229,23 +312,24 @@ function connect() {
   });
 
   client.on('connect', () => {
-    setConn(true, 'Connected');
+    setConn(true, 'connConnected');
     client.subscribe(cfg.topic + '/#');
   });
-  client.on('reconnect', () => setConn(false, 'Reconnecting…'));
-  client.on('close',     () => setConn(false, 'Disconnected'));
-  client.on('error', (err) => { setConn(false, 'Error'); console.error('MQTT error', err); });
+  client.on('reconnect', () => setConn(false, 'connReconnecting'));
+  client.on('close',     () => setConn(false, 'connDisconnected'));
+  client.on('error', (err) => { setConn(false, 'connError'); console.error('MQTT error', err); });
   client.on('message', onMqttMessage);
 }
 
 // --- Boot --------------------------------------------------------------------
 // Auto-connects if valid settings are already stored; otherwise opens the
 // settings overlay so first-run users are prompted immediately.
+applyI18n();
 cfg = loadCfg();
 if (cfg && cfg.host && cfg.topic) {
   connect();
 } else {
-  setConn(false, 'Not configured');
+  setConn(false, 'connNotConfigured');
   openSettings();
 }
 
