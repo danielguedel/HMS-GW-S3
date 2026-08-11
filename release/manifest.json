@@ -1,9 +1,9 @@
 {
-  "version": "05.1",
-  "buildNumber": 344,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-344/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-344/littlefs.bin",
-  "md5": "4b62f491d838302faccdbe4a276d0ea7",
-  "fs_md5": "571bec1cb354ea09de704582e7b3e5a4",
+  "version": "0.5.1",
+  "buildNumber": 345,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-345/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-345/littlefs.bin",
+  "md5": "c721e79d229f0729c545c2727709d2ca",
+  "fs_md5": "67866ba54e696e27658161b86c82c2eb",
   "notes": "PWA/Web-GUI Status-Layout, Header (MQTT-Label, Datum/Uhrzeit, FW/Build/MAC), Relay/IO Rand-Glow bei aktivem Zustand, PWA optimistisches UI-Verhalten (analog Web-GUI)"
 }
