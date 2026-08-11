@@ -93,7 +93,19 @@ nav button:hover  { color: var(--cyan); text-shadow: 0 0 6px var(--cyan); }
 .gpio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 14px; }
 .gpio-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
              padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+             position: relative; overflow: hidden; --glow: transparent;
              transition: transform .25s ease, box-shadow .25s ease; }
+.gpio-card::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(135deg, var(--glow), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; opacity: .8;
+  pointer-events: none;
+}
+/* Border glow turns on while the relay/IO is active - same gradient technique
+   as .card::before, but off (transparent) at rest instead of a fixed identity
+   color, since these cards represent a binary on/off state, not a live metric. */
+.gpio-card.active { --glow: var(--cyan); }
 .gpio-card:hover { transform: translateY(-2px); box-shadow: 0 0 24px -8px var(--cyan); }
 .gpio-name { font-size: 11px; font-weight: 700; color: var(--muted);
              text-transform: uppercase; letter-spacing: 1.5px; text-align: center; }
@@ -302,26 +314,6 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
 <!-- ════ DASHBOARD ════════════════════════════════════════════════════════ -->
 <div id="tab-dashboard" class="tab active">
 
-  <!-- Status bar -->
-  <div class="grid" id="status-bar">
-    <div class="card">
-      <div class="card-title" data-i18n="statTemp">Temp</div>
-      <div><span class="card-val" id="s-temp">–</span><span class="card-unit">°C</span></div>
-    </div>
-    <div class="card">
-      <div class="card-title" data-i18n="statLimit">Limit</div>
-      <div><span class="card-val" id="s-limit">–</span><span class="card-unit">%</span></div>
-    </div>
-    <div class="card">
-      <div class="card-title" data-i18n="statYieldToday">Yield today</div>
-      <div><span class="card-val" id="s-de">–</span><span class="card-unit">kWh</span></div>
-    </div>
-    <div class="card">
-      <div class="card-title" data-i18n="statTotal">Total</div>
-      <div><span class="card-val" id="s-te">–</span><span class="card-unit">kWh</span></div>
-    </div>
-  </div>
-
   <!-- Power cards -->
   <div class="grid">
     <div class="card grid-p" id="card-grid">
@@ -341,6 +333,26 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
       <div><span class="card-val" id="pv1-p">–</span><span class="card-unit">W</span></div>
       <div class="bar-wrap"><div class="bar" id="bar-pv1"></div></div>
       <div class="card-sub" id="pv1-ui">– V / – A</div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="grid" id="status-bar">
+    <div class="card">
+      <div class="card-title" data-i18n="statTemp">Temp</div>
+      <div><span class="card-val" id="s-temp">–</span><span class="card-unit">°C</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title" data-i18n="statLimit">Limit</div>
+      <div><span class="card-val" id="s-limit">–</span><span class="card-unit">%</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title" data-i18n="statYieldToday">Yield today</div>
+      <div><span class="card-val" id="s-de">–</span><span class="card-unit">kWh</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title" data-i18n="statTotal">Total</div>
+      <div><span class="card-val" id="s-te">–</span><span class="card-unit">kWh</span></div>
     </div>
   </div>
 
@@ -367,7 +379,7 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
 <!-- ════ GPIO / RELAY ═════════════════════════════════════════════════════ -->
 <div id="tab-gpio" class="tab">
   <div class="gpio-grid">
-    <div class="gpio-card">
+    <div class="gpio-card" id="card-relay">
       <div class="gpio-name" data-i18n="lblRelay">Relay</div>
       <label class="toggle">
         <input type="checkbox" id="sw-relay" onchange="setGpio('relay',this.checked)">
@@ -902,14 +914,16 @@ function tickClock() {
 
 // ─── GPIO ─────────────────────────────────────────────────────────────────
 function applyGpio(key, val) {
-  const sw  = $('sw-' + key);
-  const lbl = $('lbl-' + key);
+  const sw   = $('sw-' + key);
+  const lbl  = $('lbl-' + key);
+  const card = $('card-' + key);
   if (!sw) return;
   sw.checked = !!val;
   if (lbl) {
     lbl.textContent = val ? tr('lblOn') : tr('lblOff');
     lbl.className = 'badge ' + (val ? 'b-ok' : 'b-off');
   }
+  if (card) card.classList.toggle('active', !!val);
 }
 
 async function refreshGpio() {

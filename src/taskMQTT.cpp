@@ -123,6 +123,17 @@ static void publishSystemStats() {
     pub("system/heap",   buf, false);
 }
 
+// Publishes device identity (retained) - same fields as /api/info.json's
+// fw/build/mac, so remote clients without LAN/REST access (the PWA) can show
+// the same header info bar as data/www/index.html. Sent once per connect
+// (identity doesn't change while the client stays connected).
+static void publishSystemInfo() {
+    DataStore::SystemStatus sys = dsGetSystem();
+    pub("system/fw",    sys.fwVersion.c_str(), true);
+    pubInt("system/build", sys.buildNumber,    true);
+    pub("system/mac",   sys.macAddress.c_str(), true);
+}
+
 // --- HA Auto-Discovery (Spec §5.4) -------------------------------------------
 // Publishes a Home Assistant MQTT-discovery config for one sensor entity; pass nullptr for unit/devClass to omit those JSON fields.
 static void publishHaSensor(const char* uid, const char* name,
@@ -273,6 +284,7 @@ static void mqttEventHandler(void* /*arg*/, esp_event_base_t /*base*/,
             }
 
             pub("system/status", "online", true);
+            publishSystemInfo();
             publishGpioState(dsGetGpio());
 
             // Schedule HA discovery: 5s delay, 500ms between entities (Spec §5.4)

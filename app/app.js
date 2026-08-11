@@ -23,6 +23,7 @@ const I18N = {
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Yield today', statTotal: 'Total',
     statActive: 'Active', statStandby: 'Standby', statNoData: 'No data', statOffline: 'Offline',
     btnSet: 'Set', lblRelay: 'Relay', lblIo1: 'IO1', lblIo2: 'IO2', lblIo3: 'IO3',
+    lblOn: 'ON', lblOff: 'OFF',
     lblBrokerHost: 'Broker Host', lblPortWs: 'Port (WebSocket)',
     lblUsername: 'Username', lblPassword: 'Password', lblTopic: 'Topic',
     btnCancel: 'Cancel', btnSaveConnect: 'Save & Connect',
@@ -66,8 +67,9 @@ function toggleLang() {
   _lang = _lang === 'en' ? 'de' : 'en';
   localStorage.setItem(LANG_KEY, _lang);
   applyI18n();
-  if (_connLabelKey) $('conn-label').textContent = tr(_connLabelKey);
+  if (_connLabelKey) $('dot-conn').title = tr(_connLabelKey);
   updateStatusBadge();
+  Object.keys(gpioState).forEach(renderGpioLabel);
 }
 $('lang-btn').addEventListener('click', toggleLang);
 
@@ -112,26 +114,30 @@ $('btn-save').addEventListener('click', () => {
 });
 
 // Shows a transient toast notification, auto-hiding after 2.5s; re-triggering
-// before that resets the timer instead of stacking hides.
-function toast(msg) {
+// before that resets the timer instead of stacking hides. `ok` toggles the
+// border/glow color (cyan/pink), same convention as data/www/index.html's toast().
+function toast(msg, ok = true) {
   const t = $('toast');
   t.textContent = msg;
+  t.style.borderColor = ok ? 'var(--cyan)' : 'var(--pink)';
+  t.style.boxShadow = ok ? '0 0 24px -4px var(--cyan)' : '0 0 24px -4px var(--pink)';
   t.classList.add('show');
   clearTimeout(toast._h);
   toast._h = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-// Updates the header status dot + label to reflect the current MQTT connection
-// state, then re-applies card glow (see powerGlow()) so Grid/PV1/PV2 flip to/
-// from pink immediately on connect/disconnect rather than waiting for new data.
-// Takes an I18N key (not literal text) so toggleLang() can re-translate the
-// currently-shown connection state without needing to know what it was.
+// Updates the header MQTT status dot to reflect the current connection state
+// (color only, fixed "MQTT" label - same convention as data/www/index.html's
+// WiFi/DTU/MQTT dots), then re-applies card glow (see powerGlow()) so Grid/PV1/PV2
+// flip to/from pink immediately on connect/disconnect rather than waiting for new
+// data. Takes an I18N key (not literal text) so toggleLang() can re-translate the
+// dot's tooltip without needing to know what it was.
 let _connLabelKey = null;
 function setConn(ok, labelKey) {
   _connLabelKey = labelKey;
   $('dot-conn').classList.toggle('ok', ok);
   $('dot-conn').classList.toggle('err', !ok);
-  $('conn-label').textContent = tr(labelKey);
+  $('dot-conn').title = tr(labelKey);
   updateGridCard(); updatePvCard(0); updatePvCard(1);
 }
 
@@ -141,18 +147,37 @@ function pct(val, max) {
   return v + '%';
 }
 
-// Grid/PV1/PV2 card border+text glow scales with power once connected - same
-// thresholds as data/www/index.html's powerGlow(), so both UIs read the same way.
-// Falls back to pink while disconnected, matching that dashboard's convention.
+// Grid/PV1/PV2 card border+text glow scales with power - same thresholds as
+// data/www/index.html's powerGlow(). Caller decides the disconnected/inactive
+// fallback (see updateStatusBadge()), matching that dashboard's convention.
 function powerGlow(p) {
-  if (!client || !client.connected) return 'var(--pink)';
   if (p < 250) return 'var(--cyan)';
   if (p < 500) return 'var(--purple)';
   return 'var(--pink)';
 }
 
 // --- Live data state (assembled incrementally, one MQTT message at a time) ----
-const live = { grid: {}, pv0: {}, pv1: {}, inverter: {} };
+const live = { grid: {}, pv0: {}, pv1: {}, inverter: {}, system: {} };
+
+// Renders the MAC/FW/Build part of the header info bar from live.system, once
+// both fields have arrived (published retained on connect, see taskMQTT.cpp's
+// publishSystemInfo()) - same "<fw> (Build <build>)" format as data/www/index.html.
+function renderSystemInfo() {
+  if (live.system.mac !== undefined) $('hi-mac').textContent = live.system.mac;
+  if (live.system.fw !== undefined && live.system.build !== undefined)
+    $('hi-fw').textContent = `${live.system.fw} (Build ${live.system.build})`;
+}
+
+// Header clock - purely client-side (the browser's own time), same as
+// data/www/index.html's tickClock(): the device doesn't publish a live clock.
+const pad2 = n => String(n).padStart(2, '0');
+function tickClock() {
+  const now = new Date();
+  $('hi-time').textContent = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+  $('hi-date').textContent = `${pad2(now.getDate())}.${pad2(now.getMonth() + 1)}.${now.getFullYear()}`;
+}
+tickClock();
+setInterval(tickClock, 1000);
 
 // Re-renders the Grid card from the current `live` state; fields that haven't
 // arrived over MQTT yet are left at their previous (or initial "–") value. Glow
@@ -165,13 +190,16 @@ function updateGridCard() {
   }
   if (live.grid.U !== undefined && live.grid.I !== undefined)
     $('grid-ui').textContent = `${Number(live.grid.U).toFixed(1)} V / ${Number(live.grid.I).toFixed(2)} A`;
-  $('card-grid').style.setProperty('--glow', powerGlow(Number(live.grid.P) || 0));
   updateStatusBadge();
 }
 
 // Updates the Active/Standby/No data/Offline badge, matching data/www/index.html's
 // updateStatusBadge() states - "active" is derived from grid power > 0, since the
-// PWA has no separate WiFi/DTU signal of its own, only what MQTT carries.
+// PWA has no separate WiFi/DTU signal of its own, only what MQTT carries. Also
+// re-applies card border/glow: cyan while active, pink for standby/no-data/offline
+// on every dashboard card except Power Limit (its glow tracks pending/confirmed
+// instead, see updateLimitGlow()), with Grid/PV1/PV2 additionally power-tiered
+// while active - same split as that dashboard's updateStatusBadge().
 function updateStatusBadge() {
   const connected = !!(client && client.connected);
   const gridP = live.grid.P;
@@ -183,6 +211,13 @@ function updateStatusBadge() {
   const el = $('s-active');
   el.textContent = tr(key);
   el.className = 'badge badge-lg ' + cls;
+
+  const active = key === 'statActive';
+  const statusGlow = active ? 'var(--cyan)' : 'var(--pink)';
+  document.querySelectorAll('main .card:not(#card-limit)').forEach(c => c.style.setProperty('--glow', statusGlow));
+  $('card-grid').style.setProperty('--glow', active ? powerGlow(Number(live.grid.P) || 0) : 'var(--pink)');
+  $('card-pv0').style.setProperty('--glow', active ? powerGlow(Number(live.pv0.P) || 0) : 'var(--pink)');
+  $('card-pv1').style.setProperty('--glow', active ? powerGlow(Number(live.pv1.P) || 0) : 'var(--pink)');
 }
 // Re-renders the PV1 (n=0) or PV2 (n=1) card, same partial-update + glow-refresh behavior as updateGridCard().
 function updatePvCard(n) {
@@ -193,7 +228,7 @@ function updatePvCard(n) {
   }
   if (d.U !== undefined && d.I !== undefined)
     $(`pv${n}-ui`).textContent = `${Number(d.U).toFixed(1)} V / ${Number(d.I).toFixed(2)} A`;
-  $(`card-pv${n}`).style.setProperty('--glow', powerGlow(Number(d.P) || 0));
+  updateStatusBadge();
 }
 // Re-renders the temperature/power-limit/energy cards from the current `live` state.
 function updateSystemCards() {
@@ -211,7 +246,9 @@ let suppressPublish = false;
 // Syncs the power-limit slider to the broker's PowerLimitTarget, unless the user
 // is actively dragging it (checked via document.activeElement). Slider/label turn
 // pink ("pending") while PowerLimitTarget hasn't been confirmed by PowerLimit yet -
-// same convention as data/www/index.html's updateLimitGlow().
+// same convention as data/www/index.html's updateLimitGlow(). Toasts once when a
+// pending target flips to confirmed, matching that dashboard's refreshData().
+let _limitWasPending = false;
 function updateLimitRange() {
   const target = live.inverter.PowerLimitTarget;
   if (target === undefined) return;
@@ -219,19 +256,45 @@ function updateLimitRange() {
   $('limit-range').classList.toggle('pending', pending);
   $('range-val').classList.toggle('pending', pending);
   $('bar-limit').style.width = pct(target, 100);
+  updateLimitGlow(pending);
+  if (_limitWasPending && !pending) toast('Limit → ' + target + '%');
+  _limitWasPending = pending;
   if (document.activeElement === $('limit-range')) return; // don't fight the user mid-drag
   suppressPublish = true;
   $('limit-range').value = target;
   $('range-val').textContent = target + ' %';
   suppressPublish = false;
 }
-// Syncs a toggle switch's checked state to its retained MQTT state topic without
-// re-triggering the switch's own 'change' publish handler (see suppressPublish above).
-function updateSwitch(id, val) {
+// Power Limit card glow: pink while the sent setpoint hasn't been confirmed by the
+// DTU yet, cyan once it has - independent of connectivity-based statusGlow (see
+// updateStatusBadge()), same convention as data/www/index.html's updateLimitGlow().
+function updateLimitGlow(pending) {
+  $('card-limit').style.setProperty('--glow', pending ? 'var(--pink)' : 'var(--cyan)');
+}
+// Syncs a toggle switch + its ON/OFF badge + card border glow to its retained
+// MQTT state topic (key: 'relay'/'io1'/'io2'/'io3', matching the
+// sw-<key>/lbl-<key>/card-<key> element ids), without re-triggering the switch's
+// own 'change' publish handler (see suppressPublish above). Same badge text/class
+// + card.active convention as data/www/index.html's applyGpio().
+const gpioState = {};
+function updateSwitch(key, val) {
   if (val === undefined) return;
+  const on = (val === '1' || val === 1 || val === true);
+  gpioState[key] = on;
   suppressPublish = true;
-  $(id).checked = (val === '1' || val === 1 || val === true);
+  $('sw-' + key).checked = on;
   suppressPublish = false;
+  renderGpioLabel(key);
+}
+function renderGpioLabel(key) {
+  const lbl = $('lbl-' + key);
+  const card = $('card-' + key);
+  if (gpioState[key] === undefined) return;
+  if (lbl) {
+    lbl.textContent = tr(gpioState[key] ? 'lblOn' : 'lblOff');
+    lbl.className = 'badge ' + (gpioState[key] ? 'b-ok' : 'b-off');
+  }
+  if (card) card.classList.toggle('active', gpioState[key]);
 }
 
 // Routes one incoming MQTT message to the matching `live` field and re-render,
@@ -262,19 +325,27 @@ function onMqttMessage(topic, payloadBuf) {
     case 'inverter/PowerLimit':       live.inverter.PowerLimit = val; updateSystemCards(); updateLimitRange(); break;
     case 'inverter/PowerLimitTarget': live.inverter.PowerLimitTarget = val; updateLimitRange(); break;
 
-    case 'relay/state': updateSwitch('sw-relay', val); break;
-    case 'io1/state':   updateSwitch('sw-io1', val); break;
-    case 'io2/state':   updateSwitch('sw-io2', val); break;
-    case 'io3/state':   updateSwitch('sw-io3', val); break;
+    case 'relay/state': updateSwitch('relay', val); break;
+    case 'io1/state':   updateSwitch('io1', val); break;
+    case 'io2/state':   updateSwitch('io2', val); break;
+    case 'io3/state':   updateSwitch('io3', val); break;
+
+    case 'system/fw':    live.system.fw    = val; renderSystemInfo(); break;
+    case 'system/build': live.system.build = val; renderSystemInfo(); break;
+    case 'system/mac':   live.system.mac   = val; renderSystemInfo(); break;
   }
 }
 
 // --- Controls -> publish -------------------------------------------------------
 // Publishes a control command under `<topic>/<suffix>`; toasts instead of
-// throwing if there's currently no live connection to publish on.
+// throwing if there's currently no live connection to publish on. Returns
+// whether the publish actually happened, so callers can decide whether to
+// optimistically reflect the change (matching data/www/index.html's setGpio()/
+// setLimit(), which only update the UI after their fetch() resolves).
 function pub(suffix, value) {
-  if (!client || !client.connected) { toast(tr('toastNotConnected')); return; }
+  if (!client || !client.connected) { toast(tr('toastNotConnected')); return false; }
   client.publish(`${cfg.topic}/${suffix}`, String(value));
+  return true;
 }
 
 // Dragging only updates the visible percentage - matches data/www/index.html's
@@ -282,15 +353,33 @@ function pub(suffix, value) {
 $('limit-range').addEventListener('input', () => {
   $('range-val').textContent = $('limit-range').value + ' %';
 });
+// Optimistically shows the sent value as "pending" (pink) right away, same as
+// data/www/index.html's setLimit() - it's re-confirmed (or corrected) once the
+// retained PowerLimit topic catches up, see updateLimitRange().
 $('btn-limit-set').addEventListener('click', () => {
-  pub('inverter/PowerLimitSet/set', $('limit-range').value);
+  const val = $('limit-range').value;
+  if (!pub('inverter/PowerLimitSet/set', val)) return;
+  $('range-val').textContent = val + ' %';
+  $('bar-limit').style.width = pct(val, 100);
+  $('range-val').classList.add('pending');
+  $('limit-range').classList.add('pending');
+  updateLimitGlow(true);
+  toast('Limit → ' + val + '%', false);
 });
 
-[['sw-relay', 'relay/set'], ['sw-io1', 'io1/set'], ['sw-io2', 'io2/set'], ['sw-io3', 'io3/set']]
-  .forEach(([id, topic]) => {
+// Optimistically updates the badge/border the moment a command is accepted for
+// publish, same as data/www/index.html's setGpio() calling applyGpio() right
+// after its fetch() resolves - the later retained state topic just re-confirms it.
+const gpioLabelKey = { relay: 'lblRelay', io1: 'lblIo1', io2: 'lblIo2', io3: 'lblIo3' };
+[['sw-relay', 'relay', 'relay/set'], ['sw-io1', 'io1', 'io1/set'], ['sw-io2', 'io2', 'io2/set'], ['sw-io3', 'io3', 'io3/set']]
+  .forEach(([id, key, topic]) => {
     $(id).addEventListener('change', () => {
       if (suppressPublish) return;
-      pub(topic, $(id).checked ? '1' : '0');
+      const on = $(id).checked;
+      if (!pub(topic, on ? '1' : '0')) return;
+      gpioState[key] = on;
+      renderGpioLabel(key);
+      toast(tr(gpioLabelKey[key]).toUpperCase() + ' → ' + tr(on ? 'lblOn' : 'lblOff'));
     });
   });
 

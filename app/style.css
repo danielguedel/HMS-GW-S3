@@ -18,13 +18,18 @@ body {
 
 header {
   background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;
   gap: 12px; position: sticky; top: 0; z-index: 10;
   padding-top: max(16px, env(safe-area-inset-top));
 }
-header h1 { font-size: 16px; font-weight: 800; letter-spacing: .5px; display: flex; align-items: center; gap: 8px;
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: .5px; display: flex; align-items: center; gap: 8px;
             color: #fff; text-shadow: 0 0 6px var(--pink), 0 0 18px var(--pink), 0 0 42px rgba(255, 43, 214, .5); }
-header h1 svg { height: 24px; width: auto; flex-shrink: 0; }
+header h1 svg { height: 26px; width: auto; flex-shrink: 0; }
+
+.hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.dots { display: flex; align-items: center; gap: 14px; }
+.hdr-info { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; justify-content: flex-end; }
+.hdr-sep { color: var(--muted); }
 
 .dot-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
@@ -33,27 +38,32 @@ header h1 svg { height: 24px; width: auto; flex-shrink: 0; }
 
 .icon-btn {
   background: transparent; border: 1px solid var(--border); cursor: pointer; font-size: 11px;
-  font-weight: 700; letter-spacing: .5px; color: var(--muted); padding: 5px 12px; border-radius: 999px;
+  font-weight: 700; letter-spacing: .5px; color: var(--muted); padding: 3px 10px; border-radius: 999px;
   font-family: inherit; transition: border-color .2s ease, color .2s ease, box-shadow .2s ease;
 }
 .icon-btn:hover, .icon-btn:active { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px -2px var(--cyan); }
-/* Cyan at rest, not just on hover - matches data/www/index.html's .btn-muted,
-   the form-button convention there has no separate "neutral" variant (Cancel,
-   Save, Reset are all cyan; only destructive actions get .text-danger/pink). */
-.icon-btn.cyan { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px -2px var(--cyan); }
-.icon-btn.cyan:hover, .icon-btn.cyan:active { background: rgba(43,240,255,.08); box-shadow: 0 0 16px -2px var(--cyan); }
+
+/* Pill action buttons (Set/Cancel/Save) - same component as data/www/index.html's .btn/.btn-muted. */
+.btn { padding: 9px 20px; border-radius: 999px; border: 1.5px solid var(--muted); cursor: pointer;
+       font-size: 13px; font-weight: 600; transition: box-shadow .2s ease, background-color .2s ease, transform .15s ease;
+       display: inline-block; text-decoration: none; font-family: inherit; }
+.btn:active { transform: scale(.97); }
+.btn-muted { background: transparent; color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 8px -2px var(--cyan); }
+.btn-muted:hover { background: rgba(43,240,255,.08); box-shadow: 0 0 16px -2px var(--cyan), 0 0 40px -10px var(--cyan); }
+.btn-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 
 main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
 
 .sec { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
-       color: var(--muted); margin: 24px 0 12px; }
-.sec:first-child { margin-top: 0; }
+       color: var(--muted); margin: 0 0 12px; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 14px; }
 .card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 16px; padding: 16px; position: relative; overflow: hidden;
+  border-radius: 16px; padding: 18px; position: relative; overflow: hidden;
+  transition: transform .25s ease, box-shadow .25s ease;
 }
+.card:hover { transform: translateY(-2px); box-shadow: 0 0 24px -6px var(--glow, var(--cyan)); }
 .card::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
   background: linear-gradient(135deg, var(--glow, var(--cyan)), transparent 60%);
@@ -64,22 +74,42 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
 /* Grid/PV1/PV2 --glow is set dynamically in app.js (power-tiered, matching
    data/www/index.html's powerGlow()) - no fixed per-card identity color. */
 .card-title { font-size: 11px; font-weight: 700; color: var(--muted);
-              text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
-.card-val  { font-size: 26px; font-weight: 700; color: var(--glow, var(--cyan));
+              text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
+.card-val  { font-size: 30px; font-weight: 700; color: var(--glow, var(--cyan));
              text-shadow: 0 0 10px var(--glow, var(--cyan)); line-height: 1; }
-.card-unit { font-size: 12px; color: var(--muted); margin-left: 3px; }
+.card-unit { font-size: 13px; color: var(--muted); margin-left: 3px; }
 .card-sub  { font-size: 11px; color: var(--muted); margin-top: 8px; }
-.bar-wrap  { background: var(--surface2); border-radius: 3px; height: 5px; margin-top: 10px; }
+.bar-wrap  { background: var(--surface2); border-radius: 3px; height: 5px; margin-top: 10px; overflow: visible; }
 .bar       { height: 100%; border-radius: 3px; background: var(--glow, var(--cyan));
              box-shadow: 0 0 8px var(--glow, var(--cyan)); transition: width .5s; width: 0; }
 
-.ctrl-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
-            padding: 16px; margin-bottom: 12px; }
-.ctrl-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
-.ctrl-row + .ctrl-row { border-top: 1px solid var(--border); }
-/* Muted/gray, matching data/www/index.html's .card-title/.sec/.gpio-name convention
-   for row labels - not --text (near-white), which was the PWA/web-GUI mismatch. */
-.ctrl-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+
+/* Relay/IO cards - same layout as data/www/index.html's .gpio-grid/.gpio-card: fixed
+   columns of equal-height cards (no persistent glow border, only a hover glow, unlike
+   Grid/PV1/PV2/Status/PowerLimit's .card::before gradient). */
+.gpio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.gpio-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+             padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+             position: relative; overflow: hidden; --glow: transparent;
+             transition: transform .25s ease, box-shadow .25s ease; }
+.gpio-card::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(135deg, var(--glow), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; opacity: .8;
+  pointer-events: none;
+}
+/* Border glow turns on while the relay/IO is active - same gradient technique
+   as .card::before, but off (transparent) at rest instead of a fixed identity
+   color, since these cards represent a binary on/off state, not a live metric. */
+.gpio-card.active { --glow: var(--cyan); }
+.gpio-card:hover { transform: translateY(-2px); box-shadow: 0 0 24px -8px var(--cyan); }
+.gpio-name { font-size: 11px; font-weight: 700; color: var(--muted);
+             text-transform: uppercase; letter-spacing: 1.5px; text-align: center; }
+.gpio-card .badge { text-transform: uppercase; }
 
 /* Status badge (Active/Standby/Offline/No data) - same classes as data/www/index.html */
 .badge { font-size: 11px; font-weight: 700; letter-spacing: .5px; }
@@ -87,14 +117,17 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
 .b-ok  { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
 .b-off { color: var(--muted); }
 .b-err { color: var(--pink); text-shadow: 0 0 8px var(--pink); }
+.badge-lg.b-ok  { text-shadow: 0 0 10px var(--cyan); }
+.badge-lg.b-off { text-shadow: none; }
+.badge-lg.b-err { text-shadow: 0 0 10px var(--pink); }
 
-.range-val { font-size: 13px; color: var(--cyan); font-weight: 700; min-width: 42px; text-align: right; }
+.range-val { color: var(--cyan); font-weight: 700; text-shadow: 0 0 8px var(--cyan); min-width: 42px; text-align: right; }
 .range-val.pending { color: var(--pink); text-shadow: 0 0 8px var(--pink); }
 
 /* Range slider - same custom glow-track pattern as data/www/index.html's
    .range-wrap: track hidden, .bar-wrap/.bar underneath shows the fill, thumb
    glows cyan normally / pink while the sent target hasn't been confirmed yet. */
-.range-wrap { position: relative; height: 18px; margin: 10px 0 0; --glow: var(--cyan); }
+.range-wrap { position: relative; height: 18px; margin: 10px 0; --glow: var(--cyan); }
 .range-wrap .bar-wrap { position: absolute; top: 50%; left: 0; right: 0; margin: 0; transform: translateY(-50%); }
 .range-wrap input[type=range] {
   position: absolute; inset: 0; width: 100%; margin: 0;
@@ -117,15 +150,15 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
 .range-wrap input[type=range].pending::-webkit-slider-thumb { background: var(--pink); box-shadow: 0 0 8px var(--pink), 0 0 16px var(--pink); }
 .range-wrap input[type=range].pending::-moz-range-thumb { background: var(--pink); box-shadow: 0 0 8px var(--pink), 0 0 16px var(--pink); }
 
-/* Toggle switch */
-.switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+/* Toggle switch - same dimensions as data/www/index.html's .toggle/.slider */
+.switch { position: relative; width: 46px; height: 25px; flex-shrink: 0; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .switch .slider { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border);
-                   border-radius: 999px; cursor: pointer; transition: background .2s, border-color .2s; }
-.switch .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
-                           background: var(--muted); border-radius: 50%; transition: transform .2s, background .2s; }
-.switch input:checked + .slider { border-color: var(--cyan); background: rgba(43,240,255,.12); }
-.switch input:checked + .slider::before { transform: translateX(20px); background: var(--cyan);
+                   border-radius: 25px; cursor: pointer; transition: background .25s, border-color .25s, box-shadow .25s; }
+.switch .slider::before { content: ""; position: absolute; width: 19px; height: 19px; left: 3px; bottom: 2px;
+                           background: var(--muted); border-radius: 50%; transition: transform .25s, background .25s; }
+.switch input:checked + .slider { border-color: var(--cyan); background: rgba(43,240,255,.12); box-shadow: 0 0 12px -2px var(--cyan); }
+.switch input:checked + .slider::before { transform: translateX(21px); background: var(--cyan);
                                            box-shadow: 0 0 8px var(--cyan); }
 
 /* Settings overlay */
@@ -135,11 +168,12 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
 #settings .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
                     padding: 20px; width: 100%; max-width: 380px; max-height: 90vh; overflow-y: auto; }
 #settings h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
-               margin-bottom: 16px; color: var(--purple); text-shadow: 0 0 6px var(--purple); }
-#settings label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+               margin-bottom: 12px; color: var(--purple); text-shadow: 0 0 6px var(--purple); }
+#settings label { display: block; font-size: 12px; color: var(--muted); margin-top: 12px; }
+#settings label:first-of-type { margin-top: 0; }
 #settings input {
   width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-  padding: 9px 10px; color: var(--purple); font-size: 14px; font-family: inherit;
+  padding: 9px 12px; color: var(--purple); font-size: 13px; margin-top: 6px; font-family: inherit;
 }
 #settings input::placeholder { color: var(--muted); opacity: 1; }
 #settings input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 2px rgba(176,75,255,.25); }
@@ -151,11 +185,12 @@ main { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
   -webkit-box-shadow: 0 0 0 1000px var(--surface2) inset;
   transition: background-color 9999s ease-in-out 0s;
 }
-#settings .btn-row { display: flex; gap: 8px; margin-top: 18px; }
-#settings .btn-row .icon-btn { flex: 1; text-align: center; padding: 10px; }
+#settings .btn-row .btn { flex: 1; text-align: center; }
 
-.toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
-         background: var(--surface); border: 1px solid var(--cyan); color: var(--text); padding: 10px 18px;
-         border-radius: 999px; font-size: 13px; box-shadow: 0 0 16px -4px var(--cyan); opacity: 0;
-         pointer-events: none; transition: opacity .3s, transform .3s; z-index: 200; }
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+/* Toast - same look as data/www/index.html's #toast; bottom offset adds the
+   safe-area inset on top of the shared 24px so it clears iOS's home indicator. */
+.toast { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px);
+         padding: 12px 20px; border-radius: 10px; font-size: 12px; background: var(--surface);
+         border: 1px solid var(--cyan); color: var(--muted);
+         opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease; z-index: 200; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
