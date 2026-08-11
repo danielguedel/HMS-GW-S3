@@ -1,9 +1,9 @@
 {
-  "version": "0.5.0",
-  "buildNumber": 343,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-343/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-343/littlefs.bin",
-  "md5": "4e4b59d9c8448b672fd6ac3a6dff1084",
-  "fs_md5": "ba8e3e6abd8f858a421e7052da04c739",
-  "notes": "Expose OTA manifest-check failures in the dashboard instead of silently looking identical to "never checked" - a new OtaInfo.lastError field is set whenever the check fails (network/DNS/TLS/HTTP error, invalid manifest) and shown as "Check failed: <reason>"."
+  "version": "05.1",
+  "buildNumber": 344,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-344/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-344/littlefs.bin",
+  "md5": "4b62f491d838302faccdbe4a276d0ea7",
+  "fs_md5": "571bec1cb354ea09de704582e7b3e5a4",
+  "notes": "PWA/Web-GUI Status-Layout, Header (MQTT-Label, Datum/Uhrzeit, FW/Build/MAC), Relay/IO Rand-Glow bei aktivem Zustand, PWA optimistisches UI-Verhalten (analog Web-GUI)"
 }
