@@ -27,7 +27,7 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | 💾 Config backup/restore | Download `config.json` from the System tab (WiFi/MQTT/web passwords stripped), restore it later in one upload — restoring re-applies everything except those passwords, which must be re-entered |
 | 🔄 OTA updates | Firmware/filesystem via web file upload, or by URL (downloads + flashes directly from the gateway) |
 | 🆕 Internet update check | Polls a JSON manifest for newer versions (semver comparison wins over build number) — one-click install from the web GUI, plus a GitHub Actions workflow to publish releases |
-| 📱 PWA remote app | Progressive Web App (`app/`) — read-only dashboard over MQTT/WebSocket (port 9001), works from outside the local network via a cloud MQTT broker |
+| 📱 PWA remote app | Progressive Web App (`app/`) — view + control (power limit, relay, IO) over MQTT/WebSocket (port 9001), works from outside the local network via a cloud MQTT broker |
 | ☁️ Cloud MQTT setup | `deploy/getting-started.sh` — one-command setup of Eclipse Mosquitto on Docker (TLS + Let's Encrypt) for remote access; `deploy/uninstall.sh` to remove it |
 | 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 20 commands at 115200 baud |
 | 🧵 FreeRTOS | 8 independent tasks on Core 1 — Core 0 reserved for WiFi stack |
@@ -263,7 +263,8 @@ release/manifest.json
 A standalone Progressive Web App lives in the `app/` directory. It connects to the MQTT broker over **WebSocket (port 9001)** — not to the gateway directly — so it works from any network as long as the broker is reachable.
 
 **Features:**
-- Read-only dashboard (live grid power, PV1/PV2 power, daily energy, inverter temperature, power limit)
+- Live dashboard (grid power, PV1/PV2 power, daily/total energy, inverter temperature, power limit, relay/IO state) with the same "Neon Flow" look as the local dashboard
+- Full control: set power limit, toggle relay/IO — same optimistic-update behavior as the local dashboard (updates on send, re-confirmed once the device echoes the new state back)
 - Installable as a home screen app on Android and iOS (PWA, `manifest.json` + service worker)
 - No server required — open the `app/index.html` locally or host it statically anywhere
 
@@ -373,7 +374,8 @@ HMS-GW-S3/
 │   ├── app.js                # App logic
 │   ├── style.css             # App styles
 │   ├── manifest.json         # PWA manifest
-│   └── service-worker.js     # Offline support
+│   ├── service-worker.js     # Offline support
+│   └── icon.svg               # App icon
 ├── deploy/
 │   ├── getting-started.sh    # Cloud MQTT broker setup (Mosquitto on Docker + Let's Encrypt)
 │   └── uninstall.sh          # Remove the broker installation
@@ -383,7 +385,8 @@ HMS-GW-S3/
 ├── release/
 │   └── manifest.json         # Version manifest polled by the Internet update check
 ├── .github/workflows/
-│   └── release.yml           # Manual release workflow: build, publish, update manifest
+│   ├── release.yml           # Manual release workflow: build, publish, update manifest
+│   └── pages.yml             # Auto-deploys app/ to GitHub Pages on push
 ├── platformio.ini
 ├── custom_partitions.csv
 └── version_inc.py

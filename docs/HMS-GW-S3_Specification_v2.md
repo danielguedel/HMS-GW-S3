@@ -4,8 +4,8 @@
 **Hardware:** ESP32-S3-DevKitC-1-N8R8 (8MB Flash, 8MB PSRAM)
 **Framework:** Arduino / FreeRTOS (PlatformIO)
 **Repository:** https://github.com/danielguedel/HMS-GW-S3
-**Date:** 2026-08-05 (MQTT TLS, cloud broker, PWA remote app, semver OTA check added)
-**Status:** Implemented and in production (v0.4.3, build number is incremented automatically on every build — see `include/buildnumber.txt`)
+**Date:** 2026-08-11 (PWA gained full control parity with the local dashboard — relay/IO toggles, power-limit set, optimistic UI; relay/IO state now always retained; new `system/fw`/`system/build`/`system/mac` MQTT topics; relay/IO cards gained an active-state border glow)
+**Status:** Implemented and in production (v0.5.2, build number is incremented automatically on every build — see `include/buildnumber.txt`)
 
 ---
 
@@ -426,12 +426,15 @@ The web UI's port field auto-populates with the appropriate default when the TLS
 {mqttTopic}/inverter/Temp          Temperature [°C]
 {mqttTopic}/inverter/PowerLimit    Power limit [%] (confirmed by the DTU)
 {mqttTopic}/inverter/PowerLimitTarget  Target power limit [%] — last requested value, may briefly differ from PowerLimit until the DTU confirms it
-{mqttTopic}/relay/state            Relay state (0/1)
-{mqttTopic}/io{1-3}/state          GPIO state (0/1)
+{mqttTopic}/relay/state            Relay state (0/1) (always retained, independent of mqttRetain)
+{mqttTopic}/io{1-3}/state          GPIO state (0/1) (always retained, independent of mqttRetain)
 {mqttTopic}/system/uptime          Uptime [s]
 {mqttTopic}/system/rssi            WiFi RSSI [dBm]
 {mqttTopic}/system/heap            Free heap [bytes]
 {mqttTopic}/system/status          online/offline (retained, also used as the LWT topic)
+{mqttTopic}/system/fw              Firmware version, e.g. "0.5.2" (retained, published once on connect)
+{mqttTopic}/system/build           Build number (retained, published once on connect)
+{mqttTopic}/system/mac             Device MAC address (retained, published once on connect)
 
 # Control topics (subscribe)
 {mqttTopic}/relay/set              Set relay (0/1)
@@ -663,7 +666,7 @@ Stored as JSON in LittleFS (`/config.json`).
 
 - Typography: system font stack (`-apple-system, BlinkMacSystemFont, "Segoe UI"`)
 - Card/box/section titles consistently in violet, uppercase (`.card-title`, `.sec`, `.gpio-name`) — **except** Config/System box headers, which use the same violet but at a larger size (`.cfg-box h3`); Grid/PV1/PV2 card titles are gray like other dashboard titles, not violet
-- Card layout for dashboard elements. Dashboard `.card` elements have a **permanent** glowing border (`::before` gradient-mask trick, colored via a `--glow` CSS custom property per card) since they show the "hero" live data; `.cfg-box`/`.gpio-card` elements only glow on `:hover` (a permanent multi-color glow across 4–8 simultaneously visible boxes per tab would look busy)
+- Card layout for dashboard elements. Dashboard `.card` elements have a **permanent** glowing border (`::before` gradient-mask trick, colored via a `--glow` CSS custom property per card) since they show the "hero" live data; `.cfg-box` elements only glow on `:hover` (a permanent multi-color glow across 4–8 simultaneously visible boxes per tab would look busy). `.gpio-card` elements combine both: a `:hover` glow plus a **persistent cyan border** (same `::before` gradient technique, `--glow` defaulting to `transparent` at rest) while the relay/IO channel is currently ON — added 2026-08-11 so an active channel is visually distinguishable at a glance, analogous to the Power Limit card's pending/confirmed glow
 - Status indicators (the big dashboard status text and the small Relay/IO ON/OFF badges) render as **plain glowing text, no pill/badge background** — pill shapes are reserved for actual clickable buttons, so a status indicator is never visually confused with something tappable
 - Responsive: mobile-first, works on a smartphone without zooming
 - No external dependencies — everything in `index.html` (inline CSS + JS + inline SVG logo)
@@ -728,7 +731,7 @@ There is deliberately no frontend timeout that flips a stuck pending state to an
 Four tabs in the main navigation (`nav button`, `showTab()`):
 
 - **Dashboard** — status card, power-limit card, Temp/Limit/Yield/Total cards, PV output (Grid/PV1/PV2 cards) (section 9.2)
-- **Relay / IO** — its own tab (not part of the dashboard) with toggle switches for relay, IO1–IO3, including status badge (called "GPIO / Relay" until 2026-06-18)
+- **Relay / IO** — its own tab (not part of the dashboard) with toggle switches for relay, IO1–IO3, including status badge (called "GPIO / Relay" until 2026-06-18) and a persistent card border glow while a channel is ON (§9.1)
 - **Config** — WiFi (incl. static IP/subnet/gateway), DTU, MQTT, GPIO pin assignment, web server (port, access protection), System (organized within the tab)
 - **System** — firmware OTA (file upload), filesystem OTA (file upload), Internet update (manifest check + install), config backup/restore (download/upload `config.json`), device information, Danger Zone (reboot, factory reset)
 
@@ -794,10 +797,11 @@ The PWA connects to the **MQTT broker** (not to the gateway directly) over **Web
 | File | Description |
 |---|---|
 | `app/index.html` | Main HTML shell |
-| `app/app.js` | Application logic (MQTT/WebSocket connection, data display) |
-| `app/style.css` | Styles |
+| `app/app.js` | Application logic (MQTT/WebSocket connection, data display, controls) |
+| `app/style.css` | Styles — shares the "Neon Flow" palette/component styles with `data/www/index.html` |
 | `app/manifest.json` | PWA manifest (name, icons, display mode) |
-| `app/service-worker.js` | Offline caching (installable on Android/iOS home screens) |
+| `app/service-worker.js` | Offline caching (installable on Android/iOS home screens). `CACHE` version constant must be bumped on every change to `index.html`/`app.js`/`style.css`/`manifest.json`, or installed PWAs keep serving stale content |
+| `app/icon.svg` | App icon (SVG only — no PNG apple-touch-icon yet) |
 
 ### Data Flow
 
@@ -820,7 +824,9 @@ PWA (app/ — browser on any device)
 | Username / password | MQTT credentials |
 | Topic prefix | Must match the gateway's `mqttTopic` (default: `hmsgws3_XXXXXX`) |
 
-The PWA subscribes to the read-only data topics (grid power, PV1/PV2 power, daily energy, temperature, power limit). It does not publish to any control topics.
+The PWA subscribes to `{mqttTopic}/#` (the full topic tree — grid/PV power, daily/total energy, temperature, power limit, relay/IO state, `system/fw|build|mac`) and publishes the same control topics as the local dashboard (§5.3 "Control topics"): power limit set, relay/IO set. Controls update optimistically on send (same pattern as `data/www/index.html`'s `setGpio()`/`setLimit()`) and are re-confirmed once the retained state topic echoes back — a slider/switch pending a still-unconfirmed value turns pink, matching the local dashboard's convention.
+
+The PWA's layout mirrors `data/www/index.html`'s dashboard tab (Grid/PV1/PV2 cards, Temp/Limit/Yield/Total cards, Status + Power Limit side by side, Relay/IO cards) without the tab structure — WiFi config, OTA, and backup/restore are gateway-local features that don't apply over MQTT, so the PWA has no equivalent of the Config/System tabs, only a connection-settings overlay.
 
 ---
 
