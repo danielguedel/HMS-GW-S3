@@ -1,9 +1,9 @@
 {
-  "version": "0.5.1",
-  "buildNumber": 345,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-345/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-345/littlefs.bin",
-  "md5": "c721e79d229f0729c545c2727709d2ca",
-  "fs_md5": "67866ba54e696e27658161b86c82c2eb",
-  "notes": "PWA/Web-GUI Status-Layout, Header (MQTT-Label, Datum/Uhrzeit, FW/Build/MAC), Relay/IO Rand-Glow bei aktivem Zustand, PWA optimistisches UI-Verhalten (analog Web-GUI)"
+  "version": "0.5.2",
+  "buildNumber": 346,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-346/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-346/littlefs.bin",
+  "md5": "1c4f4f2819569d1ce05ac5c2d167f5b1",
+  "fs_md5": "afda5ae7eeb05d13ed6211da17b63373",
+  "notes": "Relais/IO-Zustand wird jetzt immer retained publiziert - PWA zeigt den korrekten Zustand sofort beim Verbinden statt erst beim naechsten Umschalten. Power-Limit-Balken folgt jetzt dem Regler und faerbt sich waehrend eines unbestaetigten Limits pink."
 }
