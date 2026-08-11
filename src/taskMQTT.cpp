@@ -102,12 +102,16 @@ static void publishPvData(const DataStore::PvData& pv) {
 }
 
 // --- Publish GPIO state -------------------------------------------------------
+// Always retained regardless of appConfig.mqttRetain (same reasoning as the
+// daily/total yield topics in publishPvData()): the gateway only publishes on
+// a state *change*, so a client that subscribes later (e.g. the PWA, which
+// connects on-demand rather than staying subscribed) would otherwise have no
+// way to learn the current relay/IO state until the next toggle.
 static void publishGpioState(const DataStore::GpioState& gpio) {
-    bool r = appConfig.mqttRetain;
-    pub("relay/state", gpio.relay ? "1" : "0", r);
+    pub("relay/state", gpio.relay ? "1" : "0", true);
     for (int i = 0; i < 3; i++) {
         char topic[24]; snprintf(topic, sizeof(topic), "io%d/state", i + 1);
-        pub(topic, gpio.gpio[i] ? "1" : "0", r);
+        pub(topic, gpio.gpio[i] ? "1" : "0", true);
     }
 }
 
