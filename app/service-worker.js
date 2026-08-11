@@ -6,7 +6,7 @@
 // changes. Browsers only re-check the app shell when this file's own bytes
 // change - if only e.g. app.js changed, installed PWAs would keep serving the
 // stale cached version indefinitely otherwise.
-const CACHE = 'hms-gw-s3-remote-v6';
+const CACHE = 'hms-gw-s3-remote-v7';
 const SHELL = [
   './',
   './index.html',

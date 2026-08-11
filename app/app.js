@@ -19,7 +19,7 @@ let cfg = null;
 const I18N = {
   en: {
     btnSettings: 'Settings', secLive: 'Live', secStatus: 'Status', secSystem: 'System',
-    secControl: 'Control', secPowerLimit: 'Power Limit',
+    secControl: 'Control', secRelayIo: 'Relay / IO', secPowerLimit: 'Power Limit',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Yield today', statTotal: 'Total',
     statActive: 'Active', statStandby: 'Standby', statNoData: 'No data', statOffline: 'Offline',
     btnSet: 'Set', lblRelay: 'Relay', lblIo1: 'IO1', lblIo2: 'IO2', lblIo3: 'IO3',
@@ -32,7 +32,7 @@ const I18N = {
   },
   de: {
     btnSettings: 'Einstellungen', secLive: 'Live', secStatus: 'Status', secSystem: 'System',
-    secControl: 'Steuerung', secPowerLimit: 'Leistungsbegrenzung',
+    secControl: 'Steuerung', secRelayIo: 'Relais / E/A', secPowerLimit: 'Leistungsbegrenzung',
     statTemp: 'Temp', statLimit: 'Limit', statYieldToday: 'Ertrag heute', statTotal: 'Gesamt',
     statActive: 'Aktiv', statStandby: 'Standby', statNoData: 'Keine Daten', statOffline: 'Offline',
     btnSet: 'Setzen', lblRelay: 'Relais', lblIo1: 'EA1', lblIo2: 'EA2', lblIo3: 'EA3',
