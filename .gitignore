@@ -40,3 +40,7 @@ package-lock.json
 .agents/
 .playwright/
 skills-lock.json
+
+# Claude Code local/machine-specific (never commit)
+.claude/settings.local.json
+.claude/memory/
