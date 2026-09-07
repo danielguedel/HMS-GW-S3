@@ -38,6 +38,5 @@ package-lock.json
 
 # Personal AI-tooling, not project source
 .agents/
-.claude/skills/
 .playwright/
 skills-lock.json
