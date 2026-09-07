@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HMS-GW-S3 — User Guide</title>
+<script src="paged.polyfill.js"></script>
+<style>
+  :root {
+    --ink: #16161f; --muted: #5b5b70; --border: #dcdce6; --bg-soft: #f4f5fa;
+    --cyan: #0a89a6; --cyan-bg: #e6f6f9; --pink: #b3186f; --pink-bg: #fbe9f3;
+    --violet: #6b3fb0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    color: var(--ink); font-size: 12.5px; line-height: 1.55;
+  }
+  @page {
+    size: A4; margin: 20mm 18mm 22mm 18mm;
+    @top-center { content: "HMS-GW-S3 User Guide  ·  v0.5.2"; font-family: "Segoe UI", sans-serif; font-size: 8px; color: #8a8aa0; letter-spacing: .3px; }
+    @bottom-center { content: "Page " counter(page) " of " counter(pages); font-family: "Segoe UI", sans-serif; font-size: 8px; color: #8a8aa0; }
+  }
+  @page :first { @top-center { content: none; } @bottom-center { content: none; } }
+
+  /* ---- Cover page ---- */
+  .cover { break-after: page; text-align: center; padding-top: 70mm; }
+  .cover .logo { display: inline-flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 18mm; }
+  .cover .logo svg { width: 34px; height: 30px; }
+  .cover h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: .5px; }
+  .cover .sub { font-size: 14px; color: var(--muted); margin-bottom: 40mm; }
+  .cover .meta { font-size: 11px; color: var(--muted); }
+  .cover .meta b { color: var(--ink); }
+  .cover .bar { width: 60px; height: 3px; background: linear-gradient(90deg, var(--cyan), var(--pink)); margin: 6mm auto; border-radius: 2px; }
+
+  /* ---- TOC ---- */
+  .toc { break-after: page; }
+  .toc h2 { border: none; }
+  .toc ol { list-style: none; padding: 0; margin: 8px 0 0; counter-reset: toc; }
+  .toc li { counter-increment: toc; padding: 5px 0; border-bottom: 1px dotted var(--border); display: flex; }
+  .toc li a { text-decoration: none; color: var(--ink); flex: 1; display: flex; justify-content: space-between; align-items: baseline; }
+  .toc li a::after { content: target-counter(attr(href), page); color: var(--cyan); font-weight: 700; margin-left: 10px; }
+  .toc li::before { content: counter(toc) ". "; color: var(--cyan); font-weight: 700; width: 22px; display: inline-block; }
+
+  /* ---- Headings ---- */
+  h1 { font-size: 19px; color: var(--ink); border-bottom: 2.5px solid var(--cyan); padding-bottom: 5px; margin: 0 0 12px; break-before: page; }
+  section:first-of-type h1 { break-before: avoid; }
+  h2 { font-size: 14.5px; color: var(--violet); margin: 20px 0 8px; }
+  h3 { font-size: 12.5px; color: var(--ink); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+  p { margin: 0 0 9px; }
+  ul, ol { margin: 0 0 9px; padding-left: 20px; }
+  li { margin-bottom: 3px; }
+  strong { color: var(--ink); }
+  code { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-family: Consolas, "Courier New", monospace; font-size: 11px; }
+  a { color: var(--cyan); }
+
+  /* ---- Callouts ---- */
+  .tip, .warn { border-radius: 6px; padding: 9px 12px; margin: 10px 0; font-size: 11.5px; }
+  .tip { background: var(--cyan-bg); border-left: 4px solid var(--cyan); }
+  .warn { background: var(--pink-bg); border-left: 4px solid var(--pink); }
+  .tip b, .warn b { display: block; margin-bottom: 2px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; }
+  .tip b { color: var(--cyan); } .warn b { color: var(--pink); }
+
+  /* ---- Step lists ---- */
+  .steps { counter-reset: step; list-style: none; padding: 0; margin: 10px 0; }
+  .steps li { counter-increment: step; position: relative; padding-left: 30px; margin-bottom: 8px; }
+  .steps li::before {
+    content: counter(step); position: absolute; left: 0; top: -1px;
+    width: 20px; height: 20px; border-radius: 50%; background: var(--cyan); color: #fff;
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ---- Field reference table ---- */
+  table.fields { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 11px; }
+  table.fields th, table.fields td { border: 1px solid var(--border); padding: 5px 8px; text-align: left; vertical-align: top; }
+  table.fields th { background: var(--bg-soft); color: var(--muted); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; }
+  table.fields tr:nth-child(even) td { background: #fbfbfd; }
+  table.fields td.field { font-weight: 600; white-space: nowrap; }
+
+  /* ---- Mockup illustrations ---- */
+  .mock { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: #fcfcfe; margin: 10px 0 6px; }
+  .mock-cap { font-size: 10px; color: var(--muted); text-align: center; margin-bottom: 14px; }
+  .mock-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mock-card { border: 1.5px solid var(--border); border-radius: 8px; padding: 8px; }
+  .mock-card.glow-cyan { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan) inset; }
+  .mock-card.glow-violet { border-color: var(--violet); box-shadow: 0 0 0 1px var(--violet) inset; }
+  .mock-card.glow-pink { border-color: var(--pink); box-shadow: 0 0 0 1px var(--pink) inset; }
+  .mock-title { font-size: 8.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
+  .mock-val { font-size: 15px; font-weight: 700; }
+  .mock-val.cyan { color: var(--cyan); } .mock-val.violet { color: var(--violet); } .mock-val.pink { color: var(--pink); }
+  .mock-sub { font-size: 8px; color: var(--muted); margin-top: 3px; }
+  .mock-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .mock-toggle { display: inline-block; width: 26px; height: 14px; border-radius: 8px; background: var(--border); position: relative; vertical-align: middle; margin-right: 6px; }
+  .mock-toggle.on { background: var(--cyan); }
+  .mock-toggle::after { content: ""; position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #fff; top: 2px; left: 2px; }
+  .mock-toggle.on::after { left: 14px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0 14px; font-size: 11px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .swatch.cyan { background: var(--cyan); } .swatch.violet { background: var(--violet); } .swatch.pink { background: var(--pink); }
+
+  .tabs-nav { display: flex; gap: 2px; border-bottom: 2px solid var(--border); margin: 4px 0 14px; font-size: 10.5px; }
+  .tabs-nav span { padding: 6px 12px; color: var(--muted); }
+  .tabs-nav span.active { color: var(--cyan); border-bottom: 2px solid var(--cyan); margin-bottom: -2px; font-weight: 600; }
+
+  footer.pf { position: running(footer); }
+  .pagefoot { font-size: 9px; color: var(--muted); text-align: center; margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="logo">
+    <svg viewBox="0 0 115 100" aria-hidden="true">
+      <path d="M55 6 L24 50 L44 50 L34 94 L80 40 L56 40 Z" fill="none" stroke="#b3186f" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M75 18 a32 32 0 0 1 0 64" stroke="#0a89a6" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M75 30 a20 20 0 0 1 0 40" stroke="#0a89a6" stroke-width="7" stroke-linecap="round" fill="none"/>
+    </svg>
+    <span style="font-size:22px; font-weight:800;">HMS-GW-S3</span>
+  </div>
+  <h1>Web Dashboard — User Guide</h1>
+  <div class="bar"></div>
+  <div class="sub">Gateway for the Hoymiles HMS-800W-2T solar inverter</div>
+  <div class="meta">
+    Firmware <b>v0.5.2</b> and later &nbsp;·&nbsp; Document date <b>2026-08-11</b><br>
+    <a href="https://github.com/danielguedel/HMS-GW-S3">github.com/danielguedel/HMS-GW-S3</a>
+  </div>
+</div>
+
+<!-- ============ TOC ============ -->
+<div class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#s1">Introduction</a></li>
+    <li><a href="#s2">Getting Started</a></li>
+    <li><a href="#s3">The Dashboard Tab</a></li>
+    <li><a href="#s4">The Relay / IO Tab</a></li>
+    <li><a href="#s5">The Config Tab</a></li>
+    <li><a href="#s6">The System Tab</a></li>
+    <li><a href="#s7">Remote Access (Mobile App)</a></li>
+    <li><a href="#s8">Troubleshooting</a></li>
+    <li><a href="#s9">Appendix: Status Colour Legend</a></li>
+  </ol>
+</div>
+
+<!-- ============ 1. INTRODUCTION ============ -->
+<section id="s1">
+<h1>1. Introduction</h1>
+
+<p>The HMS-GW-S3 gateway reads live data from your Hoymiles HMS-800W-2T solar inverter and makes it available through a built-in <strong>web dashboard</strong> — no app, no cloud account, no installation required. Just open a browser and point it at the gateway's IP address.</p>
+
+<p>This guide covers everything you can do from that dashboard: monitoring live solar output, controlling the relay and auxiliary IOs, changing WiFi/MQTT/network settings, and updating the firmware.</p>
+
+<div class="tip"><b>Also available</b>A companion Progressive Web App for viewing and controlling the gateway from outside your home network is covered briefly in §7 and described in full in the project's README.</div>
+
+<h2>What you need</h2>
+<ul>
+  <li>A device with a modern web browser (phone, tablet, laptop, desktop — any OS)</li>
+  <li>The gateway connected to your WiFi network (see §2 if this is a first-time setup)</li>
+  <li>The gateway's IP address, or its factory-default access point if it isn't on your network yet</li>
+</ul>
+</section>
+
+<!-- ============ 2. GETTING STARTED ============ -->
+<section id="s2">
+<h1>2. Getting Started</h1>
+
+<h2>2.1 First connection (factory-new device)</h2>
+<p>Out of the box, the gateway cannot yet know your home WiFi credentials, so it opens its own temporary access point:</p>
+
+<ol class="steps">
+  <li>On your phone or laptop, open the WiFi settings and connect to the network named <code>HMS-GW-S3</code>. No password is required.</li>
+  <li>Open a browser and go to <code>http://192.168.4.1</code>.</li>
+  <li>The dashboard loads. Switch to the <strong>Config</strong> tab (see §5) and enter your home WiFi network name (SSID) and password under the "WiFi" section.</li>
+  <li>Click <strong>Save</strong>. The gateway restarts and connects to your home network.</li>
+</ol>
+
+<div class="warn"><b>Note</b>Once connected to your home network, the temporary <code>HMS-GW-S3</code> access point disappears — you'll need the gateway's new IP address to reach it again (see below).</div>
+
+<h2>2.2 Finding the gateway on your network</h2>
+<p>After the WiFi setup above, the gateway gets its address from your router (DHCP) unless you configured a static IP. The most reliable way to find it:</p>
+<ul>
+  <li>Open your router's admin page and look at the list of connected devices for one named <code>HMS-GW-S3</code> (or similar).</li>
+  <li>Alternatively, check the gateway's status LED behaviour or serial console output if you have access to it (see the project's technical specification for LED colour meanings).</li>
+</ul>
+<p>There is no <code>.local</code> hostname — the gateway must be reached by its numeric IP address (e.g. <code>http://192.168.1.42</code>).</p>
+
+<h2>2.3 Bookmark it</h2>
+<p>Once you know the address, bookmark it in your browser for quick access later. If you later assign the gateway a static IP (Config tab → Network), that address won't change again.</p>
+</section>
+
+<!-- ============ 3. DASHBOARD ============ -->
+<section id="s3">
+<h1>3. The Dashboard Tab</h1>
+
+<p>The Dashboard is the default view and shows live data at a glance. It refreshes automatically every 10 seconds — no need to reload the page.</p>
+
+<h2>3.1 Layout overview</h2>
+<div class="mock">
+  <div class="mock-cap">Fig. 1 — Dashboard layout (illustrative, not a real screenshot)</div>
+  <div class="mock-row2" style="margin-top:0;">
+    <div class="mock-card"><div class="mock-title">Status</div><div class="mock-val cyan">Active</div></div>
+    <div class="mock-card"><div class="mock-title">Power Limit</div><div class="mock-val cyan">100 %</div><div class="mock-sub">▬▬▬▬▬●&nbsp;&nbsp;[ Set ]</div></div>
+  </div>
+  <div class="mock-grid" style="margin-top:8px;">
+    <div class="mock-card"><div class="mock-title">Temp</div><div class="mock-val" style="color:#555">45.2 °C</div></div>
+    <div class="mock-card"><div class="mock-title">Limit</div><div class="mock-val" style="color:#555">100 %</div></div>
+    <div class="mock-card"><div class="mock-title">Yield today</div><div class="mock-val" style="color:#555">3.04 kWh</div></div>
+  </div>
+  <div class="mock-grid" style="margin-top:8px;">
+    <div class="mock-card glow-cyan"><div class="mock-title">Grid</div><div class="mock-val cyan">610 W</div><div class="mock-sub">241.9 V / 2.5 A</div></div>
+    <div class="mock-card glow-violet"><div class="mock-title">PV1</div><div class="mock-val violet">353 W</div><div class="mock-sub">26.6 V / 1.3 A</div></div>
+    <div class="mock-card glow-cyan"><div class="mock-title">PV2</div><div class="mock-val cyan">190 W</div><div class="mock-sub">27.7 V / 0.7 A</div></div>
+  </div>
+</div>
+
+<h2>3.2 Status card</h2>
+<p>Shows one of four states, colour-coded (see §9 for the full colour legend):</p>
+<table class="fields">
+<tr><th>Label</th><th>Meaning</th></tr>
+<tr><td class="field">Active</td><td>WiFi, DTU and MQTT are all connected, and the inverter is currently feeding power into the grid. Shown in cyan.</td></tr>
+<tr><td class="field">Standby</td><td>Everything is connected, but the inverter isn't producing right now (e.g. at night, or too little sunlight).</td></tr>
+<tr><td class="field">No data</td><td>Everything is connected, but no reading has arrived yet (briefly shown right after startup).</td></tr>
+<tr><td class="field">Offline</td><td>WiFi, the DTU link, or MQTT is not connected.</td></tr>
+</table>
+
+<h2>3.3 Power Limit card</h2>
+<p>Lets you cap how much power the inverter is allowed to feed into the grid, as a percentage of its rated output.</p>
+<ol class="steps">
+  <li>Drag the slider to the desired percentage.</li>
+  <li>Click <strong>Set</strong> to send the new value.</li>
+  <li>The card border turns <strong>pink</strong> while the change is in flight, and back to <strong>cyan</strong> once the inverter confirms it (usually within a few seconds).</li>
+</ol>
+<div class="tip"><b>Tip</b>If a sent limit never turns cyan, the inverter may be unreachable (e.g. the DTU link is down) — check the Status card and the DTU settings in the Config tab.</div>
+
+<h2>3.4 Temp / Limit / Yield today / Total cards</h2>
+<p>Inverter temperature, the currently confirmed power limit, and today's/all-time energy yield across both PV strings and the grid connection combined.</p>
+
+<h2>3.5 Grid / PV1 / PV2 cards</h2>
+<p>Live power (W), voltage and current for the grid connection and each of the two PV strings. The card border and the power figure change colour depending on the current output level — see §9 for exact thresholds. This gives you an at-a-glance sense of how much each string is producing, even from across the room.</p>
+
+<h2>3.6 Header</h2>
+<p>At the top of every page: three status dots (WiFi / DTU / MQTT — lit when connected), a language toggle (<code>DE</code>/<code>EN</code>), and an info bar showing the device's MAC address, firmware version and build number, plus the current date and time.</p>
+</section>
+
+<!-- ============ 4. RELAY / IO ============ -->
+<section id="s4">
+<h1>4. The Relay / IO Tab</h1>
+
+<p>Four independent switchable channels: the <strong>Relay</strong> output and three general-purpose <strong>IO</strong> pins (which channel maps to which physical GPIO depends on your configuration — see Config → System/GPIO in the technical specification for wiring details).</p>
+
+<div class="mock">
+  <div class="mock-cap">Fig. 2 — Relay / IO tab (illustrative)</div>
+  <div class="mock-grid">
+    <div class="mock-card glow-cyan" style="text-align:center;"><div class="mock-title">Relay</div><div style="margin:6px 0;"><span class="mock-toggle on"></span></div><div class="mock-val cyan" style="font-size:11px;">ON</div></div>
+    <div class="mock-card" style="text-align:center;"><div class="mock-title">IO1</div><div style="margin:6px 0;"><span class="mock-toggle"></span></div><div class="mock-val" style="font-size:11px;color:#888">OFF</div></div>
+    <div class="mock-card" style="text-align:center;"><div class="mock-title">IO2</div><div style="margin:6px 0;"><span class="mock-toggle"></span></div><div class="mock-val" style="font-size:11px;color:#888">OFF</div></div>
+  </div>
+</div>
+
+<ol class="steps">
+  <li>Tap or click a toggle switch to turn that channel on or off.</li>
+  <li>The switch and the small ON/OFF label update immediately once the gateway confirms the change.</li>
+  <li>A card whose channel is currently <strong>ON</strong> gets a glowing cyan border, so active channels stand out even in a quick glance.</li>
+</ol>
+
+<p>Typical uses: switching an external contactor or pump via the relay, or reading/driving auxiliary equipment via the IO pins (exact wiring and pin assignment is a one-time setup done by whoever installed the gateway).</p>
+</section>
+
+<!-- ============ 5. CONFIG ============ -->
+<section id="s5">
+<h1>5. The Config Tab</h1>
+<p>All device settings live here, grouped into boxes. Change what you need, then click <strong>Save</strong> at the bottom of the page — the gateway restarts to apply the new configuration. <strong>Reset</strong> discards unsaved changes and reloads the current values from the device.</p>
+
+<h2>5.1 WiFi</h2>
+<table class="fields">
+<tr><th>Field</th><th>Description</th></tr>
+<tr><td class="field">SSID</td><td>Your WiFi network name.</td></tr>
+<tr><td class="field">Password</td><td>Your WiFi password. Leave the field as-is to keep the current password unchanged.</td></tr>
+<tr><td class="field">AP fallback if no STA</td><td>If enabled, the gateway re-opens its own <code>HMS-GW-S3</code> access point whenever it can't reach your home WiFi — useful if you ever need to reconfigure it without physical access.</td></tr>
+</table>
+
+<h2>5.2 Network</h2>
+<table class="fields">
+<tr><th>Field</th><th>Description</th></tr>
+<tr><td class="field">Static IP address</td><td>Enable to give the gateway a fixed address instead of one assigned automatically by your router (DHCP). Recommended once everything is working, so the address never changes.</td></tr>
+<tr><td class="field">IP Address / Subnet Mask / Gateway</td><td>Only used when static IP is enabled. The gateway address is also used as the DNS server.</td></tr>
+</table>
+
+<h2>5.3 DTU (Hoymiles)</h2>
+<p>Connection settings for the inverter's built-in DTU (data transfer unit). These are normally pre-configured correctly and rarely need changes — the poll interval and reconnect behaviour can be tuned here if needed.</p>
+
+<h2>5.4 MQTT</h2>
+<p>MQTT lets the gateway publish live data to a broker, for use with Home Assistant, the mobile app, or any other MQTT client.</p>
+<table class="fields">
+<tr><th>Field</th><th>Description</th></tr>
+<tr><td class="field">Broker Host / Port</td><td>Address of your MQTT broker. Port switches automatically between 1883 (plain) and 8883 (TLS) when you toggle TLS.</td></tr>
+<tr><td class="field">Username / Password</td><td>Broker login credentials, if required.</td></tr>
+<tr><td class="field">Topic</td><td>Prefix under which all data is published (defaults to a unique <code>hmsgws3_XXXXXX</code> per device).</td></tr>
+<tr><td class="field">TLS</td><td>Encrypts the connection to the broker — required for brokers reachable over the internet.</td></tr>
+<tr><td class="field">HA Auto-Discovery</td><td>Automatically registers all sensors/switches in Home Assistant — no manual YAML configuration needed.</td></tr>
+<tr><td class="field">OpenDTU mode</td><td>Publishes using the OpenDTU-compatible topic layout, for tools expecting that format instead of this gateway's own.</td></tr>
+<tr><td class="field">Retain (live values)</td><td>Keeps the last live reading available to newly-connecting clients. Daily/total yield and relay/IO state are always kept available regardless of this setting.</td></tr>
+</table>
+
+<h2>5.5 Power Control</h2>
+<p>The default power limit applied on startup, and an optional timeout after which a manually-set limit automatically reverts to that default.</p>
+
+<h2>5.6 NTP &amp; Time</h2>
+<p>The time server used to keep the gateway's clock accurate, and your timezone offset in seconds (e.g. <code>3600</code> for UTC+1).</p>
+
+<h2>5.7 Web Server</h2>
+<p>The port the dashboard itself is served on (default 80), and optional username/password protection for the whole dashboard.</p>
+<div class="warn"><b>Important</b>Port and login-protection changes only take effect after the automatic restart. If you enable protection, your browser will prompt for the new credentials on the next page load — don't lock yourself out by forgetting them (a factory reset, §6.4, is the only way back in).</div>
+
+<h2>5.8 System</h2>
+<p>The onboard status LED's brightness, the verbosity of the serial diagnostic log, and the URL used for automatic Internet update checks (§6.3).</p>
+</section>
+
+<!-- ============ 6. SYSTEM ============ -->
+<section id="s6">
+<h1>6. The System Tab</h1>
+<p>Firmware updates, backups, device information, and administrative actions.</p>
+
+<h2>6.1 Firmware / Filesystem OTA (local upload)</h2>
+<p>If you have a firmware file (<code>firmware.bin</code>) or filesystem image (<code>littlefs.bin</code>) downloaded to your device, you can flash it directly:</p>
+<ol class="steps">
+  <li>Click <strong>Choose File</strong> and select the <code>.bin</code> file.</li>
+  <li>Click <strong>Flash</strong>. A progress bar shows the upload.</li>
+  <li>The gateway restarts automatically once the update completes.</li>
+</ol>
+<div class="warn"><b>Both parts matter</b>Firmware and filesystem are updated independently. A release usually needs <em>both</em> flashed — flashing only the firmware can leave the dashboard page itself outdated even though the device logic is current.</div>
+
+<h2>6.2 Internet Update</h2>
+<p>Checks a version manifest online and offers a one-click install if a newer release is available — no file download needed.</p>
+<ol class="steps">
+  <li>Click <strong>Check</strong>.</li>
+  <li>If an update is available, an <strong>Install now</strong> button appears — click it to download and flash both firmware and filesystem automatically.</li>
+  <li>If you're already on the latest version, this is shown clearly instead.</li>
+</ol>
+
+<h2>6.3 Backup Configuration</h2>
+<p><strong>Download Backup</strong> saves all current settings to a <code>.json</code> file on your device — handy before a factory reset or when setting up a second gateway. WiFi, MQTT and web passwords are <em>not</em> included in the backup; you'll need to re-enter those after a restore.</p>
+<p>To restore: choose a previously-downloaded backup file and click <strong>Restore</strong>. The gateway applies it and restarts.</p>
+
+<h2>6.4 Device Information</h2>
+<p>A read-only summary: firmware version and build number, MAC address, IP address, WiFi signal strength, uptime, free memory, and current NTP time.</p>
+
+<h2>6.5 Danger Zone</h2>
+<table class="fields">
+<tr><th>Action</th><th>Effect</th></tr>
+<tr><td class="field">Reboot</td><td>Restarts the device. All settings are kept.</td></tr>
+<tr><td class="field">Factory reset</td><td>Erases <strong>all</strong> configuration, including WiFi credentials — the device restarts and opens its own <code>HMS-GW-S3</code> access point again, as if brand new (§2.1).</td></tr>
+</table>
+<div class="warn"><b>Before a factory reset</b>Download a configuration backup first (§6.3) if you might want your settings back afterwards — a factory reset cannot be undone.</div>
+</section>
+
+<!-- ============ 7. REMOTE ACCESS ============ -->
+<section id="s7">
+<h1>7. Remote Access (Mobile App)</h1>
+<p>The web dashboard covered in this guide only works while your device is on the same local network as the gateway. For access from anywhere — e.g. checking your solar output while away from home — a companion Progressive Web App is available at <code>app/</code> in the project repository, or hosted at the project's GitHub Pages URL.</p>
+<p>It talks to the gateway indirectly through a cloud MQTT broker instead of connecting to it directly, so it needs a one-time broker setup first (see the project README, section "Cloud MQTT Broker Setup"). Once configured, it offers the same live view and the same controls (power limit, relay, IO) as this web dashboard, installable as a home-screen app on both Android and iOS.</p>
+</section>
+
+<!-- ============ 8. TROUBLESHOOTING ============ -->
+<section id="s8">
+<h1>8. Troubleshooting</h1>
+
+<h2>I can't find the gateway on my network</h2>
+<p>Check your router's connected-devices list for <code>HMS-GW-S3</code>. If it's not there at all, it may still be in its own access-point mode — look for a WiFi network named <code>HMS-GW-S3</code> and connect to it directly (§2.1).</p>
+
+<h2>I forgot my WiFi password / can't reach the device at all</h2>
+<p>If you have physical access to the device, a factory reset (§6.5) clears the WiFi configuration and re-opens the setup access point. There is currently no remote recovery if you can't reach the dashboard at all.</p>
+
+<h2>MQTT won't connect</h2>
+<p>Double-check host, port, username and password in Config → MQTT (§5.4). If using TLS, make sure the port is 8883 (or your broker's TLS port) and that the broker's certificate is trusted by the gateway (see the technical specification for CA-certificate setup).</p>
+
+<h2>An OTA update failed or the device won't boot after one</h2>
+<p>The gateway keeps the previous firmware as a fallback and will not brick from a failed update in normal operation. Power-cycle the device and try the update again; if problems persist, flash both firmware and filesystem locally via USB as described in the project README.</p>
+
+<h2>I'm locked out after enabling web login protection</h2>
+<p>A factory reset (§6.5) is the only way to clear a forgotten dashboard password if you don't have another way in.</p>
+</section>
+
+<!-- ============ 9. APPENDIX ============ -->
+<section id="s9">
+<h1>9. Appendix: Status Colour Legend</h1>
+<p>The dashboard uses a small, consistent colour language throughout — once you know it, every screen reads at a glance:</p>
+<div class="legend">
+  <span><span class="swatch cyan"></span> Cyan — active / connected / confirmed</span>
+  <span><span class="swatch violet"></span> Violet — mid-range value / settings</span>
+  <span><span class="swatch pink"></span> Pink — inactive / disconnected / pending / needs attention</span>
+</div>
+<p>On the Grid/PV1/PV2 cards specifically, colour also reflects the current power level (roughly: cyan at low output, violet at moderate output, pink near the string's maximum) — this is a visual cue only and does not indicate a fault.</p>
+</section>
+
+</body>
+</html>
