@@ -1,3 +1,0 @@
-# Web assets served from LittleFS.
-# index.html is the single-page application (SPA).
-# Flash to device with: pio run -t uploadfs
