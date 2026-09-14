@@ -822,6 +822,7 @@ static void setupRoutes() {
     server->on("/api/gpio",      HTTP_GET, handleApiGpioGet);
     server->on("/api/dtu",       HTTP_GET, handleApiDtuGet);
     server->on("/api/config",    HTTP_GET, handleApiConfigGet);
+    server->on("/api/log",       HTTP_GET, handleApiLog);
 
     server->on("/api/gpio", HTTP_POST, [](AsyncWebServerRequest* r){}, nullptr,
         [](AsyncWebServerRequest* r, uint8_t* d, size_t l, size_t i, size_t t){ handleApiGpioPost(r,d,l,i,t); });
