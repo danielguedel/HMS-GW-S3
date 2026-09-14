@@ -33,6 +33,8 @@ There is no automated test suite (embedded firmware). Verify changes by building
 
 Git commit messages and any GitHub-facing text (PR descriptions, release notes) must be written in English, even though a lot of the pre-existing commit history is in German — don't follow that older convention for new work.
 
+Converse with the user in German in this project (chat responses, clarifying questions, explanations) — this applies to the conversation itself, independent of the English-only rule above for commit messages/GitHub text. Prefer plain chat text over structured question/multi-choice UI widgets for clarifying questions; ask them conversationally instead.
+
 ## Architecture
 
 **DataStore pattern**: all FreeRTOS tasks read/write a single central in-memory `DataStore` (`src/dataStore.cpp`, `include/dataStore.h`) — there are no direct task-to-task dependencies or queues between tasks. When tracing a data flow (e.g. "how does a new PV reading reach MQTT"), look at how the producing task writes to DataStore and how the consuming task polls it, not at any direct call between the two task files.
