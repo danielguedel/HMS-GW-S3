@@ -5,5 +5,5 @@
   "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-367/littlefs.bin",
   "md5": "57eec8cff23a51341652f2b48de68d41",
   "fs_md5": "f0f1d939e1392c0d63c10af2fae3fa38",
-  "notes": "WLAN-Reconnect ueberarbeitet: kein dauerhaftes Haengenbleiben im offenen AP-Fallback mehr nach vorruebergehendem Verbindungsverlust. Konfigurierte Geraete versuchen bei Ausfall still und unbegrenzt weiter, sich zu verbinden. AP-Modus (Config-Aenderung) laesst sich per 3s BOOT-Tastendruck manuell erzwingen (Factory Reset neu bei 10s). wifiApFallback-Einstellung entfernt."
+  "notes": "Reworked WiFi reconnect behavior: the gateway no longer gets stuck permanently in open AP fallback mode after a transient connection loss. Configured devices now silently and indefinitely retry connecting on failure. AP mode (for reconfiguration) can be manually triggered via a 3s BOOT button hold (factory reset threshold raised to 10s). The now-obsolete wifiApFallback setting has been removed."
 }
