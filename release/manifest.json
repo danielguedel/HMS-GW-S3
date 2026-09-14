@@ -1,9 +1,9 @@
 {
-  "version": "0.6.0",
-  "buildNumber": 367,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-367/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-367/littlefs.bin",
-  "md5": "57eec8cff23a51341652f2b48de68d41",
-  "fs_md5": "f0f1d939e1392c0d63c10af2fae3fa38",
-  "notes": "Reworked WiFi reconnect behavior: the gateway no longer gets stuck permanently in open AP fallback mode after a transient connection loss. Configured devices now silently and indefinitely retry connecting on failure. AP mode (for reconfiguration) can be manually triggered via a 3s BOOT button hold (factory reset threshold raised to 10s). The now-obsolete wifiApFallback setting has been removed."
+  "version": "0.7.0",
+  "buildNumber": 372,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-372/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-372/littlefs.bin",
+  "md5": "53d1e308547694f14bd9cd5c025235c3",
+  "fs_md5": "0032e1ed456656bd848b74deee1a64ca",
+  "notes": "Added a persistent, size-capped log file (LittleFS): INFO-and-above events are now retained across reboots, independent of the Serial log level, rotating at 16KB (32KB total budget). Downloadable via the System tab, GET /api/log, or the new serial 'log' command. Also reduced DTU per-cycle telemetry logging noise so the retained history covers meaningfully more time."
 }
