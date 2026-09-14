@@ -1,9 +1,9 @@
 {
-  "version": "0.5.2",
-  "buildNumber": 346,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-346/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-346/littlefs.bin",
-  "md5": "1c4f4f2819569d1ce05ac5c2d167f5b1",
-  "fs_md5": "afda5ae7eeb05d13ed6211da17b63373",
-  "notes": "Relais/IO-Zustand wird jetzt immer retained publiziert - PWA zeigt den korrekten Zustand sofort beim Verbinden statt erst beim naechsten Umschalten. Power-Limit-Balken folgt jetzt dem Regler und faerbt sich waehrend eines unbestaetigten Limits pink."
+  "version": "0.6.0",
+  "buildNumber": 367,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-367/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-367/littlefs.bin",
+  "md5": "57eec8cff23a51341652f2b48de68d41",
+  "fs_md5": "f0f1d939e1392c0d63c10af2fae3fa38",
+  "notes": "WLAN-Reconnect ueberarbeitet: kein dauerhaftes Haengenbleiben im offenen AP-Fallback mehr nach vorruebergehendem Verbindungsverlust. Konfigurierte Geraete versuchen bei Ausfall still und unbegrenzt weiter, sich zu verbinden. AP-Modus (Config-Aenderung) laesst sich per 3s BOOT-Tastendruck manuell erzwingen (Factory Reset neu bei 10s). wifiApFallback-Einstellung entfernt."
 }
