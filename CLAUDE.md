@@ -35,6 +35,8 @@ Git commit messages and any GitHub-facing text (PR descriptions, release notes) 
 
 Converse with the user in German in this project (chat responses, clarifying questions, explanations) — this applies to the conversation itself, independent of the English-only rule above for commit messages/GitHub text. Prefer plain chat text over structured question/multi-choice UI widgets for clarifying questions; ask them conversationally instead.
 
+The user works on this project from two different machines, each with its own Claude Code session — check `git fetch origin -q && git log --oneline <last-known>..origin/main` before nontrivial work, since substantial changes can land from the other session between turns. Claude's own memory for this project is deliberately backed by a separate git repo (symlinked into the session's memory directory) for the same reason, so memory written on one machine shows up on the other — it has its own auto-commit/auto-push mechanism, so don't try to manually `git commit`/`push` memory file edits.
+
 ## Architecture
 
 **DataStore pattern**: all FreeRTOS tasks read/write a single central in-memory `DataStore` (`src/dataStore.cpp`, `include/dataStore.h`) — there are no direct task-to-task dependencies or queues between tasks. When tracing a data flow (e.g. "how does a new PV reading reach MQTT"), look at how the producing task writes to DataStore and how the consuming task polls it, not at any direct call between the two task files.
