@@ -169,7 +169,6 @@ static void cmdGpio() {
 static void cmdConfig() {
     Serial.println("--- WiFi -------------------------------");
     printf_("  ssid        : %s\n",   appConfig.wifiSsid);
-    printf_("  apFallback  : %s\n",   appConfig.wifiApFallback ? "yes" : "no");
     Serial.println("--- DTU --------------------------------");
     printf_("  host        : %s\n",   appConfig.dtuHost);
     printf_("  port        : %d\n",   appConfig.dtuPort);

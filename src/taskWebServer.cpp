@@ -213,7 +213,6 @@ static void handleApiDtuPost(AsyncWebServerRequest* req, uint8_t* data,
 static void handleApiConfigGet(AsyncWebServerRequest* req) {
     JsonDocument doc;
     doc["wifiSsid"]        = appConfig.wifiSsid;
-    doc["wifiApFallback"]  = appConfig.wifiApFallback;
     // passwords never sent back
     doc["useStaticIp"] = appConfig.useStaticIp;
     doc["staticIp"]    = appConfig.staticIp;
@@ -300,7 +299,6 @@ static void handleApiConfigPost(AsyncWebServerRequest* req, uint8_t* data,
         strlcpy(appConfig.wifiSsid, doc["wifiSsid"].as<const char*>(), sizeof(appConfig.wifiSsid));
     if (doc["wifiPass"].is<const char*>())
         strlcpy(appConfig.wifiPass, doc["wifiPass"].as<const char*>(), sizeof(appConfig.wifiPass));
-    if (!doc["wifiApFallback"].isNull()) appConfig.wifiApFallback = doc["wifiApFallback"].as<bool>();
 
     if (!doc["useStaticIp"].isNull()) {
         const char* ip = doc["staticIp"].is<const char*>() ? doc["staticIp"].as<const char*>() : "";

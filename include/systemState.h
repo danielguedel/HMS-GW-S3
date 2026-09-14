@@ -3,14 +3,20 @@
 #include <freertos/event_groups.h>
 
 // --- System EventGroup Bits (Spec §3.3) --------------------------------------
+// WiFi connectivity state
 #define EVT_WIFI_CONNECTED    BIT0
 #define EVT_WIFI_AP_MODE      BIT1
-#define EVT_DTU_ONLINE        BIT2
-#define EVT_MQTT_CONNECTED    BIT3
-#define EVT_DATA_RECEIVED     BIT4
-#define EVT_OTA_RUNNING       BIT5
-#define EVT_FACTORY_RESET     BIT6
+#define EVT_WIFI_FORCE_AP     BIT2
+
+// Peripheral / service connectivity
+#define EVT_DTU_ONLINE        BIT3
+#define EVT_MQTT_CONNECTED    BIT4
+#define EVT_DATA_RECEIVED     BIT5
+
+// System operations
+#define EVT_OTA_RUNNING       BIT6
 #define EVT_REBOOT            BIT7
+#define EVT_FACTORY_RESET     BIT8
 
 extern EventGroupHandle_t systemStateEvents;
 

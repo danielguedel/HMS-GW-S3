@@ -12,6 +12,7 @@ static const uint32_t CONNECT_TIMEOUT_MS   = 15000;
 static const uint32_t MONITOR_INTERVAL_MS  = 5000;
 static const uint32_t NTP_SYNC_TIMEOUT_MS  = 10000;
 static const uint32_t NTP_REFRESH_MS       = 3600000UL;  // 1 hour
+static const uint32_t AP_RETRY_INTERVAL_MS = 60000;      // retry STA every 60s while in AP mode
 
 // --- Helper functions ---------------------------------------------------------
 
@@ -70,11 +71,33 @@ static void startApMode() {
 void taskWiFi(void* pvParameters) {
     LOG_I(MOD_WIFI, "Task started (Core %d)", xPortGetCoreID());
 
+    uint32_t lastApRetryMs = 0;
+
     for (;;) {
-        // -- AP mode active: no further reconnect attempts -------------------
-        if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE) {
-            vTaskDelay(pdMS_TO_TICKS(MONITOR_INTERVAL_MS));
+        // -- Manual AP mode request (BOOT button) -----------------------------
+        if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_FORCE_AP) {
+            xEventGroupClearBits(systemStateEvents, EVT_WIFI_FORCE_AP);
+            LOG_W(MOD_WIFI, "AP mode requested via BOOT button");
+            WiFi.disconnect(true);
+            startApMode();
             continue;
+        }
+
+        // -- AP mode active: periodically retry STA in the background --------
+        if (xEventGroupGetBits(systemStateEvents) & EVT_WIFI_AP_MODE) {
+            uint32_t now = millis();
+            bool captivePortalClientActive = WiFi.softAPgetStationNum() > 0;
+
+            if (!captivePortalClientActive && (now - lastApRetryMs) >= AP_RETRY_INTERVAL_MS) {
+                lastApRetryMs = now;
+                LOG_I(MOD_WIFI, "AP mode active - retrying STA connection to %s", appConfig.wifiSsid);
+                xEventGroupClearBits(systemStateEvents, EVT_WIFI_AP_MODE);
+                // Falls through into the STA-connect block below on this same
+                // iteration rather than waiting for the next loop pass.
+            } else {
+                vTaskDelay(pdMS_TO_TICKS(MONITOR_INTERVAL_MS));
+                continue;
+            }
         }
 
         // -- STA connection attempt ---------------------------------------------
@@ -104,7 +127,7 @@ void taskWiFi(void* pvParameters) {
             WiFi.disconnect(true);
             LOG_W(MOD_WIFI, "Connection failed after %lu ms", (unsigned long)(millis() - startMs));
 
-            if (appConfig.wifiApFallback) {
+            if (appConfig.wifiSsid[0] == 0) {
                 startApMode();
             } else {
                 vTaskDelay(pdMS_TO_TICKS(10000));
@@ -135,7 +158,8 @@ void taskWiFi(void* pvParameters) {
         uint32_t lastNtpMs     = millis();
 
         // -- Connection monitor -----------------------------------------------
-        while (WiFi.status() == WL_CONNECTED) {
+        while (WiFi.status() == WL_CONNECTED &&
+               !(xEventGroupGetBits(systemStateEvents) & EVT_WIFI_FORCE_AP)) {
             vTaskDelay(pdMS_TO_TICKS(1000));
             uint32_t now = millis();
 

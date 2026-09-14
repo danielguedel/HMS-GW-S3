@@ -202,12 +202,13 @@ A FreeRTOS EventGroup is used for system-wide events:
 // Bits (in systemState.h)
 #define EVT_WIFI_CONNECTED    BIT0
 #define EVT_WIFI_AP_MODE      BIT1
-#define EVT_DTU_ONLINE        BIT2
-#define EVT_MQTT_CONNECTED    BIT3
-#define EVT_DATA_RECEIVED     BIT4
-#define EVT_OTA_RUNNING       BIT5
-#define EVT_FACTORY_RESET     BIT6
+#define EVT_WIFI_FORCE_AP     BIT2
+#define EVT_DTU_ONLINE        BIT3
+#define EVT_MQTT_CONNECTED    BIT4
+#define EVT_DATA_RECEIVED     BIT5
+#define EVT_OTA_RUNNING       BIT6
 #define EVT_REBOOT            BIT7
+#define EVT_FACTORY_RESET     BIT8
 ```
 
 Tasks set and read these bits. The DataStore holds the detailed state.
@@ -550,7 +551,6 @@ struct AppConfig {
     // WiFi
     char wifiSsid[33];
     char wifiPass[65];
-    bool wifiApFallback;        // AP mode when WiFi is unavailable
 
     // WiFi — Static IP (useStaticIp=false -> DHCP, default)
     bool useStaticIp;
@@ -617,6 +617,35 @@ struct AppConfig {
     char uiLang[3];             // dashboard display language, "en" or "de", default: "en"
 };
 ```
+
+### 8.0a WiFi Reconnect / AP Mode (implemented 2026-09-14)
+
+`taskWiFi.cpp` distinguishes three situations instead of a single
+`wifiApFallback` toggle (removed):
+
+- **Unconfigured device** (`wifiSsid` empty): a failed STA connect attempt
+  opens the fallback AP (`AP_DEFAULT_SSID`, open, `192.168.4.1`) — unchanged
+  from before, since there is nothing else to try.
+- **Configured device, connection failure**: no automatic AP mode. The task
+  silently keeps retrying `WiFi.begin()` with the stored credentials every
+  10s, indefinitely — no open AP is broadcast during a transient outage
+  (e.g. router maintenance/reconfiguration).
+- **Manual reconfiguration**: holding the BOOT button for `AP_MODE_HOLD_MS`
+  (3s) sets `EVT_WIFI_FORCE_AP`, which makes `taskWiFi` immediately drop any
+  current connection and open the fallback AP so new credentials can be
+  entered via the captive portal — regardless of whether the device was
+  currently connected. Holding past `FACTORY_RESET_HOLD_MS` (10s) additionally
+  triggers a full factory reset (unchanged behavior, just a higher threshold
+  to leave clear separation from the 3s gesture).
+
+Whenever the AP mode is active for any reason, `taskWiFi` retries the stored
+STA credentials every `AP_RETRY_INTERVAL_MS` (60s) in the background, skipping
+the attempt while a captive-portal client is connected (`WiFi.softAPgetStationNum() > 0`)
+so an active reconfiguration session isn't interrupted by a brief AP drop.
+This also acts as a safety net for the manual-trigger case: if the user
+forces AP mode and then doesn't finish reconfiguring, the device
+automatically returns to normal operation once the original network is
+reachable again.
 
 ### 8.0 Static IP (implemented 2026-06-18)
 

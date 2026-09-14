@@ -420,9 +420,6 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
     <h3>WiFi</h3>
     <label><span data-i18n="lblSsid">SSID</span><input type="text" id="c-ssid"></label>
     <label><span data-i18n="lblPassword">Password</span><input type="password" id="c-pass" data-i18n-ph="phUnchanged" placeholder="(leave unchanged)" autocomplete="new-password"></label>
-    <div class="chk-row">
-      <label><input type="checkbox" id="c-apfb"> <span data-i18n="lblApFallback">AP fallback if no STA</span></label>
-    </div>
   </div>
   <div class="cfg-box">
     <h3 data-i18n="hNetwork">Network</h3>
@@ -617,7 +614,7 @@ const I18N = {
     hNetwork: 'Network', hPowerControl: 'Power Control', hNtpTime: 'NTP & Time', hWebServer: 'Web Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
     hBackupConfig: 'Backup Configuration', hDeviceInfo: 'Device Information',
-    lblSsid: 'SSID', lblPassword: 'Password', lblApFallback: 'AP fallback if no STA',
+    lblSsid: 'SSID', lblPassword: 'Password',
     lblStaticIp: 'Static IP address (instead of DHCP)', lblIpAddress: 'IP Address', lblSubnet: 'Subnet Mask',
     lblGateway: 'Gateway (also used as DNS)', lblHostIp: 'Host / IP', lblPort: 'Port',
     lblPollInterval: 'Poll interval (s, min 1)', lblCloudPause: 'Cloud pause (s)',
@@ -669,7 +666,7 @@ const I18N = {
     hNetwork: 'Netzwerk', hPowerControl: 'Leistungsregelung', hNtpTime: 'NTP & Zeit', hWebServer: 'Web-Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
     hBackupConfig: 'Konfiguration sichern', hDeviceInfo: 'Geräteinformationen',
-    lblSsid: 'SSID', lblPassword: 'Passwort', lblApFallback: 'AP-Fallback wenn kein STA',
+    lblSsid: 'SSID', lblPassword: 'Passwort',
     lblStaticIp: 'Feste IP-Adresse (statt DHCP)', lblIpAddress: 'IP-Adresse', lblSubnet: 'Subnetzmaske',
     lblGateway: 'Gateway (wird auch als DNS verwendet)', lblHostIp: 'Host / IP', lblPort: 'Port',
     lblPollInterval: 'Poll-Intervall (s, min 1)', lblCloudPause: 'Cloud-Pause (s)',
@@ -966,7 +963,6 @@ async function loadConfig() {
   try {
     const d = await fetch('/api/config').then(r => r.json());
     $('c-ssid').value        = d.wifiSsid        || '';
-    $('c-apfb').checked      = !!d.wifiApFallback;
     $('c-static-ip').checked = !!d.useStaticIp;
     $('c-ip').value          = d.staticIp         || '';
     $('c-subnet').value      = d.subnet           || '';
@@ -1000,7 +996,6 @@ async function loadConfig() {
 async function saveConfig() {
   const cfg = {
     wifiSsid:           $('c-ssid').value,
-    wifiApFallback:     $('c-apfb').checked,
     useStaticIp:        $('c-static-ip').checked,
     staticIp:           $('c-ip').value,
     subnet:             $('c-subnet').value,

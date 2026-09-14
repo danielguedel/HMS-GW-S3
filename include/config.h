@@ -71,8 +71,9 @@
 #define MQTT_KEEPALIVE_S   60
 #define MQTT_DEFAULT_TOPIC "hmsgws3"
 
-// --- Factory Reset ------------------------------------------------------------
-#define FACTORY_RESET_HOLD_MS  5000   // hold the BOOT button for this duration
+// --- BOOT Button Gestures -------------------------------------------------------
+#define AP_MODE_HOLD_MS        3000    // hold the BOOT button this long to request AP mode
+#define FACTORY_RESET_HOLD_MS  10000   // hold the BOOT button this long for a factory reset
 
 // --- FreeRTOS Task Priorities -------------------------------------------------
 #define TASK_PRIO_WIFI         5
