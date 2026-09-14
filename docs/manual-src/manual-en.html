@@ -18,7 +18,7 @@
   }
   @page {
     size: A4; margin: 20mm 18mm 22mm 18mm;
-    @top-center { content: "HMS-GW-S3 User Guide  ·  v0.5.2"; font-family: "Segoe UI", sans-serif; font-size: 8px; color: #8a8aa0; letter-spacing: .3px; }
+    @top-center { content: "HMS-GW-S3 User Guide  ·  v0.7.2"; font-family: "Segoe UI", sans-serif; font-size: 8px; color: #8a8aa0; letter-spacing: .3px; }
     @bottom-center { content: "Page " counter(page) " of " counter(pages); font-family: "Segoe UI", sans-serif; font-size: 8px; color: #8a8aa0; }
   }
   @page :first { @top-center { content: none; } @bottom-center { content: none; } }
@@ -123,7 +123,7 @@
   <div class="bar"></div>
   <div class="sub">Gateway for the Hoymiles HMS-800W-2T solar inverter</div>
   <div class="meta">
-    Firmware <b>v0.5.2</b> and later &nbsp;·&nbsp; Document date <b>2026-08-11</b><br>
+    Firmware <b>v0.7.2</b> and later &nbsp;·&nbsp; Document date <b>2026-09-14</b><br>
     <a href="https://github.com/danielguedel/HMS-GW-S3">github.com/danielguedel/HMS-GW-S3</a>
   </div>
 </div>
@@ -278,8 +278,11 @@
 <tr><th>Field</th><th>Description</th></tr>
 <tr><td class="field">SSID</td><td>Your WiFi network name.</td></tr>
 <tr><td class="field">Password</td><td>Your WiFi password. Leave the field as-is to keep the current password unchanged.</td></tr>
-<tr><td class="field">AP fallback if no STA</td><td>If enabled, the gateway re-opens its own <code>HMS-GW-S3</code> access point whenever it can't reach your home WiFi — useful if you ever need to reconfigure it without physical access.</td></tr>
 </table>
+
+<p>If the gateway loses its WiFi connection after it has already been configured once, it keeps quietly retrying in the background rather than opening its own access point — so no unsecured WiFi network suddenly appears at home during a router outage. The temporary <code>HMS-GW-S3</code> access point only opens automatically on a factory-fresh device that has never been configured yet (§2.1).</p>
+
+<div class="tip"><b>Reconfiguring WiFi without dashboard access</b>Hold the gateway's physical BOOT button for about 3 seconds to open the <code>HMS-GW-S3</code> access point on demand — handy after changing your home router's WiFi settings. This does not erase any other settings, and if you don't finish reconfiguring within about a minute, the gateway automatically goes back to trying your saved network on its own. Holding the button much longer (about 10 seconds) instead performs a full factory reset — see §6.6.</div>
 
 <h2>5.2 Network</h2>
 <table class="fields">
@@ -312,7 +315,7 @@
 
 <h2>5.7 Web Server</h2>
 <p>The port the dashboard itself is served on (default 80), and optional username/password protection for the whole dashboard.</p>
-<div class="warn"><b>Important</b>Port and login-protection changes only take effect after the automatic restart. If you enable protection, your browser will prompt for the new credentials on the next page load — don't lock yourself out by forgetting them (a factory reset, §6.4, is the only way back in).</div>
+<div class="warn"><b>Important</b>Port and login-protection changes only take effect after the automatic restart. If you enable protection, your browser will prompt for the new credentials on the next page load — don't lock yourself out by forgetting them (a factory reset, §6.6, is the only way back in).</div>
 
 <h2>5.8 System</h2>
 <p>The onboard status LED's brightness, the verbosity of the serial diagnostic log, and the URL used for automatic Internet update checks (§6.3).</p>
@@ -344,16 +347,21 @@
 <p><strong>Download Backup</strong> saves all current settings to a <code>.json</code> file on your device — handy before a factory reset or when setting up a second gateway. WiFi, MQTT and web passwords are <em>not</em> included in the backup; you'll need to re-enter those after a restore.</p>
 <p>To restore: choose a previously-downloaded backup file and click <strong>Restore</strong>. The gateway applies it and restarts.</p>
 
-<h2>6.4 Device Information</h2>
+<h2>6.4 Device Log</h2>
+<p>Downloads a persistent log of the gateway's most important events (informational messages and above), stored on the device itself so it survives reboots — useful for diagnosing something that happened before you had the dashboard open, such as a WiFi outage overnight. Click <strong>Download Log</strong> to save it as a text file.</p>
+<p>The log is capped at 32 KB total and automatically discards the oldest entries once full, so it always holds recent history rather than growing without bound. A firmware or filesystem update clears it.</p>
+
+<h2>6.5 Device Information</h2>
 <p>A read-only summary: firmware version and build number, MAC address, IP address, WiFi signal strength, uptime, free memory, and current NTP time.</p>
 
-<h2>6.5 Danger Zone</h2>
+<h2>6.6 Danger Zone</h2>
 <table class="fields">
 <tr><th>Action</th><th>Effect</th></tr>
 <tr><td class="field">Reboot</td><td>Restarts the device. All settings are kept.</td></tr>
 <tr><td class="field">Factory reset</td><td>Erases <strong>all</strong> configuration, including WiFi credentials — the device restarts and opens its own <code>HMS-GW-S3</code> access point again, as if brand new (§2.1).</td></tr>
 </table>
 <div class="warn"><b>Before a factory reset</b>Download a configuration backup first (§6.3) if you might want your settings back afterwards — a factory reset cannot be undone.</div>
+<p>Both actions are also available directly on the device: hold the physical BOOT button for about 10 seconds for a factory reset, no dashboard needed. A shorter, non-destructive alternative — reopening the WiFi setup access point without erasing anything — only needs about 3 seconds (§5.1).</p>
 </section>
 
 <!-- ============ 7. REMOTE ACCESS ============ -->
@@ -371,7 +379,7 @@
 <p>Check your router's connected-devices list for <code>HMS-GW-S3</code>. If it's not there at all, it may still be in its own access-point mode — look for a WiFi network named <code>HMS-GW-S3</code> and connect to it directly (§2.1).</p>
 
 <h2>I forgot my WiFi password / can't reach the device at all</h2>
-<p>If you have physical access to the device, a factory reset (§6.5) clears the WiFi configuration and re-opens the setup access point. There is currently no remote recovery if you can't reach the dashboard at all.</p>
+<p>If you have physical access to the device, hold the BOOT button for about 3 seconds to reopen the <code>HMS-GW-S3</code> setup access point without erasing any other settings, then reconfigure WiFi as in §2.1. If that doesn't help, a full factory reset (§6.6) clears everything, including WiFi, and starts over. There is currently no remote recovery if you can't reach the dashboard or the device physically at all.</p>
 
 <h2>MQTT won't connect</h2>
 <p>Double-check host, port, username and password in Config → MQTT (§5.4). If using TLS, make sure the port is 8883 (or your broker's TLS port) and that the broker's certificate is trusted by the gateway (see the technical specification for CA-certificate setup).</p>
@@ -380,7 +388,7 @@
 <p>The gateway keeps the previous firmware as a fallback and will not brick from a failed update in normal operation. Power-cycle the device and try the update again; if problems persist, flash both firmware and filesystem locally via USB as described in the project README.</p>
 
 <h2>I'm locked out after enabling web login protection</h2>
-<p>A factory reset (§6.5) is the only way to clear a forgotten dashboard password if you don't have another way in.</p>
+<p>A factory reset (§6.6) is the only way to clear a forgotten dashboard password if you don't have another way in.</p>
 </section>
 
 <!-- ============ 9. APPENDIX ============ -->

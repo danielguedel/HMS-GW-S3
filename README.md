@@ -19,7 +19,7 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | ⚡ Solar data | PV1/PV2 power, voltage, current · Grid feed-in · Daily & total energy · Temperature |
 | 🌐 Web dashboard | Live data, GPIO controls, config tabs — responsive "Neon Flow" dark-glow SPA at `http://<ip>`, English/German UI toggle (preference saved on the device) |
 | 📡 MQTT | Full publish/subscribe · TLS (`mqtts://`, port 8883) · Home Assistant auto-discovery · OpenDTU-compatible mode |
-| 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/dtu`, `/api/config`, `/api/ota/*` |
+| 🔌 REST API | JSON endpoints: `/api/data.json`, `/api/info.json`, `/api/gpio`, `/api/dtu`, `/api/config`, `/api/log`, `/api/ota/*` |
 | 🌈 NeoPixel LED | Onboard WS2812B (GPIO38) — 11 states via colour & animation |
 | 🔀 Relay + 3 IO | Switchable via Web GUI, REST API and MQTT · IO1/IO2 (GPIO2/3) suited for future I2C per datasheet |
 | 🔧 Web config | All settings in browser — WiFi (DHCP or static IP), DTU, MQTT, GPIO, System |
@@ -29,7 +29,8 @@ Based on [dtuGateway](https://github.com/ohAnd/dtuGateway) by ohAnd (Apache 2.0)
 | 🆕 Internet update check | Polls a JSON manifest for newer versions (semver comparison wins over build number) — one-click install from the web GUI, plus a GitHub Actions workflow to publish releases |
 | 📱 PWA remote app | Progressive Web App (`app/`) — view + control (power limit, relay, IO) over MQTT/WebSocket (port 9001), works from outside the local network via a cloud MQTT broker |
 | ☁️ Cloud MQTT setup | `deploy/getting-started.sh` — one-command setup of Eclipse Mosquitto on Docker (TLS + Let's Encrypt) for remote access; `deploy/uninstall.sh` to remove it |
-| 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 20 commands at 115200 baud |
+| 🖥️ Serial console | Structured log output `[HH:MM:SS.mmm] [LVL] [MODULE]` + 21 commands at 115200 baud |
+| 📜 Persistent log file | INFO-and-above events retained on LittleFS across reboots, independent of the Serial log level, rotating at 16 KB (32 KB total) — download via the System tab, `GET /api/log`, or the serial `log` command |
 | 🧵 FreeRTOS | 8 independent tasks on Core 1 — Core 0 reserved for WiFi stack |
 | 🗄️ DataStore | Central in-memory data store — no direct task-to-task dependencies |
 
@@ -171,6 +172,7 @@ esptool.py --chip esp32s3 --baud 921600 \
 | `io2 on\|off` | Set IO2 |
 | `io3 on\|off` | Set IO3 |
 | `loglevel error\|warn\|info\|debug` | Set log level |
+| `log [prev]` | Dump the persistent log file (or the rotated-out previous one) |
 | `tasks` | FreeRTOS task list |
 | `heap` | Heap usage |
 | `uptime` | Uptime (seconds + d/h/m/s) |

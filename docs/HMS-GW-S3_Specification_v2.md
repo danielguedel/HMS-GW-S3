@@ -469,6 +469,7 @@ Discovery messages are sent 5 seconds after the MQTT connect, one every 500ms (p
 | POST | `/api/gpio` | Set GPIO |
 | GET | `/api/dtu` | DTU status (power limit, power limit target, inverter active) |
 | POST | `/api/dtu` | DTU control commands (power limit, reboot, inverter on/off) |
+| GET | `/api/log` | Persistent log file as a download (chronological: `/log.txt.1` then `/log.txt`), plain text |
 | POST | `/update` | OTA firmware update (file upload) |
 | POST | `/updatefs` | OTA filesystem update (file upload) |
 | GET | `/api/ota/check` | Query the last Internet OTA check status |
@@ -960,11 +961,15 @@ mqtt              # MQTT status
 gpio              # GPIO state
 relay on|off      # switch relay
 io1 on|off        # switch IO1
+io2 on|off        # switch IO2
+io3 on|off        # switch IO3
 loglevel <lvl>    # set log level
+log [prev]        # dump the persistent log file (or the rotated-out previous one)
 version           # firmware version
 uptime            # uptime
 heap              # heap usage
 tasks             # FreeRTOS task list
+otainfo           # OTA partition info (running/next, boot state)
 ledtest           # cycle through all LED states (diagnostics)
 ```
 
@@ -999,12 +1004,14 @@ HMS-GW-S3/
 │   ├── dataStore.h             (DataStore struct + API)
 │   ├── systemState.h           (EventGroup bits)
 │   ├── logger.h                (LOG_I/W/E/D macros with ANSI colors)
+│   ├── logFile.h               (persistent log file: append + rotation API)
 │   └── taskLED.h               (setLedState() declaration)
 └── src/
     ├── main.cpp                (setup, task startup, dsInit)
     ├── appConfig.cpp           (load/save config)
     ├── dataStore.cpp           (DataStore implementation)
     ├── logger.cpp              (formatted output HH:MM:SS.mmm)
+    ├── logFile.cpp             (16KB two-file rotation on LittleFS)
     ├── taskWiFi.cpp            (WiFi + NTP as its own task)
     ├── taskDTU.cpp             (TCP + manual Protobuf, no Nanopb)
     ├── taskMQTT.cpp            (esp-mqtt non-blocking, TLS, ESP-IDF 4.x flat API)

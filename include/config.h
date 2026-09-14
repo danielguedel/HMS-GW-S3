@@ -2,7 +2,7 @@
 
 // --- Firmware Version ---------------------------------------------------------
 #ifndef FW_VERSION
-  #define FW_VERSION "0.3.1"
+  #define FW_VERSION "0.7.2"
 #endif
 #ifndef FW_DATE
   #define FW_DATE __DATE__
