@@ -14,7 +14,6 @@ struct AppConfig {
     // WiFi
     char wifiSsid[33];
     char wifiPass[65];
-    bool wifiApFallback;        // fall back to AP mode if WiFi is unreachable
 
     // WiFi  -  Static IP (useStaticIp=false -> DHCP, default)
     bool useStaticIp;

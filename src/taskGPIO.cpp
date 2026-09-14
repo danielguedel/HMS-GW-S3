@@ -25,14 +25,25 @@ static void applyIo(int idx, bool state, DataStore::GpioState& gpio) {
     gpio.gpio[idx] = state;
 }
 
-// --- Factory reset via long BOOT press ---------------------------------------
-// Blocks (busy-waits in this task only) while BOOT_PIN is held low; once held for FACTORY_RESET_HOLD_MS it signals EVT_FACTORY_RESET, shows the LED pattern, and reboots — never returns in that case.
-static void checkFactoryReset() {
+// --- BOOT button gestures: AP mode request / factory reset --------------------
+// Blocks (busy-waits in this task only) while BOOT_PIN is held low. At AP_MODE_HOLD_MS
+// it requests AP mode (EVT_WIFI_FORCE_AP) once and keeps watching; at FACTORY_RESET_HOLD_MS
+// it signals EVT_FACTORY_RESET, shows the LED pattern, and reboots — never returns in that case.
+static void checkBootButton() {
     if (digitalRead(BOOT_PIN) != LOW) return;
     uint32_t pressStart = millis();
+    bool apModeFired = false;
     while (digitalRead(BOOT_PIN) == LOW) {
         vTaskDelay(pdMS_TO_TICKS(100));
-        if ((millis() - pressStart) >= FACTORY_RESET_HOLD_MS) {
+        uint32_t held = millis() - pressStart;
+
+        if (!apModeFired && held >= AP_MODE_HOLD_MS) {
+            apModeFired = true;
+            LOG_W(MOD_GPIO, "AP mode requested (BOOT held %lums)", (unsigned long)held);
+            xEventGroupSetBits(systemStateEvents, EVT_WIFI_FORCE_AP);
+        }
+
+        if (held >= FACTORY_RESET_HOLD_MS) {
             LOG_W(MOD_GPIO, "Factory reset triggered!");
             xEventGroupSetBits(systemStateEvents, EVT_FACTORY_RESET);
             setLedState(LED_FACTORY_RESET);
@@ -127,7 +138,7 @@ void taskGPIO(void* pvParameters) {
         if (inputChanged) dsSetGpio(gpio);
 
         // -- Factory reset check -----------------------------------------------
-        checkFactoryReset();
+        checkBootButton();
 
         vTaskDelay(pdMS_TO_TICKS(20));
     }

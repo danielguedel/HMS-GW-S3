@@ -29,7 +29,6 @@ void configSetDefaults() {
     // WiFi
     strlcpy(appConfig.wifiSsid,  "", sizeof(appConfig.wifiSsid));
     strlcpy(appConfig.wifiPass,  "", sizeof(appConfig.wifiPass));
-    appConfig.wifiApFallback = true;
 
     // WiFi  -  Static IP (default: DHCP)
     appConfig.useStaticIp = false;
@@ -122,8 +121,6 @@ static void applyConfigJson(JsonDocument& doc) {
         strlcpy(appConfig.wifiSsid, doc["wifiSsid"].as<const char*>(), sizeof(appConfig.wifiSsid));
     if (doc["wifiPass"].is<const char*>())
         strlcpy(appConfig.wifiPass, doc["wifiPass"].as<const char*>(), sizeof(appConfig.wifiPass));
-    if (!doc["wifiApFallback"].isNull())
-        appConfig.wifiApFallback = doc["wifiApFallback"].as<bool>();
 
     // WiFi  -  Static IP (only apply if all three fields contain valid IPs)
     if (!doc["useStaticIp"].isNull()) {
@@ -297,7 +294,6 @@ void configSave() {
 
     doc["wifiSsid"]        = appConfig.wifiSsid;
     doc["wifiPass"]        = appConfig.wifiPass;
-    doc["wifiApFallback"]  = appConfig.wifiApFallback;
 
     doc["useStaticIp"] = appConfig.useStaticIp;
     doc["staticIp"]    = appConfig.staticIp;
