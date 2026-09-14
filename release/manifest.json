@@ -1,9 +1,9 @@
 {
-  "version": "0.7.0",
-  "buildNumber": 372,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-372/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-372/littlefs.bin",
-  "md5": "53d1e308547694f14bd9cd5c025235c3",
-  "fs_md5": "0032e1ed456656bd848b74deee1a64ca",
-  "notes": "Added a persistent, size-capped log file (LittleFS): INFO-and-above events are now retained across reboots, independent of the Serial log level, rotating at 16KB (32KB total budget). Downloadable via the System tab, GET /api/log, or the new serial 'log' command. Also reduced DTU per-cycle telemetry logging noise so the retained history covers meaningfully more time."
+  "version": "0.7.1",
+  "buildNumber": 373,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-373/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-373/littlefs.bin",
+  "md5": "4e7da471133652ebd784487e0dd37578",
+  "fs_md5": "48370635ace72434536c3115f148e168",
+  "notes": "Fixed: the new GET /api/log endpoint from v0.7.0 was never actually registered, so it silently returned the dashboard page instead of the log content. No other changes."
 }
