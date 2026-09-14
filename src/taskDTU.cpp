@@ -203,11 +203,11 @@ static bool parseRealDataNew(const uint8_t* data, size_t len, DataStore::PvData&
     pv.grid_tE = pv.pv0_tE + pv.pv1_tE;
     pv.valid   = true;
 
-    LOG_I(MOD_DATA, "PV1: %.1f V / %.2f A / %.0f W  PV2: %.1f V / %.2f A / %.0f W",
+    LOG_D(MOD_DATA, "PV1: %.1f V / %.2f A / %.0f W  PV2: %.1f V / %.2f A / %.0f W",
           pv.pv0_v, pv.pv0_i, pv.pv0_p, pv.pv1_v, pv.pv1_i, pv.pv1_p);
-    LOG_I(MOD_DATA, "Grid: %.1f V / %.2f A / %.0f W  Temp: %.1f Grad Celsius",
+    LOG_D(MOD_DATA, "Grid: %.1f V / %.2f A / %.0f W  Temp: %.1f Grad Celsius",
           pv.grid_v, pv.grid_i, pv.grid_p, pv.temp);
-    LOG_I(MOD_DATA, "Energy today: %.3f kWh  Total: %.3f kWh", pv.grid_dE, pv.grid_tE);
+    LOG_D(MOD_DATA, "Energy today: %.3f kWh  Total: %.3f kWh", pv.grid_dE, pv.grid_tE);
     return true;
 }
 
@@ -304,7 +304,7 @@ static void onData(void*, AsyncClient*, void* data, size_t len) {
     _rxLen = copy;
     xSemaphoreGive(_rxMutex);
     const uint8_t* d = (const uint8_t*)data;
-    if (len >= 4) LOG_I(MOD_DTU, "RX %zu bytes: cmd=%02X%02X  %02X %02X ...", len, d[2],d[3],d[0],d[1]);
+    if (len >= 4) LOG_D(MOD_DTU, "RX %zu bytes: cmd=%02X%02X  %02X %02X ...", len, d[2],d[3],d[0],d[1]);
     // Signal based on what's pending
     if (!_appReady)       { _appReady  = true; return; }
     if (!_dataReady)      { _dataReady = true; return; }
@@ -367,7 +367,7 @@ static bool sendRealDataNew(uint32_t ntpTime) {
     if (!msgLen) return false;
     _dataReady = false;
     _client->write((const char*)msg, msgLen);
-    LOG_I(MOD_DTU, "Sent RealDataNew (%zu bytes)", msgLen);
+    LOG_D(MOD_DTU, "Sent RealDataNew (%zu bytes)", msgLen);
     return true;
 }
 

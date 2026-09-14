@@ -569,6 +569,15 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); box-shadow
   </div>
 
   <div class="cfg-box">
+    <h3 data-i18n="hDeviceLog">Device Log</h3>
+    <p class="hint" data-i18n="pLogHint">
+      Persistent log (INFO and above), capped at 32 KB total across two rotating files. A filesystem update (OTA or uploadfs) clears it.</p>
+    <div class="flex-row">
+      <a class="btn btn-muted" href="/api/log" download="hms-gw-log.txt" data-i18n="btnDownloadLog">Download Log</a>
+    </div>
+  </div>
+
+  <div class="cfg-box">
     <h3 data-i18n="hDeviceInfo">Device Information</h3>
     <div id="sysinfo"></div>
   </div>
@@ -613,7 +622,7 @@ const I18N = {
     secPowerLimit: 'Power Limit', secStatus: 'Status', btnSet: 'Set',
     hNetwork: 'Network', hPowerControl: 'Power Control', hNtpTime: 'NTP & Time', hWebServer: 'Web Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
-    hBackupConfig: 'Backup Configuration', hDeviceInfo: 'Device Information',
+    hBackupConfig: 'Backup Configuration', hDeviceLog: 'Device Log', hDeviceInfo: 'Device Information',
     lblSsid: 'SSID', lblPassword: 'Password',
     lblStaticIp: 'Static IP address (instead of DHCP)', lblIpAddress: 'IP Address', lblSubnet: 'Subnet Mask',
     lblGateway: 'Gateway (also used as DNS)', lblHostIp: 'Host / IP', lblPort: 'Port',
@@ -633,6 +642,8 @@ const I18N = {
     btnCheck: 'Check', btnInstallNow: 'Install now',
     pBackupHint: 'Backup contains all settings except WiFi/MQTT/web passwords (re-enter them after a restore).',
     btnDownloadBackup: 'Download backup', btnRestore: 'Restore',
+    pLogHint: 'Persistent log (INFO and above), capped at 32 KB total across two rotating files. A filesystem update (OTA or uploadfs) clears it.',
+    btnDownloadLog: 'Download log',
     btnRebootGw: 'Reboot', btnFactoryReset: 'Factory reset', hDangerZone: 'Danger Zone',
     lblRebootDevice: 'The device will restart. Current configuration is preserved.',
     lblFactoryResetRow: 'Current configuration will be erased. The device restarts with factory settings.',
@@ -665,7 +676,7 @@ const I18N = {
     secPowerLimit: 'Leistungsbegrenzung', secStatus: 'Status', btnSet: 'Setzen',
     hNetwork: 'Netzwerk', hPowerControl: 'Leistungsregelung', hNtpTime: 'NTP & Zeit', hWebServer: 'Web-Server',
     hFirmwareOta: 'Firmware OTA', hFilesystemOta: 'Filesystem OTA', hInternetUpdate: 'Internet Update',
-    hBackupConfig: 'Konfiguration sichern', hDeviceInfo: 'Geräteinformationen',
+    hBackupConfig: 'Konfiguration sichern', hDeviceLog: 'Geräte-Log', hDeviceInfo: 'Geräteinformationen',
     lblSsid: 'SSID', lblPassword: 'Passwort',
     lblStaticIp: 'Feste IP-Adresse (statt DHCP)', lblIpAddress: 'IP-Adresse', lblSubnet: 'Subnetzmaske',
     lblGateway: 'Gateway (wird auch als DNS verwendet)', lblHostIp: 'Host / IP', lblPort: 'Port',
@@ -685,6 +696,8 @@ const I18N = {
     btnCheck: 'Prüfen', btnInstallNow: 'Jetzt installieren',
     pBackupHint: 'Backup enthält alle Einstellungen ausser WLAN-/MQTT-/Web-Passwörter (nach einer Wiederherstellung erneut eingeben).',
     btnDownloadBackup: 'Backup herunterladen', btnRestore: 'Wiederherstellen',
+    pLogHint: 'Persistentes Log (INFO und höher), auf insgesamt 32 KB über zwei rotierende Dateien begrenzt. Ein Dateisystem-Update (OTA oder uploadfs) löscht es.',
+    btnDownloadLog: 'Log herunterladen',
     btnRebootGw: 'Neustart', btnFactoryReset: 'Werkseinstellungen', hDangerZone: 'Gefahrenzone',
     lblRebootDevice: 'Das Gerät wird neu gestartet. Die aktuelle Konfiguration bleibt erhalten.',
     lblFactoryResetRow: 'Die aktuelle Konfiguration wird gelöscht. Das Gerät startet neu mit Werkseinstellungen.',

@@ -8,6 +8,7 @@
 #include "taskLED.h"
 #include "config.h"
 #include "logger.h"
+#include "logFile.h"
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
@@ -764,6 +765,25 @@ static bool doUrlOtaPartition(const char* url, int partition, const char* expect
     LOG_E(MOD_OTA, "URL-OTA %s end failed: %s", tag, Update.errorString());
     if (partition == U_SPIFFS) restoreConfigAfterFsOta();
     return false;
+}
+
+// --- GET /api/log  -  chronological log download (/log.txt.1 then /log.txt) ---
+static void handleApiLog(AsyncWebServerRequest* req) {
+    String out;
+    out.reserve(LOG_FILE_MAX_BYTES * 2 + 64);   // 32KB cap; avoids realloc churn while building
+
+    File prev = LittleFS.open(LOG_FILE_PATH_PREV, "r");
+    if (prev) { out += prev.readString(); prev.close(); }
+    File cur = LittleFS.open(LOG_FILE_PATH, "r");
+    if (cur)  { out += cur.readString();  cur.close(); }
+
+    if (out.length() == 0) {
+        req->send(200, "text/plain", "(log is empty)\n");
+        return;
+    }
+    AsyncWebServerResponse* res = req->beginResponse(200, "text/plain", out);
+    res->addHeader("Content-Disposition", "attachment; filename=\"hms-gw-log.txt\"");
+    req->send(res);
 }
 
 // --- Captive portal redirect --------------------------------------------------

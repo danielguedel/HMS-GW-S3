@@ -12,6 +12,7 @@
 #include "appConfig.h"
 #include "dataStore.h"
 #include "logger.h"
+#include "logFile.h"
 
 #include "taskWiFi.h"
 #include "taskLED.h"
@@ -51,6 +52,7 @@ void setup() {
     LOG_I(MOD_SYS, "LittleFS: total=%lu B  used=%lu B",
           (unsigned long)LittleFS.totalBytes(),
           (unsigned long)LittleFS.usedBytes());
+    logFileInit();   // enable file-backed logging now that LittleFS is confirmed mounted
 
     // -- 4. Config -------------------------------------------------------------
     configLoad();

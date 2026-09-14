@@ -8,9 +8,11 @@
 #include "systemState.h"
 #include "config.h"
 #include "logger.h"
+#include "logFile.h"
 #include "taskLED.h"
 #include <Arduino.h>
 #include <esp_ota_ops.h>
+#include <LittleFS.h>
 
 // --- Output helpers -----------------------------------------------------------
 
@@ -40,6 +42,7 @@ static void cmdHelp() {
     Serial.println("  io2 on|off        Set IO2");
     Serial.println("  io3 on|off        Set IO3");
     Serial.println("  loglevel error|warn|info|debug");
+    Serial.println("  log [prev]        Dump current log file (or 'log prev' for the rotated-out one)");
     Serial.println("  tasks             FreeRTOS task list");
     Serial.println("  heap              Heap statistics");
     Serial.println("  uptime            Uptime (seconds + d/h/m/s)");
@@ -227,6 +230,21 @@ static void cmdLoglevel(const char* arg) {
     printf_("Log level -> %d (%s)\n", lvl, arg);
 }
 
+static void cmdLog(const char* arg) {
+    const char* path = (arg && strcmp(arg, "prev") == 0) ? LOG_FILE_PATH_PREV : LOG_FILE_PATH;
+    File f = LittleFS.open(path, "r");
+    if (!f) { printf_("No log file (%s)\n", path); return; }
+    printf_("--- %s (%u bytes) ---\n", path, (unsigned)f.size());
+    char buf[128];
+    while (f.available()) {
+        size_t n = f.readBytes(buf, sizeof(buf) - 1);
+        buf[n] = '\0';
+        Serial.print(buf);
+    }
+    f.close();
+    printf_("\n--- end ---\n");
+}
+
 static void cmdLedTest() {
     const struct { LedState_t state; const char* name; } seq[] = {
         { LED_BOOT,            "BOOT"            },
@@ -327,6 +345,7 @@ static void dispatch(char* line) {
     else if (strcmp(verb, "uptime")   == 0) cmdUptime();
     else if (strcmp(verb, "otainfo")  == 0) cmdOtaInfo();
     else if (strcmp(verb, "loglevel") == 0) cmdLoglevel(arg);
+    else if (strcmp(verb, "log")      == 0) cmdLog(arg);
     else if (strcmp(verb, "ledtest")  == 0) cmdLedTest();
     else if (strcmp(verb, "restart")  == 0) cmdRestart();
     else if (strcmp(verb, "reset")    == 0) cmdReset();
