@@ -29,6 +29,10 @@ There is no automated test suite (embedded firmware). Verify changes by building
 
 **`uploadfs` over USB erases `/config.json`** on an already-configured device — it writes LittleFS directly via esptool, bypassing the app's own backup logic that runs during a Filesystem-OTA. Only Filesystem-OTA (`/updatefs` endpoint or the Internet Update flow, both going through the running firmware) preserves config across a filesystem flash.
 
+## Conventions
+
+Git commit messages and any GitHub-facing text (PR descriptions, release notes) must be written in English, even though a lot of the pre-existing commit history is in German — don't follow that older convention for new work.
+
 ## Architecture
 
 **DataStore pattern**: all FreeRTOS tasks read/write a single central in-memory `DataStore` (`src/dataStore.cpp`, `include/dataStore.h`) — there are no direct task-to-task dependencies or queues between tasks. When tracing a data flow (e.g. "how does a new PV reading reach MQTT"), look at how the producing task writes to DataStore and how the consuming task polls it, not at any direct call between the two task files.
