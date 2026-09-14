@@ -1,9 +1,9 @@
 {
-  "version": "0.7.1",
-  "buildNumber": 373,
-  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-373/firmware.bin",
-  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-373/littlefs.bin",
-  "md5": "4e7da471133652ebd784487e0dd37578",
-  "fs_md5": "48370635ace72434536c3115f148e168",
-  "notes": "Fixed: the new GET /api/log endpoint from v0.7.0 was never actually registered, so it silently returned the dashboard page instead of the log content. No other changes."
+  "version": "0.7.2",
+  "buildNumber": 375,
+  "url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-375/firmware.bin",
+  "fs_url": "https://github.com/danielguedel/HMS-GW-S3/releases/download/build-375/littlefs.bin",
+  "md5": "6e62b13bf413e5fe614f09c3f00aa816",
+  "fs_md5": "48801743c138527d7694e358119f9b82",
+  "notes": "Cleaned up the German web UI: unified hyphenation of compound terms (e.g. Firmware-OTA, Dateisystem-OTA, Internet-Update, NTP-Server) and standardized on 'Dateisystem' throughout. Removed the unmaintained design/ mockup folder. No functional changes."
 }
